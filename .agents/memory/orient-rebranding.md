@@ -1,24 +1,25 @@
 ---
-name: Orient ERP rebranding complete
-description: Documents the completed rebranding from Salmon Developer to ORIENT ERP — all IDs, package names, and file paths that were changed.
+name: Wintech Agro — full rebranding history
+description: This app was originally ORIENT ERP (and before that, salmon_app). It is now fully Wintech Agro. All future work must use Wintech Agro identifiers only.
 ---
 
-# Orient ERP Rebranding — Completed
+# Wintech Agro — Rebranding History
 
 ## Rule
-There must be zero "Salmon"/"salmon_app" references in code, config, strings, or comments. The app is ORIENT ERP only.
+This app is **Wintech Agro**. Any new platform config, test file, or package reference must use Wintech Agro identifiers. There must be zero "ORIENT ERP", "orient_app", or "salmon" references in code, config, strings, or comments.
 
-**Why:** The project was originally scaffolded as `salmon_app` but has been fully rebranded to ORIENT ERP. Any new agent should treat this as a green-field ORIENT ERP codebase.
+**Why:** Originally scaffolded as `salmon_app`, then rebranded to ORIENT ERP, then fully rebranded to Wintech Agro. Any new agent should treat this as a Wintech Agro codebase from the start.
 
-**How to apply:** If you ever add a new platform config, test file, or package reference, use the ORIENT ERP identifiers below — never the old salmon ones.
-
-## Canonical Identifiers
-| Identifier | Value |
-|-----------|-------|
-| Dart package name | `orient_app` |
-| Android namespace | `com.example.orient_erp` |
-| Android applicationId | `com.example.orient_erp` |
-| Android MainActivity path | `android/app/src/main/kotlin/com/example/orient_erp/MainActivity.kt` |
-| iOS bundle ID | `com.example.orientErp` |
-| iOS test bundle ID | `com.example.orientErp.RunnerTests` |
-| Root Flutter widget class | `OrientErpApp` (in `lib/main.dart`) |
+## Current Identifiers
+| What | Value |
+|------|-------|
+| Dart package name | `wintech_agro` |
+| Android namespace | `com.example.wintech_agro` |
+| Android applicationId | `com.example.wintech_agro` |
+| iOS bundle ID | `com.example.wintechAgro` |
+| iOS test bundle ID | `com.example.wintechAgro.RunnerTests` |
+| Root Flutter widget class | `WintechAgroApp` (in `lib/main.dart`) |
+| App logo | `assets/images/wintech.png` |
+| Brand color | `#1B9DD9` (Wintech Blue) — `AppTheme.primaryAccent` |
+| Demo SR email | `sr@wintech.com` |
+| SharedPreferences order key | `wintech_orders` |

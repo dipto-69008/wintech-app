@@ -1,30 +1,30 @@
 ---
-name: Orient ERP data model
-description: User roles, data models, and storage conventions for the ORIENT ERP Flutter app.
+name: Wintech Agro data model
+description: User roles, data models, and storage conventions for the Wintech Agro Flutter ERP app.
 ---
 
-# Orient ERP — Data Model & Storage Conventions
+# Wintech Agro — Data Model & Storage Conventions
 
 ## User Roles
-Four roles determined at login, stored locally, read by `home_shell.dart`:
-- **Admin** — `admin@gmail.com` — sales reporting, SR performance, employee management
-- **SR/Employee** — `sr@orient.com` — POS, order list, target tracking, commissions
-- **Customer** — `customer@gmail.com` — credit limit, purchase history
-- **Super Admin** — `superadmin@orient.com` — CEO analytics (routes to `SuperAdminDashboard`, no regular tabs)
+- **Super Admin** — `superadmin@gmail.com` — CEO analytics (routes to `SuperAdminDashboard`, no regular tabs)
+- **Admin** — `admin@gmail.com` — Sales reporting, SR performance
+- **SR/Employee** — `sr@wintech.com` — POS, order list, target tracking, commissions; dashboard shows branch name
+- **Customer** — `customer@gmail.com` — Credit limit, purchase history
 
-## Demo Credentials
-- OTP: `123456`, Password: any value
-
-## Storage
-- All data is local via `SharedPreferences` through `lib/services/local_storage_service.dart`
-- No backend or server; demo data is seeded on first run via `LocalStorageService.seedDemoData()`
+Demo OTP: `123456` | Demo password: any value
 
 ## Key Models (`lib/models/`)
-- `UserModel` — role, creditLimit, creditUsed, targetAmount, achievedAmount
-- `OrderModel` + `OrderItem` — POS orders
-- `LeadModel`, `FollowUpModel` — lead tracking
-- `TargetModel`, `InvestmentModel`, `PropertyModel`, `TutorialModel`
+- `UserModel` — role, branch, creditLimit/Used, targetAmount/achievedAmount, totalSales, badge system
+- `OrderModel` + `OrderItem` — POS orders stored in SharedPreferences under key `wintech_orders`
+- `TargetModel`, `LeadModel`, `FollowUpModel`, `InvestmentModel`, `TutorialModel`
 
-## Theme Convention
-- Colors defined in `lib/config/theme.dart`; primaryAccent = `#8A252C` (maroon)
-- Do not hardcode colors in screen files — always reference AppTheme
+## Storage
+- All data is local via `SharedPreferences` — no backend
+- Service class: `lib/services/local_storage_service.dart`
+- Orders key: `wintech_orders`
+- Current user key: `currentUser`
+- Demo data seeded on first launch via `seedDemoData()`
+
+## SR Branch
+- `UserModel.branch` (String, default `''`) — set in `_demoAccounts` map in local_storage_service
+- Displayed in employee dashboard header: "Wintech Agro — [branch]"

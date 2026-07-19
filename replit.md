@@ -9,8 +9,8 @@
 | Platform | ID |
 |----------|----|
 | Dart package | `wintech_agro` |
-| Android namespace / applicationId | `com.example.orient_erp` |
-| iOS bundle ID | `com.example.orientErp` |
+| Android namespace / applicationId | `com.example.wintech_agro` |
+| iOS bundle ID | `com.example.wintechAgro` |
 
 ## Tech Stack
 - **Framework**: Flutter 3.x / Dart SDK ^3.12.2

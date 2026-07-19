@@ -1,4 +1,4 @@
-package com.example.orient_erp
+package com.example.wintech_agro
 
 import io.flutter.embedding.android.FlutterActivity
 

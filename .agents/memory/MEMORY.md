@@ -1,5 +1,5 @@
 - [Flutter-Replit dev workflow](flutter-replit-workflow.md) — no flutter/dart toolchain on Replit; verify by careful manual code review, not `flutter analyze` or workflows.
-- [Orient ERP data model](orient-erp-data-model.md) — user roles, models, storage conventions for the ORIENT ERP Flutter app.
-- [Orient ERP super admin routing](orient-super-admin-routing.md) — super admin uses CEO analytics view (SuperAdminDashboard), not employee tabs; routed from home_shell.dart.
-- [Orient ERP rebranding complete](orient-rebranding.md) — all Salmon/salmon_app references replaced; new IDs are orient_app / com.example.orient_erp / com.example.orientErp.
-- [Wintech Agro rebranding](wintech-rebranding.md) — ORIENT ERP → Wintech Agro; blue palette #1B9DD9; logo wintech.png; SR branch field added; demo email sr@wintech.com.
+- [Wintech Agro data model](orient-erp-data-model.md) — user roles, models, storage conventions for the Wintech Agro Flutter ERP app.
+- [Wintech Agro super admin routing](orient-super-admin-routing.md) — super admin uses CEO analytics view (SuperAdminDashboard), not employee tabs; routed from home_shell.dart.
+- [Wintech Agro rebranding history](orient-rebranding.md) — app was salmon_app → ORIENT ERP → Wintech Agro; all identifiers are now wintech_agro / com.example.wintech_agro / WintechAgroApp.
+- [Wintech Agro branding details](wintech-rebranding.md) — blue palette #1B9DD9; logo wintech.png; SR branch field; demo email sr@wintech.com.
