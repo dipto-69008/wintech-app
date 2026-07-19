@@ -151,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                   child: ClipOval(
                                     child: Image.asset(
-                                      'assets/images/moon.jpeg',
+                                      'assets/images/wintech.png',
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Container(
                                         color: Colors.white,
@@ -469,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: Image.asset(
-                              'assets/images/moon.jpeg',
+                              'assets/images/wintech.png',
                               width: 40, height: 40,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
@@ -479,7 +479,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '© ২০২৬ ORIENT ERP\nসর্বস্বত্ব সংরক্ষিত',
+                            '© ২০২৬ Wintech Agro\nসর্বস্বত্ব সংরক্ষিত',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12,

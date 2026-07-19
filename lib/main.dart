@@ -43,18 +43,18 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(OrientErpApp(initialDarkMode: isDark));
+  runApp(WintechAgroApp(initialDarkMode: isDark));
 }
 
-class OrientErpApp extends StatefulWidget {
+class WintechAgroApp extends StatefulWidget {
   final bool initialDarkMode;
-  const OrientErpApp({super.key, required this.initialDarkMode});
+  const WintechAgroApp({super.key, required this.initialDarkMode});
 
   @override
-  State<OrientErpApp> createState() => _OrientErpAppState();
+  State<WintechAgroApp> createState() => _WintechAgroAppState();
 }
 
-class _OrientErpAppState extends State<OrientErpApp> {
+class _WintechAgroAppState extends State<WintechAgroApp> {
   late ThemeMode _themeMode;
 
   @override
@@ -70,7 +70,7 @@ class _OrientErpAppState extends State<OrientErpApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Orient',
+      title: 'Wintech Agro',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

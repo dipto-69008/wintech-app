@@ -176,7 +176,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.asset(
-                        'assets/images/moon.jpeg',
+                        'assets/images/wintech.png',
                         width: 36, height: 36,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
@@ -191,7 +191,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('ORIENT ERP',
+                        Text('Wintech Agro',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,

@@ -65,10 +65,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final pdf = pw.Document();
 
     // Colour palette (PDF colours)
-    const brandColor = PdfColor.fromInt(0xFFF5A623);
-    const darkColor = PdfColor.fromInt(0xFF2C2C2C);
-    const greyColor = PdfColor.fromInt(0xFF888888);
-    const lightBg = PdfColor.fromInt(0xFFFFFDF7);
+    const brandColor = PdfColor.fromInt(0xFF1B9DD9);
+    const darkColor = PdfColor.fromInt(0xFF1A2D3D);
+    const greyColor = PdfColor.fromInt(0xFF7A8EA0);
+    const lightBg = PdfColor.fromInt(0xFFF0F8FD);
     const successColor = PdfColor.fromInt(0xFF2E7D32);
     const warningColor = PdfColor.fromInt(0xFFF57F17);
     const errorColor = PdfColor.fromInt(0xFFC62828);
@@ -111,7 +111,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('ORIENT ERP',
+                        pw.Text('Wintech Agro',
                             style: pw.TextStyle(
                                 fontSize: 22,
                                 fontWeight: pw.FontWeight.bold,
@@ -155,7 +155,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         borderRadius:
                             const pw.BorderRadius.all(pw.Radius.circular(8)),
                         border: pw.Border.all(
-                            color: const PdfColor.fromInt(0xFFEEE8DC)),
+                            color: const PdfColor.fromInt(0xFFD6EAF5)),
                       ),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -190,7 +190,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         borderRadius:
                             const pw.BorderRadius.all(pw.Radius.circular(8)),
                         border: pw.Border.all(
-                            color: const PdfColor.fromInt(0xFFEEE8DC)),
+                            color: const PdfColor.fromInt(0xFFD6EAF5)),
                       ),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -227,7 +227,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               pw.SizedBox(height: 6),
               pw.Table(
                 border: pw.TableBorder.all(
-                    color: const PdfColor.fromInt(0xFFEEE8DC), width: 0.5),
+                    color: const PdfColor.fromInt(0xFFD6EAF5), width: 0.5),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(4),
                   1: const pw.FlexColumnWidth(1.5),
@@ -253,7 +253,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     final i = e.key;
                     final item = e.value;
                     final rowBg = i.isOdd
-                        ? const PdfColor.fromInt(0xFFFFFDF7)
+                        ? const PdfColor.fromInt(0xFFF0F8FD)
                         : PdfColors.white;
                     return pw.TableRow(
                       decoration: pw.BoxDecoration(color: rowBg),
@@ -281,7 +281,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       _totalRow('Subtotal', _order.total),
                       pw.Divider(
-                          color: const PdfColor.fromInt(0xFFEEE8DC),
+                          color: const PdfColor.fromInt(0xFFD6EAF5),
                           height: 8),
                       pw.Row(
                         mainAxisAlignment:
@@ -309,11 +309,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 pw.Container(
                   padding: const pw.EdgeInsets.all(12),
                   decoration: pw.BoxDecoration(
-                    color: const PdfColor.fromInt(0xFFFFF3E0),
+                    color: const PdfColor.fromInt(0xFFE1F4FD),
                     borderRadius:
                         const pw.BorderRadius.all(pw.Radius.circular(6)),
                     border: pw.Border.all(
-                        color: const PdfColor.fromInt(0xFFFFB74D)),
+                        color: const PdfColor.fromInt(0xFF56C1E8)),
                   ),
                   child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -337,7 +337,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
               // ── Footer ───────────────────────────────────────────────────
               pw.Divider(
-                  color: const PdfColor.fromInt(0xFFEEE8DC)),
+                  color: const PdfColor.fromInt(0xFFD6EAF5)),
               pw.SizedBox(height: 6),
               pw.Row(
                 mainAxisAlignment:
@@ -347,7 +347,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       'Generated: ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
                       style: const pw.TextStyle(
                           fontSize: 8, color: greyColor)),
-                  pw.Text('ORIENT ERP • orient-erp.com',
+                  pw.Text('Wintech Agro • wintech-agro.com',
                       style: const pw.TextStyle(
                           fontSize: 8, color: greyColor)),
                 ],
@@ -361,7 +361,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
       name:
-          'orient_invoice_${_order.id.substring(0, 8).toUpperCase()}.pdf',
+          'wintech_invoice_${_order.id.substring(0, 8).toUpperCase()}.pdf',
     );
   }
 

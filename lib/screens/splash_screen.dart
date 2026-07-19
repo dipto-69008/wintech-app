@@ -55,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ORIENT ERP Logo
+                // Wintech Agro Logo
                 Container(
                   width: 110,
                   height: 110,
@@ -72,11 +72,11 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
-                    'assets/images/moon.jpeg',
+                    'assets/images/wintech.png',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Center(
                       child: Text(
-                        'OE',
+                        'WA',
                         style: GoogleFonts.hindSiliguri(
                           fontSize: 36,
                           fontWeight: FontWeight.w900,
@@ -88,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'ORIENT ERP',
+                  'Wintech Agro',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,

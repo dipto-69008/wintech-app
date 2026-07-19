@@ -205,7 +205,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                   borderRadius: BorderRadius.circular(12)),
               clipBehavior: Clip.antiAlias,
               child: Image.asset(
-                'assets/images/moon.jpeg',
+                'assets/images/wintech.png',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const Icon(
                     Icons.business_rounded,

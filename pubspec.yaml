@@ -1,5 +1,5 @@
-name: orient_app
-description: "ORIENT ERP - Enterprise Resource Management"
+name: wintech_agro
+description: "Wintech Agro - Enterprise Resource Management"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -30,10 +30,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/moon.jpeg"
+  image_path: "assets/images/wintech.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#F5A623"
-  adaptive_icon_foreground: "assets/images/moon.jpeg"
+  adaptive_icon_background: "#1B9DD9"
+  adaptive_icon_foreground: "assets/images/wintech.png"
 
 flutter:
   uses-material-design: true

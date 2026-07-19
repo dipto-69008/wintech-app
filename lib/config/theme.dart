@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // ── Brand Colors (Light) — Moon Gallery Orange/Amber ─────────────────
-  static const Color primaryBg = Color(0xFFFFFDF7);       // Warm White
-  static const Color primaryAccent = Color(0xFFF5A623);   // Moon Gallery Orange
-  static const Color secondaryAccent = Color(0xFFFFB74D); // Light Amber
-  static const Color textDark = Color(0xFF2C2C2C);
-  static const Color textGrey = Color(0xFF888888);
+  // ── Brand Colors (Light) — Wintech Agro Blue ──────────────────────────
+  static const Color primaryBg = Color(0xFFF0F8FD);       // Very light blue tint
+  static const Color primaryAccent = Color(0xFF1B9DD9);   // Wintech Blue
+  static const Color secondaryAccent = Color(0xFF56C1E8); // Light Blue
+  static const Color textDark = Color(0xFF1A2D3D);
+  static const Color textGrey = Color(0xFF7A8EA0);
   static const Color cardWhite = Color(0xFFFFFFFF);
-  static const Color divider = Color(0xFFEEE8DC);
+  static const Color divider = Color(0xFFD6EAF5);
   static const Color success = Color(0xFF2E7D32);
   static const Color warning = Color(0xFFF57F17);
   static const Color error = Color(0xFFC62828);
-  static const Color lightAccent = Color(0xFFFFF3E0);     // Very light orange tint
+  static const Color lightAccent = Color(0xFFE1F4FD);     // Very light blue tint
 
   // ── Brand Colors (Dark) ──────────────────────────────────────────────
-  static const Color darkBg = Color(0xFF121212);
-  static const Color darkCard = Color(0xFF1E1E1E);
-  static const Color darkCard2 = Color(0xFF2A2A2A);
-  static const Color darkDivider = Color(0xFF333333);
+  static const Color darkBg = Color(0xFF0D1B26);
+  static const Color darkCard = Color(0xFF152435);
+  static const Color darkCard2 = Color(0xFF1E3045);
+  static const Color darkDivider = Color(0xFF2A3F52);
   static const Color darkText = Color(0xFFEEEEEE);
-  static const Color darkTextGrey = Color(0xFF9E9E9E);
-  static const Color darkAccentSoft = Color(0xFF3D2800); // dark amber tint
+  static const Color darkTextGrey = Color(0xFF8BAEC5);
+  static const Color darkAccentSoft = Color(0xFF003D5C); // dark blue tint
 
   // ── Text theme factory ────────────────────────────────────────────────
   static TextTheme _textTheme(Color primary, Color secondary) => TextTheme(

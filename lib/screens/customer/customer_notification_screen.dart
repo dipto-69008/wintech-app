@@ -19,7 +19,7 @@ class CustomerNotificationScreen extends StatelessWidget {
       'body': 'জুলাই মাসের পেমেন্ট এখনও করা হয়নি। অনুগ্রহ করে ১০ জুলাইয়ের মধ্যে পরিশোধ করুন।',
       'date': '১ জুলাই ২০২৬',
       'icon': Icons.payment_rounded,
-      'color': Color(0xFF8A252C),
+      'color': Color(0xFF1B9DD9),
       'type': 'পেমেন্ট',
     },
     {

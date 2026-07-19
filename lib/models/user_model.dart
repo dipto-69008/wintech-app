@@ -14,6 +14,7 @@ class UserModel {
   final String referredByCode;
   final String teamId;
   final String teamName;
+  final String branch;
   // SR / Sales performance
   final double totalSales;
   final double totalCommission;
@@ -42,6 +43,7 @@ class UserModel {
     this.referredByCode = '',
     this.teamId = '',
     this.teamName = '',
+    this.branch = '',
     this.totalSales = 0,
     this.totalCommission = 0,
     this.pendingCommission = 0,
@@ -154,6 +156,7 @@ class UserModel {
         'referredByCode': referredByCode,
         'teamId': teamId,
         'teamName': teamName,
+        'branch': branch,
         'totalSales': totalSales,
         'totalCommission': totalCommission,
         'pendingCommission': pendingCommission,
@@ -180,6 +183,7 @@ class UserModel {
         referredByCode: m['referredByCode'] ?? '',
         teamId: m['teamId'] ?? '',
         teamName: m['teamName'] ?? '',
+        branch: m['branch'] ?? '',
         totalSales: (m['totalSales'] as num?)?.toDouble() ?? 0,
         totalCommission: (m['totalCommission'] as num?)?.toDouble() ?? 0,
         pendingCommission: (m['pendingCommission'] as num?)?.toDouble() ?? 0,
@@ -202,6 +206,7 @@ class UserModel {
     String? thana,
     String? teamId,
     String? teamName,
+    String? branch,
     double? totalSales,
     double? totalCommission,
     double? pendingCommission,
@@ -227,6 +232,7 @@ class UserModel {
         referredByCode: referredByCode,
         teamId: teamId ?? this.teamId,
         teamName: teamName ?? this.teamName,
+        branch: branch ?? this.branch,
         totalSales: totalSales ?? this.totalSales,
         totalCommission: totalCommission ?? this.totalCommission,
         pendingCommission: pendingCommission ?? this.pendingCommission,

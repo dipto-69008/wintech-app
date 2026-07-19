@@ -154,7 +154,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                 decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6)),
-                child: Text('ORIENT ERP — কাস্টমার পোর্টাল',
+                child: Text('Wintech Agro — কাস্টমার পোর্টাল',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,

@@ -159,7 +159,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                     color: Colors.white)),
           ]),
           const SizedBox(height: 6),
-          Text('ORIENT ERP — Sales Achievement',
+          Text('Wintech Agro — Sales Achievement',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: Colors.white70)),
         ],

@@ -149,7 +149,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                 decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6)),
-                child: Text('ORIENT ERP — সেলস রিপ্রেজেন্টেটিভ',
+                child: Text(
+                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'সেলস রিপ্রেজেন্টেটিভ'}',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,

@@ -39,11 +39,12 @@ class LocalStorageService {
       'id': 'demo-teammember',
       'referral': 'TM001',
     },
-    'sr@orient.com': {
+    'sr@wintech.com': {
       'name': 'সেলস রিপ্রেজেন্টেটিভ',
       'role': UserModel.roleTeamMember,
       'id': 'demo-sr',
       'referral': 'SR001',
+      'branch': 'ঢাকা সেন্ট্রাল',
     },
     'customer@gmail.com': {
       'name': 'মেসার্স আল-আমিন ট্রেডার্স',
@@ -95,6 +96,7 @@ class LocalStorageService {
       myReferralCode: data['referral']!,
       zela: 'ঢাকা',
       thana: 'ধানমন্ডি',
+      branch: data['branch'] ?? '',
       totalSales: sales,
       totalCommission: totalCommission,
       pendingCommission: totalCommission * 0.3,
@@ -259,7 +261,7 @@ class LocalStorageService {
         TutorialModel(
           id: 'tut-1',
           title: 'অ্যাপ পরিচিতি — শুরু করুন',
-          description: 'ORIENT ERP অ্যাপ কিভাবে ব্যবহার করবেন তার সম্পূর্ণ গাইড।',
+          description: 'Wintech Agro অ্যাপ কিভাবে ব্যবহার করবেন তার সম্পূর্ণ গাইড।',
           videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
           category: 'সাধারণ',
           durationMinutes: 5,
@@ -567,8 +569,8 @@ class LocalStorageService {
     await prefs.setString(_keyWithdrawals, jsonEncode(list));
   }
 
-  // ── Orders (ORIENT ERP POS) ────────────────────────────────────────────
-  static const _keyOrders = 'orient_orders';
+  // ── Orders (Wintech Agro POS) ────────────────────────────────────────────
+  static const _keyOrders = 'wintech_orders';
 
   static Future<List<OrderModel>> getOrders() async {
     final prefs = await SharedPreferences.getInstance();

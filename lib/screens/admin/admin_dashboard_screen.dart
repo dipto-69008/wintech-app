@@ -143,7 +143,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6)),
-                    child: Text('ORIENT ERP — অ্যাডমিন',
+                    child: Text('Wintech Agro — অ্যাডমিন',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11,
                             color: Colors.white,

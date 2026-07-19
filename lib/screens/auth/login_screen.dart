@@ -74,11 +74,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.asset(
-                  'assets/images/moon.jpeg',
+                  'assets/images/wintech.png',
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Center(
                     child: Text(
-                      'OE',
+                      'WA',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('ORIENT ERP',
+              Text('Wintech Agro',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -172,7 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Icon(Icons.info_outline_rounded,
                                 size: 16, color: AppTheme.primaryAccent),
                             const SizedBox(width: 6),
-                            Text('ডেমো অ্যাকাউন্ট — ORIENT ERP',
+                            Text('ডেমো অ্যাকাউন্ট — Wintech Agro',
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ]),
                           const SizedBox(height: 8),
                           _demoRow('অ্যাডমিন', 'admin@gmail.com'),
-                          _demoRow('এস.আর. / কর্মী', 'sr@orient.com'),
+                          _demoRow('এস.আর. / কর্মী', 'sr@wintech.com'),
                           _demoRow('কাস্টমার', 'customer@gmail.com'),
                           const SizedBox(height: 4),
                           Text('পাসওয়ার্ড: যেকোনো কিছু | OTP: 123456',
