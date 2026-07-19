@@ -1,0 +1,4 @@
+- [Flutter-Replit dev workflow](flutter-replit-workflow.md) — no flutter/dart toolchain on Replit; verify by careful manual code review, not `flutter analyze` or workflows.
+- [Orient ERP data model](orient-erp-data-model.md) — user roles, models, storage conventions for the ORIENT ERP Flutter app.
+- [Orient ERP super admin routing](orient-super-admin-routing.md) — super admin uses CEO analytics view (SuperAdminDashboard), not employee tabs; routed from home_shell.dart.
+- [Orient ERP rebranding complete](orient-rebranding.md) — all Salmon/salmon_app references replaced; new IDs are orient_app / com.example.orient_erp / com.example.orientErp.
