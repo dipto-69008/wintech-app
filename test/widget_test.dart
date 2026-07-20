@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:orient_app/main.dart';
+import 'package:wintech_agro/main.dart';
 
 void main() {
-  testWidgets('Orient ERP smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const OrientErpApp(initialDarkMode: false));
+  testWidgets('Wintech Agro smoke test', (WidgetTester tester) async {
+    await tester.pumpWidget(const WintechAgroApp(initialDarkMode: false));
     await tester.pump();
   });
 }
