@@ -6,6 +6,10 @@ import '../models/survey_model.dart';
 import '../models/tutorial_model.dart';
 import '../models/user_model.dart';
 import '../models/target_model.dart';
+import '../models/stock_transfer_model.dart';
+import '../models/expense_model.dart';
+import '../models/payment_collection_model.dart';
+import '../models/leave_model.dart';
 
 class LocalStorageService {
   static const _keyTutorials = 'tutorials';
@@ -641,6 +645,145 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keyOrders, jsonEncode(orders.map((o) => o.toMap()).toList()));
+  }
+
+  // ── Stock Transfers ────────────────────────────────────────────────────
+  static const _keyStockTransfers = 'wintech_stock_transfers';
+
+  static Future<List<StockTransferModel>> getStockTransfers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyStockTransfers);
+    if (raw == null) return [];
+    final List<dynamic> list = jsonDecode(raw);
+    return list
+        .map((e) => StockTransferModel.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  static Future<void> saveStockTransfer(StockTransferModel t) async {
+    final list = await getStockTransfers();
+    final idx = list.indexWhere((x) => x.id == t.id);
+    if (idx >= 0) {
+      list[idx] = t;
+    } else {
+      list.insert(0, t);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyStockTransfers, jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  static Future<void> deleteStockTransfer(String id) async {
+    final list = await getStockTransfers();
+    list.removeWhere((x) => x.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyStockTransfers, jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  // ── Expenses ───────────────────────────────────────────────────────────
+  static const _keyExpenses = 'wintech_expenses';
+
+  static Future<List<ExpenseModel>> getExpenses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyExpenses);
+    if (raw == null) return [];
+    final List<dynamic> list = jsonDecode(raw);
+    return list
+        .map((e) => ExpenseModel.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  static Future<void> saveExpense(ExpenseModel e) async {
+    final list = await getExpenses();
+    final idx = list.indexWhere((x) => x.id == e.id);
+    if (idx >= 0) {
+      list[idx] = e;
+    } else {
+      list.insert(0, e);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyExpenses, jsonEncode(list.map((x) => x.toMap()).toList()));
+  }
+
+  static Future<void> deleteExpense(String id) async {
+    final list = await getExpenses();
+    list.removeWhere((x) => x.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyExpenses, jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  // ── Payment Collections ────────────────────────────────────────────────
+  static const _keyPaymentCollections = 'wintech_payment_collections';
+
+  static Future<List<PaymentCollectionModel>> getPaymentCollections() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyPaymentCollections);
+    if (raw == null) return [];
+    final List<dynamic> list = jsonDecode(raw);
+    return list
+        .map((e) =>
+            PaymentCollectionModel.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  static Future<void> savePaymentCollection(PaymentCollectionModel p) async {
+    final list = await getPaymentCollections();
+    final idx = list.indexWhere((x) => x.id == p.id);
+    if (idx >= 0) {
+      list[idx] = p;
+    } else {
+      list.insert(0, p);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyPaymentCollections,
+        jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  static Future<void> deletePaymentCollection(String id) async {
+    final list = await getPaymentCollections();
+    list.removeWhere((x) => x.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyPaymentCollections,
+        jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  // ── Leaves ─────────────────────────────────────────────────────────────
+  static const _keyLeaves = 'wintech_leaves';
+
+  static Future<List<LeaveModel>> getLeaves() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyLeaves);
+    if (raw == null) return [];
+    final List<dynamic> list = jsonDecode(raw);
+    return list
+        .map((e) => LeaveModel.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  static Future<void> saveLeave(LeaveModel l) async {
+    final list = await getLeaves();
+    final idx = list.indexWhere((x) => x.id == l.id);
+    if (idx >= 0) {
+      list[idx] = l;
+    } else {
+      list.insert(0, l);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyLeaves, jsonEncode(list.map((e) => e.toMap()).toList()));
+  }
+
+  static Future<void> deleteLeave(String id) async {
+    final list = await getLeaves();
+    list.removeWhere((x) => x.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyLeaves, jsonEncode(list.map((e) => e.toMap()).toList()));
   }
 
   /// Demo orders seeded on first launch

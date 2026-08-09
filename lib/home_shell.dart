@@ -13,6 +13,7 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/employee/order_list_screen.dart';
 import 'screens/notifications/notification_screen.dart';
 import 'screens/survey/survey_screen.dart';
+import 'screens/employee/more_screen.dart';
 
 class HomeShell extends StatefulWidget {
   final ValueChanged<bool> onThemeToggle;
@@ -67,7 +68,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
         const OrderListScreen(),
         const TargetAchievementScreen(),
-        const SurveyScreen(),
+        const MoreScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
@@ -75,7 +76,7 @@ class _HomeShellState extends State<HomeShell> {
     _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
     _NavDef(Icons.receipt_long_rounded, 'অর্ডার'),
     _NavDef(Icons.flag_rounded, 'টার্গেট'),
-    _NavDef(Icons.assignment_rounded, 'সার্ভে'),
+    _NavDef(Icons.grid_view_rounded, 'আরো'),
     _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 
