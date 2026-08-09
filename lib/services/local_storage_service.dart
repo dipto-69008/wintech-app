@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order_model.dart';
+import '../models/survey_model.dart';
 import '../models/tutorial_model.dart';
 import '../models/user_model.dart';
 import '../models/target_model.dart';
