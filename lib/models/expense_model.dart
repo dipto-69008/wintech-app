@@ -3,7 +3,7 @@
 class ExpenseModel {
   final String id;
   final String type;
-  final String month;        // e.g. "জুলাই ২০২৬"
+  final String month;        // e.g. "July 2026"
   final String applicantName;
   final String designation;
   final String zone;
@@ -57,21 +57,21 @@ class ExpenseModel {
 
   String get typeLabel {
     switch (type) {
-      case typeTaBill:     return 'TA বিল';
-      case typeDa:         return 'DA বিল';
-      case typeTaDaSheet:  return 'TA/DA শিট';
-      case typeOutStation: return 'আউট স্টেশন';
-      case typeMotorcycle: return 'মটরসাইকেল লগ';
-      case typeOthersBill: return 'অন্যান্য বিল';
+      case typeTaBill:     return 'TA Bill';
+      case typeDa:         return 'DA Bill';
+      case typeTaDaSheet:  return 'TA/DA Sheet';
+      case typeOutStation: return 'Out Station';
+      case typeMotorcycle: return 'Motorcycle Log';
+      case typeOthersBill: return 'Others Bill';
       default:             return type;
     }
   }
 
   String get statusLabel {
     switch (status) {
-      case statusApproved: return 'অনুমোদিত';
-      case statusRejected: return 'বাতিল';
-      default:             return 'অপেক্ষমাণ';
+      case statusApproved: return 'Approved';
+      case statusRejected: return 'Rejected';
+      default:             return 'Pending';
     }
   }
 

@@ -74,20 +74,20 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('মুছে ফেলুন?',
+        title: Text('Delete?',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('এই ট্রান্সফার মুছে ফেলা হবে।',
+        content: Text('This transfer will be deleted.',
             style: GoogleFonts.hindSiliguri()),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('না', style: GoogleFonts.hindSiliguri())),
+              child: Text('No', style: GoogleFonts.hindSiliguri())),
           ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.error,
                   minimumSize: const Size(80, 40)),
-              child: Text('হ্যাঁ', style: GoogleFonts.hindSiliguri())),
+              child: Text('Yes', style: GoogleFonts.hindSiliguri())),
         ],
       ),
     );
@@ -130,7 +130,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         onPressed: () => _openDialog(),
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('নতুন ট্রান্সফার',
+        label: Text('New Transfer',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -149,15 +149,21 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 14, 20, 20),
       child: Row(children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_rounded,
+              color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
         const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('স্টক ট্রান্সফার',
+        Text('Stock Transfer',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
-        Text('মোট: ${_transfers.length}',
+        Text('Total: ${_transfers.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -168,11 +174,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        _chip('all', 'সব', isDark),
+        _chip('all', 'All', isDark),
         const SizedBox(width: 8),
-        _chip('today', 'আজকের', isDark),
+        _chip('today', 'Today', isDark),
         const SizedBox(width: 8),
-        _chip('month', 'এই মাস', isDark),
+        _chip('month', 'This Month', isDark),
       ]),
     );
   }
@@ -218,7 +224,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           const Icon(Icons.swap_horiz_rounded,
               color: AppTheme.primaryAccent, size: 18),
           const SizedBox(width: 8),
-          Text('${_filtered.length} ট্রান্সফার',
+          Text('${_filtered.length} transfers',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey)),
         ]),
@@ -235,11 +241,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
               size: 64,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 14),
-          Text('কোনো ট্রান্সফার নেই',
+          Text('No transfers',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('নতুন ট্রান্সফার দিতে + বোতাম চাপুন',
+          Text('Tap + to add a new transfer',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -354,11 +360,11 @@ class _TransferDialogState extends State<_TransferDialog> {
   late TextEditingController _productCtrl;
   late TextEditingController _qtyCtrl;
   late TextEditingController _notesCtrl;
-  String _unit = 'কেজি';
+  String _unit = 'KG';
   DateTime _date = DateTime.now();
   bool _saving = false;
 
-  static const _units = ['কেজি', 'লিটার', 'পিস', 'বাক্স', 'কার্টন', 'বস্তা', 'ডজন'];
+  static const _units = ['KG', 'Liter', 'Piece', 'Box', 'Carton', 'Sack', 'Dozen'];
 
   @override
   void initState() {
@@ -370,7 +376,7 @@ class _TransferDialogState extends State<_TransferDialog> {
     _qtyCtrl     = TextEditingController(
         text: e != null ? e.quantity.toString() : '');
     _notesCtrl   = TextEditingController(text: e?.notes ?? '');
-    _unit = e?.unit ?? 'কেজি';
+    _unit = e?.unit ?? 'KG';
     _date = e?.date ?? DateTime.now();
   }
 
@@ -440,33 +446,33 @@ class _TransferDialogState extends State<_TransferDialog> {
             const SizedBox(height: 16),
             Text(
                 widget.existing == null
-                    ? 'নতুন স্টক ট্রান্সফার'
-                    : 'ট্রান্সফার সম্পাদনা',
+                    ? 'New Stock Transfer'
+                    : 'Edit Transfer',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            _label('কোথা থেকে (গুদাম)'),
+            _label('From (Warehouse)'),
             TextFormField(
               controller: _fromCtrl,
-              decoration: const InputDecoration(hintText: 'প্রেরণকারী গুদাম'),
+              decoration: const InputDecoration(hintText: 'Sender warehouse'),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'প্রয়োজনীয়' : null,
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 12),
-            _label('কোথায় (গুদাম)'),
+            _label('To (Warehouse)'),
             TextFormField(
               controller: _toCtrl,
-              decoration: const InputDecoration(hintText: 'প্রাপক গুদাম'),
+              decoration: const InputDecoration(hintText: 'Receiver warehouse'),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'প্রয়োজনীয়' : null,
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 12),
-            _label('পণ্যের নাম'),
+            _label('Product Name'),
             TextFormField(
               controller: _productCtrl,
-              decoration: const InputDecoration(hintText: 'পণ্যের নাম লিখুন'),
+              decoration: const InputDecoration(hintText: 'Enter product name'),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'প্রয়োজনীয়' : null,
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 12),
             Row(children: [
@@ -475,16 +481,16 @@ class _TransferDialogState extends State<_TransferDialog> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _label('পরিমাণ'),
+                      _label('Quantity'),
                       TextFormField(
                         controller: _qtyCtrl,
                         keyboardType: TextInputType.number,
                         decoration:
-                            const InputDecoration(hintText: '০'),
+                            const InputDecoration(hintText: '0'),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'প্রয়োজনীয়';
+                          if (v == null || v.trim().isEmpty) return 'Required';
                           if (double.tryParse(v.trim()) == null) {
-                            return 'সংখ্যা লিখুন';
+                            return 'Enter a number';
                           }
                           return null;
                         },
@@ -497,7 +503,7 @@ class _TransferDialogState extends State<_TransferDialog> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _label('একক'),
+                      _label('Unit'),
                       DropdownButtonFormField<String>(
                         value: _unit,
                         items: _units
@@ -513,7 +519,7 @@ class _TransferDialogState extends State<_TransferDialog> {
               ),
             ]),
             const SizedBox(height: 12),
-            _label('তারিখ'),
+            _label('Date'),
             GestureDetector(
               onTap: _pickDate,
               child: Container(
@@ -535,11 +541,11 @@ class _TransferDialogState extends State<_TransferDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            _label('নোট (ঐচ্ছিক)'),
+            _label('Notes (optional)'),
             TextFormField(
               controller: _notesCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(hintText: 'অতিরিক্ত তথ্য...'),
+              decoration: const InputDecoration(hintText: 'Additional info...'),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -551,7 +557,7 @@ class _TransferDialogState extends State<_TransferDialog> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : Text(
-                      widget.existing == null ? 'সংরক্ষণ করুন' : 'আপডেট করুন',
+                      widget.existing == null ? 'Save' : 'Update',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 16, fontWeight: FontWeight.w700)),
             ),

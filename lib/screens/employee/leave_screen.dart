@@ -66,20 +66,20 @@ class _LeaveScreenState extends State<LeaveScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('মুছে ফেলুন?',
+        title: Text('Delete?',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('এই ছুটির আবেদন মুছে ফেলা হবে।',
+        content: Text('This leave application will be deleted.',
             style: GoogleFonts.hindSiliguri()),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('না', style: GoogleFonts.hindSiliguri())),
+              child: Text('No', style: GoogleFonts.hindSiliguri())),
           ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.error,
                   minimumSize: const Size(80, 40)),
-              child: Text('হ্যাঁ', style: GoogleFonts.hindSiliguri())),
+              child: Text('Yes', style: GoogleFonts.hindSiliguri())),
         ],
       ),
     );
@@ -119,8 +119,8 @@ class _LeaveScreenState extends State<LeaveScreen>
                       unselectedLabelColor: AppTheme.textGrey,
                       indicatorColor: AppTheme.primaryAccent,
                       tabs: const [
-                        Tab(text: 'অপেক্ষমাণ'),
-                        Tab(text: 'ইতিহাস'),
+                        Tab(text: 'Pending'),
+                        Tab(text: 'History'),
                       ],
                     ),
                     bg: isDark ? AppTheme.darkCard : Colors.white,
@@ -139,7 +139,7 @@ class _LeaveScreenState extends State<LeaveScreen>
         onPressed: _openApplySheet,
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('ছুটির আবেদন',
+        label: Text('Leave Application',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -158,15 +158,21 @@ class _LeaveScreenState extends State<LeaveScreen>
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 14, 20, 20),
       child: Row(children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_rounded,
+              color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
         const Icon(Icons.beach_access_rounded, color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('ছুটির আবেদন',
+        Text('Leave Application',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
-        Text('মোট: ${_leaves.length}',
+        Text('Total: ${_leaves.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -182,11 +188,11 @@ class _LeaveScreenState extends State<LeaveScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        _statCard('অপেক্ষমাণ', '$pending', AppTheme.warning, cardBg),
+        _statCard('Pending', '$pending', AppTheme.warning, cardBg),
         const SizedBox(width: 12),
-        _statCard('অনুমোদিত', '$approved', AppTheme.success, cardBg),
+        _statCard('Approved', '$approved', AppTheme.success, cardBg),
         const SizedBox(width: 12),
-        _statCard('মোট', '${_leaves.length}', AppTheme.primaryAccent, cardBg),
+        _statCard('Total', '${_leaves.length}', AppTheme.primaryAccent, cardBg),
       ]),
     );
   }
@@ -222,7 +228,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                 size: 64,
                 color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
             const SizedBox(height: 14),
-            Text('কোনো ছুটির আবেদন নেই',
+            Text('No leave applications',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 15, color: AppTheme.textGrey)),
           ],
@@ -281,7 +287,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                 '${l.fromDate.day}/${l.fromDate.month}/${l.fromDate.year} — ${l.toDate.day}/${l.toDate.month}/${l.toDate.year}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12, color: AppTheme.textGrey)),
-            Text('${l.totalDays} দিন',
+            Text('${l.totalDays} days',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -413,11 +419,11 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
                       borderRadius: BorderRadius.circular(2))),
             ),
             const SizedBox(height: 16),
-            Text('ছুটির আবেদন করুন',
+            Text('Apply for Leave',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            _label('ছুটির ধরন'),
+            _label('Leave Type'),
             DropdownButtonFormField<String>(
               value: _type,
               items: LeaveModel.leaveTypes.map((t) {
@@ -444,7 +450,7 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _label('শুরুর তারিখ'),
+                      _label('Start Date'),
                       GestureDetector(
                         onTap: _pickFrom,
                         child: _dateField(
@@ -458,7 +464,7 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _label('শেষের তারিখ'),
+                      _label('End Date'),
                       GestureDetector(
                         onTap: _pickTo,
                         child: _dateField(
@@ -479,7 +485,7 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
                 const Icon(Icons.info_outline_rounded,
                     size: 14, color: AppTheme.primaryAccent),
                 const SizedBox(width: 6),
-                Text('মোট $_days দিনের ছুটি',
+                Text('Total $_days days of leave',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -487,14 +493,14 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
               ]),
             ),
             const SizedBox(height: 12),
-            _label('কারণ'),
+            _label('Reason'),
             TextFormField(
               controller: _reasonCtrl,
               maxLines: 3,
               decoration:
-                  const InputDecoration(hintText: 'ছুটির কারণ লিখুন...'),
+                  const InputDecoration(hintText: 'Enter leave reason...'),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'প্রয়োজনীয়' : null,
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -505,7 +511,7 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
                       height: 22,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : Text('আবেদন জমা দিন',
+                  : Text('Submit Application',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 16, fontWeight: FontWeight.w700)),
             ),

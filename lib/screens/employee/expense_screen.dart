@@ -22,12 +22,12 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   late TabController _tabCtrl;
 
   static const _typeOptions = [
-    ('all',                   'সব'),
-    (ExpenseModel.typeTaBill,     'TA বিল'),
+    ('all',                   'All'),
+    (ExpenseModel.typeTaBill,     'TA Bill'),
     (ExpenseModel.typeTaDaSheet,  'TA/DA'),
-    (ExpenseModel.typeOutStation, 'আউট স্টেশন'),
-    (ExpenseModel.typeMotorcycle, 'মটরসাইকেল'),
-    (ExpenseModel.typeOthersBill, 'অন্যান্য'),
+    (ExpenseModel.typeOutStation, 'Out Station'),
+    (ExpenseModel.typeMotorcycle, 'Motorcycle'),
+    (ExpenseModel.typeOthersBill, 'Others'),
   ];
 
   final _fmt = NumberFormat('#,##0', 'en_US');
@@ -98,20 +98,20 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('মুছে ফেলুন?',
+        title: Text('Delete?',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('এই ব্যয় বিল মুছে ফেলা হবে।',
+        content: Text('This expense bill will be deleted.',
             style: GoogleFonts.hindSiliguri()),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('না', style: GoogleFonts.hindSiliguri())),
+              child: Text('No', style: GoogleFonts.hindSiliguri())),
           ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.error,
                   minimumSize: const Size(80, 40)),
-              child: Text('হ্যাঁ', style: GoogleFonts.hindSiliguri())),
+              child: Text('Yes', style: GoogleFonts.hindSiliguri())),
         ],
       ),
     );
@@ -154,7 +154,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
         onPressed: _openAdd,
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('নতুন বিল',
+        label: Text('New Bill',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -173,13 +173,19 @@ class _ExpenseScreenState extends State<ExpenseScreen>
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 14, 20, 20),
       child: Row(children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_rounded,
+              color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
         const Icon(Icons.receipt_rounded, color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('এক্সপেন্স / TA-DA',
+        Text('Expense / TA-DA',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
         const Spacer(),
-        Text('মোট: ${_expenses.length}',
+        Text('Total: ${_expenses.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -241,7 +247,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
           const Icon(Icons.receipt_rounded,
               color: AppTheme.primaryAccent, size: 18),
           const SizedBox(width: 8),
-          Text('${_filtered.length} বিল',
+          Text('${_filtered.length} bills',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey)),
           if (total > 0) ...[
@@ -267,11 +273,11 @@ class _ExpenseScreenState extends State<ExpenseScreen>
               size: 64,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 14),
-          Text('কোনো বিল নেই',
+          Text('No bills',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('নতুন বিল যোগ করতে + বোতাম চাপুন',
+          Text('Tap + to add a new bill',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -390,12 +396,12 @@ class _TypePickerSheet extends StatelessWidget {
   const _TypePickerSheet({required this.onPick});
 
   static const _items = [
-    (ExpenseModel.typeTaBill,     'TA বিল',        Icons.directions_car_rounded,   AppTheme.primaryAccent),
-    (ExpenseModel.typeTaDaSheet,  'Monthly TA/DA শিট', Icons.table_rows_rounded, Color(0xFF6A1B9A)),
-    (ExpenseModel.typeOutStation, 'আউট স্টেশন বিল', Icons.hotel_rounded,          Color(0xFFE65100)),
-    (ExpenseModel.typeMotorcycle, 'মটরসাইকেল লগ',   Icons.two_wheeler_rounded,    Color(0xFF1565C0)),
-    (ExpenseModel.typeOthersBill, 'TA/DA ও অন্যান্য বিল', Icons.summarize_rounded, Color(0xFF2E7D32)),
-    (ExpenseModel.typeDa,         'DA বিল',          Icons.account_balance_wallet_rounded, AppTheme.warning),
+    (ExpenseModel.typeTaBill,     'TA Bill',        Icons.directions_car_rounded,   AppTheme.primaryAccent),
+    (ExpenseModel.typeTaDaSheet,  'Monthly TA/DA Sheet', Icons.table_rows_rounded, Color(0xFF6A1B9A)),
+    (ExpenseModel.typeOutStation, 'Out Station Bill', Icons.hotel_rounded,          Color(0xFFE65100)),
+    (ExpenseModel.typeMotorcycle, 'Motorcycle Log',   Icons.two_wheeler_rounded,    Color(0xFF1565C0)),
+    (ExpenseModel.typeOthersBill, 'TA/DA & Others Bill', Icons.summarize_rounded, Color(0xFF2E7D32)),
+    (ExpenseModel.typeDa,         'DA Bill',          Icons.account_balance_wallet_rounded, AppTheme.warning),
   ];
 
   @override
@@ -415,7 +421,7 @@ class _TypePickerSheet extends StatelessWidget {
                 color: AppTheme.divider,
                 borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 16),
-        Text('বিলের ধরন বেছে নিন',
+        Text('Select Bill Type',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 17, fontWeight: FontWeight.w700)),
         const SizedBox(height: 16),
@@ -562,28 +568,28 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   ];
 
   static const Map<String, String> _otherLabels = {
-    'previousDues':       'পূর্ববর্তী বকেয়া',
-    'salesTarget':        'বিক্রয় লক্ষ্যমাত্রা',
-    'salesAmount':        'বিক্রয় পরিমাণ',
-    'salesAchievement':   'বিক্রয় অর্জন',
-    'recoveryAmount':     'রিকভারি পরিমাণ',
-    'salesRecoveryPercent': 'বিক্রয় রিকভারি %',
-    'tadaPercent':        'TA ও DA শতাংশ',
-    'currentDues':        'বর্তমান বকেয়া',
-    'tadaAmount':         'TA ও DA পরিমাণ',
-    'outStationBill':     'আউট স্টেশন বিল',
-    'entertainment':      'বিনোদন',
-    'telephoneBill':      'টেলিফোন বিল',
-    'ddttCommission':     'DD/TT কমিশন',
-    'courierBill':        'কুরিয়ার বিল',
-    'othersBill':         'অন্যান্য বিল',
+    'previousDues':       'Previous Dues',
+    'salesTarget':        'Sales Target',
+    'salesAmount':        'Sales Amount',
+    'salesAchievement':   'Sales Achievement',
+    'recoveryAmount':     'Recovery Amount',
+    'salesRecoveryPercent': 'Sales Recovery %',
+    'tadaPercent':        'TA & DA Percent',
+    'currentDues':        'Current Dues',
+    'tadaAmount':         'TA & DA Amount',
+    'outStationBill':     'Out Station Bill',
+    'entertainment':      'Entertainment',
+    'telephoneBill':      'Telephone Bill',
+    'ddttCommission':     'DD/TT Commission',
+    'courierBill':        'Courier Bill',
+    'othersBill':         'Others Bill',
   };
 
   String _currentMonthBn() {
     const months = [
-      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল',
-      'মে', 'জুন', 'জুলাই', 'আগস্ট',
-      'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
+      'January', 'February', 'March', 'April',
+      'May', 'June', 'July', 'August',
+      'September', 'October', 'November', 'December',
     ];
     final now = DateTime.now();
     return '${months[now.month - 1]} ${now.year}';
@@ -789,7 +795,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           else
             TextButton(
               onPressed: _submit,
-              child: Text('সংরক্ষণ',
+              child: Text('Save',
                   style: GoogleFonts.hindSiliguri(
                       color: Colors.white, fontWeight: FontWeight.w700)),
             ),
@@ -803,13 +809,13 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Common header fields
             _sectionCard(isDark, children: [
-              _field('আবেদনকারীর নাম', _nameCtrl),
+              _field('Applicant Name', _nameCtrl),
               const SizedBox(height: 12),
-              _field('পদবি / Designation', _designationCtrl),
+              _field('Designation', _designationCtrl),
               const SizedBox(height: 12),
-              _field('জোন / Zone', _zoneCtrl),
+              _field('Zone', _zoneCtrl),
               const SizedBox(height: 12),
-              _field('মাস', _monthCtrl),
+              _field('Month', _monthCtrl),
             ]),
             const SizedBox(height: 16),
 
@@ -820,7 +826,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             ElevatedButton(
               onPressed: _saving ? null : _submit,
               child: Text(
-                  widget.existing == null ? 'সংরক্ষণ করুন' : 'আপডেট করুন',
+                  widget.existing == null ? 'Save' : 'Update',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16, fontWeight: FontWeight.w700)),
             ),
@@ -854,14 +860,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   List<Widget> _buildTaBillFields(bool isDark) {
     return [
       Row(children: [
-        Text('TA বিলের সারি',
+        Text('TA Bill Rows',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
         TextButton.icon(
           onPressed: _addTaRow,
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: Text('সারি যোগ', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
         ),
       ]),
       ..._taRows.asMap().entries.map((entry) {
@@ -869,7 +875,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final r = entry.value;
         return _sectionCard(isDark, children: [
           Row(children: [
-            Text('সারি ${i + 1}',
+            Text('Row ${i + 1}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -884,26 +890,26 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('তারিখ', r['date']!)),
+            Expanded(child: _field('Date', r['date']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('কোথা থেকে', r['from']!)),
+            Expanded(child: _field('From', r['from']!)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('কোথায়', r['to']!)),
+            Expanded(child: _field('To', r['to']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('যানবাহন', r['modeOfTransport']!)),
+            Expanded(child: _field('Transport', r['modeOfTransport']!)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(flex: 2, child: _field('বিবরণ', r['description']!)),
+            Expanded(flex: 2, child: _field('Description', r['description']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('পরিমাণ (৳)', r['amount']!,
+            Expanded(child: _field('Amount (৳)', r['amount']!,
                 keyboardType: TextInputType.number)),
           ]),
         ]);
       }),
-      _totalRow('মোট TA',
+      _totalRow('Total TA',
           _taRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
     ];
   }
@@ -912,14 +918,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   List<Widget> _buildTaDaSheetFields(bool isDark) {
     return [
       Row(children: [
-        Text('Monthly TA/DA শিট',
+        Text('Monthly TA/DA Sheet',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
         TextButton.icon(
           onPressed: _addTadaRow,
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: Text('সারি যোগ', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
         ),
       ]),
       ..._tadaRows.asMap().entries.map((entry) {
@@ -928,7 +934,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final total = _dbl(r['ta']!) + _dbl(r['da']!);
         return _sectionCard(isDark, children: [
           Row(children: [
-            Text('${i + 1} তারিখ',
+            Text('Row ${i + 1}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -943,9 +949,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('তারিখ', r['date']!)),
+            Expanded(child: _field('Date', r['date']!)),
             const SizedBox(width: 8),
-            Expanded(flex: 2, child: _field('স্থান', r['place']!)),
+            Expanded(flex: 2, child: _field('Place', r['place']!)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
@@ -961,7 +967,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Column(children: [
-                Text('মোট',
+                Text('Total',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11, color: AppTheme.textGrey)),
                 const SizedBox(height: 4),
@@ -975,7 +981,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
         ]);
       }),
-      _totalRow('মোট',
+      _totalRow('Total',
           _tadaRows.fold(0.0, (s, r) => s + _dbl(r['ta']!) + _dbl(r['da']!))),
     ];
   }
@@ -984,14 +990,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   List<Widget> _buildOutStationFields(bool isDark) {
     return [
       Row(children: [
-        Text('আউট স্টেশন বিল',
+        Text('Out Station Bill',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
         TextButton.icon(
           onPressed: _addOutRow,
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: Text('সারি যোগ', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
         ),
       ]),
       ..._outRows.asMap().entries.map((entry) {
@@ -1000,7 +1006,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final total = _dbl(r['ta']!) + _dbl(r['da']!) + _dbl(r['hotel']!);
         return _sectionCard(isDark, children: [
           Row(children: [
-            Text('সারি ${i + 1}',
+            Text('Row ${i + 1}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1015,11 +1021,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('তারিখ', r['date']!)),
+            Expanded(child: _field('Date', r['date']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('কোথা থেকে', r['from']!)),
+            Expanded(child: _field('From', r['from']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('কোথায়', r['to']!)),
+            Expanded(child: _field('To', r['to']!)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
@@ -1034,19 +1040,19 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
             Expanded(
-                child: _field('হোটেল (৳)', r['hotel']!,
+                child: _field('Hotel (৳)', r['hotel']!,
                     keyboardType: TextInputType.number,
                     onChanged: (_) => setState(() {}))),
           ]),
           const SizedBox(height: 6),
-          Text('মোট: ৳ ${_fmt.format(total)}',
+          Text('Total: ৳ ${_fmt.format(total)}',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primaryAccent)),
         ]);
       }),
-      _totalRow('মোট', _outRows.fold(0.0,
+      _totalRow('Total', _outRows.fold(0.0,
           (s, r) => s + _dbl(r['ta']!) + _dbl(r['da']!) + _dbl(r['hotel']!))),
     ];
   }
@@ -1055,14 +1061,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   List<Widget> _buildMotoFields(bool isDark) {
     return [
       Row(children: [
-        Text('মটরসাইকেল লগ বুক',
+        Text('Motorcycle Log Book',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
         TextButton.icon(
           onPressed: _addMotoRow,
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: Text('সারি যোগ', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
         ),
       ]),
       ..._motoRows.asMap().entries.map((entry) {
@@ -1071,7 +1077,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final km = _dbl(r['latestReading']!) - _dbl(r['prevReading']!);
         return _sectionCard(isDark, children: [
           Row(children: [
-            Text('সারি ${i + 1}',
+            Text('Row ${i + 1}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1086,27 +1092,27 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('তারিখ', r['date']!)),
+            Expanded(child: _field('Date', r['date']!)),
             const SizedBox(width: 8),
-            Expanded(flex: 2, child: _field('গন্তব্য/স্থান', r['destination']!)),
+            Expanded(flex: 2, child: _field('Destination/Place', r['destination']!)),
           ]),
           const SizedBox(height: 8),
-          _field('উদ্দেশ্য', r['purposes']!),
+          _field('Purpose', r['purposes']!),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(
-                child: _field('পূর্ববর্তী রিডিং', r['prevReading']!,
+                child: _field('Previous Reading', r['prevReading']!,
                     keyboardType: TextInputType.number,
                     onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
             Expanded(
-                child: _field('সর্বশেষ রিডিং', r['latestReading']!,
+                child: _field('Latest Reading', r['latestReading']!,
                     keyboardType: TextInputType.number,
                     onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
             Expanded(
               child: Column(children: [
-                Text('মোট (KM)',
+                Text('Total (KM)',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 10, color: AppTheme.textGrey)),
                 Text('${_fmt.format(km < 0 ? 0 : km)}',
@@ -1120,11 +1126,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           const SizedBox(height: 8),
           Row(children: [
             Expanded(
-                child: _field('পেট্রোল/অকটেন (লি)', r['petrol']!,
+                child: _field('Petrol/Octane (L)', r['petrol']!,
                     keyboardType: TextInputType.number)),
             const SizedBox(width: 8),
             Expanded(
-                child: _field('মবিল (লি)', r['mobil']!,
+                child: _field('Mobil (L)', r['mobil']!,
                     keyboardType: TextInputType.number)),
           ]),
         ]);
@@ -1135,7 +1141,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   // ── Others Bill ──────────────────────────────────────────────────────
   List<Widget> _buildOthersBillFields(bool isDark) {
     return [
-      Text('TA/DA ও অন্যান্য বিল',
+      Text('TA/DA & Others Bill',
           style: GoogleFonts.hindSiliguri(
               fontSize: 14, fontWeight: FontWeight.w700)),
       const SizedBox(height: 8),
@@ -1148,7 +1154,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             )),
         Divider(color: AppTheme.divider.withValues(alpha: 0.5)),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('মোট টাকা',
+          Text('Total Taka',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 14, fontWeight: FontWeight.w700)),
           Text(
@@ -1170,10 +1176,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   List<Widget> _buildDaFields(bool isDark) {
     return [
       _sectionCard(isDark, children: [
-        _field('DA পরিমাণ (৳)', _daAmountCtrl,
+        _field('DA Amount (৳)', _daAmountCtrl,
             keyboardType: TextInputType.number),
         const SizedBox(height: 12),
-        _field('নোট', _daNoteCtrl),
+        _field('Note', _daNoteCtrl),
       ]),
     ];
   }

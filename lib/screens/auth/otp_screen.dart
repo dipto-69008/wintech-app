@@ -119,13 +119,13 @@ class _OtpScreenState extends State<OtpScreen>
                           color: Colors.white, size: 32),
                     ),
                     const SizedBox(height: 16),
-                    Text('যাচাইকরণ কোড',
+                    Text('Verification Code',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Colors.white)),
                     const SizedBox(height: 6),
-                    Text('আপনার ৬ সংখ্যার কোডটি প্রবেশ করুন',
+                    Text('Enter your 6-digit code',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 14,
                             color: Colors.white.withValues(alpha: 0.75))),
@@ -150,7 +150,7 @@ class _OtpScreenState extends State<OtpScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('কোড লিখুন',
+                  Text('Enter code',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -191,7 +191,7 @@ class _OtpScreenState extends State<OtpScreen>
 
                   if (_hasError) ...[
                     const SizedBox(height: 12),
-                    Text('কোডটি সঠিক নয়, আবার চেষ্টা করুন',
+                    Text('Incorrect code, please try again',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 13,
                             color: AppTheme.error,
@@ -220,7 +220,7 @@ class _OtpScreenState extends State<OtpScreen>
                                   valueColor:
                                       AlwaysStoppedAnimation(Colors.white)),
                             )
-                          : Text('যাচাই করুন',
+                          : Text('Verify',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 16, fontWeight: FontWeight.w700)),
                     ),

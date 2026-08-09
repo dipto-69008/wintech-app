@@ -26,7 +26,7 @@ class OrderItem {
   factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
         productName: m['productName'] ?? '',
         quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
-        unit: m['unit'] ?? 'পিস',
+        unit: m['unit'] ?? 'Piece',
         unitPrice: (m['unitPrice'] as num?)?.toDouble() ?? 0,
         isBonus: m['isBonus'] == true,
       );
@@ -76,10 +76,10 @@ class OrderModel {
 
   String get statusLabel {
     switch (status) {
-      case 'confirmed': return 'নিশ্চিত';
-      case 'delivered': return 'ডেলিভারি হয়েছে';
-      case 'cancelled': return 'বাতিল';
-      default: return 'অপেক্ষমাণ';
+      case 'confirmed': return 'Confirmed';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      default: return 'Pending';
     }
   }
 

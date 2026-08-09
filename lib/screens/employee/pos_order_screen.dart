@@ -36,38 +36,38 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   // Demo customers list
   final List<Map<String, String>> _customers = [
-    {'id': 'cust-001', 'name': 'মেসার্স আল-আমিন ট্রেডার্স'},
-    {'id': 'cust-002', 'name': 'নিউ ঢাকা এন্টারপ্রাইজ'},
-    {'id': 'cust-003', 'name': 'রহমান স্টোর্স'},
-    {'id': 'cust-004', 'name': 'বাংলাদেশ মার্চেন্টস'},
-    {'id': 'cust-005', 'name': 'সিটি ট্রেডিং কোম্পানি'},
-    {'id': 'cust-006', 'name': 'মেসার্স করিম ব্রাদার্স'},
-    {'id': 'cust-007', 'name': 'নর্থ বেঙ্গল ট্রেডার্স'},
-    {'id': 'cust-008', 'name': 'ইস্ট ওয়েস্ট সাপ্লাই'},
+    {'id': 'cust-001', 'name': 'Messrs Al-Amin Traders'},
+    {'id': 'cust-002', 'name': 'New Dhaka Enterprise'},
+    {'id': 'cust-003', 'name': 'Rahman Stores'},
+    {'id': 'cust-004', 'name': 'Bangladesh Merchants'},
+    {'id': 'cust-005', 'name': 'City Trading Company'},
+    {'id': 'cust-006', 'name': 'Messrs Karim Brothers'},
+    {'id': 'cust-007', 'name': 'North Bengal Traders'},
+    {'id': 'cust-008', 'name': 'East West Supply'},
   ];
 
   // Demo products
   final List<Map<String, dynamic>> _productSuggestions = [
-    {'name': 'সয়াবিন তেল ৫ লিটার', 'unit': 'কার্টন', 'price': 3200.0},
-    {'name': 'সয়াবিন তেল ১ লিটার', 'unit': 'কার্টন', 'price': 2800.0},
-    {'name': 'চিনি ১ কেজি', 'unit': 'বস্তা', 'price': 4500.0},
-    {'name': 'আটা ২ কেজি', 'unit': 'বস্তা', 'price': 2200.0},
-    {'name': 'ময়দা ১ কেজি', 'unit': 'বস্তা', 'price': 1800.0},
-    {'name': 'লবণ ১ কেজি', 'unit': 'কার্টন', 'price': 650.0},
-    {'name': 'মসুর ডাল ১ কেজি', 'unit': 'বস্তা', 'price': 5200.0},
-    {'name': 'ছোলার ডাল ১ কেজি', 'unit': 'বস্তা', 'price': 4800.0},
-    {'name': 'গুঁড়া দুধ ৪০০ গ্রাম', 'unit': 'কার্টন', 'price': 3600.0},
-    {'name': 'টমেটো সস ৩২০ গ্রাম', 'unit': 'কার্টন', 'price': 1200.0},
-    {'name': 'সরিষার তেল ১ লিটার', 'unit': 'কার্টন', 'price': 2200.0},
-    {'name': 'হলুদ গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 980.0},
-    {'name': 'মরিচ গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 1100.0},
-    {'name': 'ধনিয়া গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 850.0},
-    {'name': 'বিস্কুট (প্যাকেট)', 'unit': 'কার্টন', 'price': 1440.0},
-    {'name': 'চানাচুর ২৫০ গ্রাম', 'unit': 'কার্টন', 'price': 960.0},
-    {'name': 'সাবান (বার)', 'unit': 'কার্টন', 'price': 780.0},
-    {'name': 'শ্যাম্পু ৩৪০ মিলি', 'unit': 'ডজন', 'price': 1560.0},
-    {'name': 'টুথপেস্ট ১০০ গ্রাম', 'unit': 'ডজন', 'price': 1200.0},
-    {'name': 'ডিটারজেন্ট পাউডার ১ কেজি', 'unit': 'কার্টন', 'price': 2400.0},
+    {'name': 'Soybean Oil 5 Litre', 'unit': 'Carton', 'price': 3200.0},
+    {'name': 'Soybean Oil 1 Litre', 'unit': 'Carton', 'price': 2800.0},
+    {'name': 'Sugar 1 kg', 'unit': 'Sack', 'price': 4500.0},
+    {'name': 'Flour 2 kg', 'unit': 'Sack', 'price': 2200.0},
+    {'name': 'Maida 1 kg', 'unit': 'Sack', 'price': 1800.0},
+    {'name': 'Salt 1 kg', 'unit': 'Carton', 'price': 650.0},
+    {'name': 'Red Lentil 1 kg', 'unit': 'Sack', 'price': 5200.0},
+    {'name': 'Chickpea Dal 1 kg', 'unit': 'Sack', 'price': 4800.0},
+    {'name': 'Milk Powder 400 g', 'unit': 'Carton', 'price': 3600.0},
+    {'name': 'Tomato Sauce 320 g', 'unit': 'Carton', 'price': 1200.0},
+    {'name': 'Mustard Oil 1 Litre', 'unit': 'Carton', 'price': 2200.0},
+    {'name': 'Turmeric Powder 200 g', 'unit': 'Carton', 'price': 980.0},
+    {'name': 'Chilli Powder 200 g', 'unit': 'Carton', 'price': 1100.0},
+    {'name': 'Coriander Powder 200 g', 'unit': 'Carton', 'price': 850.0},
+    {'name': 'Biscuit (Packet)', 'unit': 'Carton', 'price': 1440.0},
+    {'name': 'Chanachur 250 g', 'unit': 'Carton', 'price': 960.0},
+    {'name': 'Soap (Bar)', 'unit': 'Carton', 'price': 780.0},
+    {'name': 'Shampoo 340 ml', 'unit': 'Dozen', 'price': 1560.0},
+    {'name': 'Toothpaste 100 g', 'unit': 'Dozen', 'price': 1200.0},
+    {'name': 'Detergent Powder 1 kg', 'unit': 'Carton', 'price': 2400.0},
   ];
 
   final _fmt = NumberFormat('#,##0.00', 'en_US');
@@ -114,12 +114,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   Future<void> _submitOrder() async {
     if (_selectedCustomerId.isEmpty) {
-      _showError('কাস্টমার বেছে নিন');
+      _showError('Please select a customer');
       return;
     }
     final validItems = _items.where((i) => i.isValid).toList();
     if (validItems.isEmpty) {
-      _showError('কমপক্ষে একটি পণ্য যোগ করুন');
+      _showError('Please add at least one product');
       return;
     }
 
@@ -170,7 +170,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     setState(() => _saving = false);
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ অর্ডার সফলভাবে জমা হয়েছে!',
+      content: Text('✅ Order submitted successfully!',
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
       backgroundColor: AppTheme.success,
       behavior: SnackBarBehavior.floating,
@@ -212,7 +212,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                   decoration: BoxDecoration(
                       color: AppTheme.divider,
                       borderRadius: BorderRadius.circular(4))),
-              Text('কাস্টমার বেছে নিন',
+              Text('Select Customer',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
@@ -275,7 +275,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('নতুন অর্ডার — POS',
+        title: Text('New Order — POS',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 17, fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
@@ -320,12 +320,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('কাস্টমার *',
+                              Text('Customer *',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 11, color: AppTheme.textGrey)),
                               Text(
                                 _selectedCustomerName.isEmpty
-                                    ? 'কাস্টমার বেছে নিন'
+                                    ? 'Select Customer'
                                     : _selectedCustomerName,
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 14,
@@ -363,7 +363,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                                 color: AppTheme.primaryAccent,
                                 borderRadius: BorderRadius.circular(2))),
                         const SizedBox(width: 8),
-                        Text('পণ্য তালিকা',
+                        Text('Product List',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -374,7 +374,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       TextButton.icon(
                         onPressed: _addItem,
                         icon: const Icon(Icons.add_rounded, size: 18),
-                        label: Text('পণ্য যোগ',
+                        label: Text('Add Product',
                             style: GoogleFonts.hindSiliguri(fontSize: 13)),
                         style: TextButton.styleFrom(
                             foregroundColor: AppTheme.primaryAccent),
@@ -403,7 +403,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       maxLines: 3,
                       style: GoogleFonts.hindSiliguri(fontSize: 14),
                       decoration: InputDecoration(
-                        labelText: 'নোট (ঐচ্ছিক)',
+                        labelText: 'Notes (Optional)',
                         labelStyle: GoogleFonts.hindSiliguri(
                             fontSize: 13, color: AppTheme.textGrey),
                         border: InputBorder.none,
@@ -434,7 +434,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('মোট পরিমাণ',
+                    Text('Total Amount',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 16, fontWeight: FontWeight.w600)),
                     Text('৳ ${_fmt.format(_total)}',
@@ -452,7 +452,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       Text('🎁 Bonus / Free',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 12, color: AppTheme.warning)),
-                      Text('${_fmt.format(_bonusCount)} ইউনিট',
+                      Text('${_fmt.format(_bonusCount)} units',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -484,7 +484,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                                 valueColor:
                                     AlwaysStoppedAnimation(Colors.white)))
                         : const Icon(Icons.check_circle_rounded, size: 20),
-                    label: Text(_saving ? 'সংরক্ষণ হচ্ছে...' : 'অর্ডার জমা দিন',
+                    label: Text(_saving ? 'Saving...' : 'Submit Order',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
@@ -513,7 +513,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               const Icon(Icons.description_rounded,
                   color: AppTheme.primaryAccent, size: 19),
               const SizedBox(width: 8),
-              Text('অর্ডার তথ্য',
+              Text('Order Info',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 15, fontWeight: FontWeight.w700)),
             ],
@@ -593,7 +593,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                     ),
                     child: Text(
                       _probablePaymentDate == null
-                          ? 'তারিখ দিন'
+                          ? 'Select date'
                           : DateFormat('dd MMM yyyy')
                               .format(_probablePaymentDate!),
                       style: GoogleFonts.hindSiliguri(
@@ -614,7 +614,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               child: TextButton.icon(
                 onPressed: () => setState(() => _probablePaymentDate = null),
                 icon: const Icon(Icons.close_rounded, size: 14),
-                label: const Text('তারিখ সরান'),
+                label: const Text('Remove Date'),
               ),
             ),
           const SizedBox(height: 10),
@@ -694,7 +694,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                 onChanged: (_) => setState(() {}),
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'পণ্যের নাম *',
+                  labelText: 'Product Name *',
                   labelStyle: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey),
                   border: OutlineInputBorder(
@@ -744,7 +744,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                 ],
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'পরিমাণ *',
+                  labelText: 'Quantity *',
                   labelStyle: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey),
                   border: OutlineInputBorder(
@@ -764,7 +764,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                     fontSize: 14,
                     color: isDark ? AppTheme.darkText : AppTheme.textDark),
                 decoration: InputDecoration(
-                  labelText: 'একক',
+                  labelText: 'Unit',
                   labelStyle: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey),
                   border: OutlineInputBorder(
@@ -773,13 +773,13 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       horizontal: 12, vertical: 10),
                   isDense: true,
                 ),
-                items: ['পিস', 'কেজি', 'লিটার', 'বাক্স', 'ডজন', 'কার্টন', 'গ্রাম']
+                items: ['Piece', 'Kg', 'Litre', 'Box', 'Dozen', 'Carton', 'Gram']
                     .map((u) => DropdownMenuItem(
                         value: u,
                         child: Text(u,
                             style: GoogleFonts.hindSiliguri(fontSize: 13))))
                     .toList(),
-                onChanged: (v) => setState(() => item.unit = v ?? 'পিস'),
+                onChanged: (v) => setState(() => item.unit = v ?? 'Piece'),
               ),
             ),
             const SizedBox(width: 8),
@@ -795,7 +795,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                 ],
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'একক মূল্য (৳) *',
+                  labelText: 'Unit Price (৳) *',
                   labelStyle: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey),
                   border: OutlineInputBorder(
@@ -864,7 +864,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                         textAlign: TextAlign.center,
                         style: GoogleFonts.hindSiliguri(fontSize: 12),
                         decoration: InputDecoration(
-                          labelText: 'ফ্রি পরিমাণ',
+                          labelText: 'Free Qty',
                           labelStyle:
                               GoogleFonts.hindSiliguri(fontSize: 10),
                           isDense: true,
@@ -877,7 +877,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'ফ্রি',
+                      'Free',
                       style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: AppTheme.warning,
@@ -905,7 +905,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                'মোট: ৳ ${_fmt.format(item.lineTotal)}',
+                'Total: ৳ ${_fmt.format(item.lineTotal)}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -990,7 +990,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text('পণ্য বেছে নিন',
+                    child: Text('Select Product',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 16, fontWeight: FontWeight.w700,
                             color: isDark
@@ -1014,7 +1014,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
-                  hintText: 'পণ্যের নাম খুঁজুন...',
+                  hintText: 'Search product name...',
                   hintStyle: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: AppTheme.textGrey),
                   prefixIcon: const Icon(Icons.search_rounded,
@@ -1063,7 +1063,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                       const Icon(Icons.search_off_rounded,
                           color: AppTheme.textGrey, size: 40),
                       const SizedBox(height: 8),
-                      Text('কোনো পণ্য পাওয়া যায়নি',
+                      Text('No products found',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 14, color: AppTheme.textGrey)),
                     ],
@@ -1114,7 +1114,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                               .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text('যোগ করুন',
+                        child: Text('Add',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12,
                                 color: AppTheme.primaryAccent,
@@ -1140,7 +1140,7 @@ class _ItemRow {
   final qtyCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final bonusQtyCtrl = TextEditingController();
-  String unit = 'পিস';
+  String unit = 'Piece';
   bool bonusEnabled = false;
 
   bool get isValid {

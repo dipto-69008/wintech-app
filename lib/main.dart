@@ -15,7 +15,6 @@ import 'screens/settings/digital_id_card_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/target/target_screen.dart';
 import 'screens/commission/commission_screen.dart';
-import 'screens/withdrawal/withdrawal_screen.dart';
 import 'models/order_model.dart';
 import 'screens/employee/pos_order_screen.dart';
 import 'screens/employee/order_detail_screen.dart';
@@ -106,8 +105,6 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
             return _slide(const TargetScreen(), settings);
           case '/commission':
             return _slide(const CommissionScreen(), settings);
-          case '/withdrawal':
-            return _slide(const WithdrawalScreen(), settings);
           case '/order-detail':
             final order = settings.arguments as OrderModel;
             return _slide(OrderDetailScreen(order: order), settings);

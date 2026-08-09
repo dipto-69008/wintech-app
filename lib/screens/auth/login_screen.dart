@@ -95,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: AppTheme.primaryAccent,
                       letterSpacing: 2)),
               const SizedBox(height: 4),
-              Text('আপনার অ্যাকাউন্টে লগইন করুন',
+              Text('Sign in to your account',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, color: AppTheme.textGrey)),
               const SizedBox(height: 32),
@@ -105,17 +105,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     BanglaTextField(
                       controller: _emailCtrl,
-                      label: 'ইমেইল',
+                      label: 'Email',
                       hint: 'example@gmail.com',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) =>
-                          (v == null || v.isEmpty) ? 'ইমেইল দিন' : null,
+                          (v == null || v.isEmpty) ? 'Enter your email' : null,
                     ),
                     const SizedBox(height: 16),
                     BanglaTextField(
                       controller: _passCtrl,
-                      label: 'পাসওয়ার্ড',
+                      label: 'Password',
                       hint: '••••••••',
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: _obscurePass,
@@ -131,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             setState(() => _obscurePass = !_obscurePass),
                       ),
                       validator: (v) =>
-                          (v == null || v.length < 4) ? 'পাসওয়ার্ড দিন' : null,
+                          (v == null || v.length < 4) ? 'Enter your password' : null,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     valueColor: AlwaysStoppedAnimation(
                                         Colors.white)),
                               )
-                            : Text('লগইন করুন',
+                            : Text('Log In',
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700)),
@@ -172,18 +172,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Icon(Icons.info_outline_rounded,
                                 size: 16, color: AppTheme.primaryAccent),
                             const SizedBox(width: 6),
-                            Text('ডেমো অ্যাকাউন্ট — Wintech Agro',
+                            Text('Demo Account — Wintech Agro',
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primaryAccent)),
                           ]),
                           const SizedBox(height: 8),
-                          _demoRow('অ্যাডমিন', 'admin@gmail.com'),
-                          _demoRow('এস.আর. / কর্মী', 'sr@wintech.com'),
-                          _demoRow('কাস্টমার', 'customer@gmail.com'),
+                          _demoRow('Admin', 'admin@gmail.com'),
+                          _demoRow('Officer / Staff', 'sr@wintech.com'),
+                          _demoRow('Customer', 'customer@gmail.com'),
                           const SizedBox(height: 4),
-                          Text('পাসওয়ার্ড: যেকোনো কিছু | OTP: 123456',
+                          Text('Password: anything | OTP: 123456',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 11,
                                   color: AppTheme.textGrey,

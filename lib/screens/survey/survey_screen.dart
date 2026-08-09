@@ -95,7 +95,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
       initialDate: (from ? _fromDate : _toDate) ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      helpText: from ? 'শুরুর তারিখ বাছাই করুন' : 'শেষের তারিখ বাছাই করুন',
+      helpText: from ? 'Select Start Date' : 'Select End Date',
     );
     if (picked == null) return;
     setState(() {
@@ -122,21 +122,21 @@ class _SurveyScreenState extends State<SurveyScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('রেকর্ড মুছে ফেলবেন?',
+        title: Text('Delete Record?',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         content: Text(
-          'এই ${survey.type == SurveyModel.typeFarmer ? 'কৃষক' : 'ডিলার'} ভিজিটের তথ্য আর ফিরে পাওয়া যাবে না।',
+          'This ${survey.type == SurveyModel.typeFarmer ? 'farmer' : 'dealer'} visit record cannot be recovered.',
           style: GoogleFonts.hindSiliguri(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('বাতিল'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('মুছে ফেলুন'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -147,7 +147,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
     _load();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Survey রেকর্ড মুছে ফেলা হয়েছে',
+        content: Text('Survey record deleted',
             style: GoogleFonts.hindSiliguri()),
         behavior: SnackBarBehavior.floating,
       ),
@@ -164,7 +164,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final title = _tab == SurveyModel.typeFarmer ? 'কৃষক ভিজিট' : 'ডিলার ভিজিট';
+    final title = _tab == SurveyModel.typeFarmer ? 'Farmer Visit' : 'Dealer Visit';
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: RefreshIndicator(
@@ -207,7 +207,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: Text('$title যোগ করুন',
+        label: Text('Add $title',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
       ),
     );
@@ -245,12 +245,12 @@ class _SurveyScreenState extends State<SurveyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('ফিল্ড সার্ভে',
+                Text('Field Survey',
                     style: GoogleFonts.hindSiliguri(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w800)),
-                Text('SR field visit reports',
+                Text('Officer field visit reports',
                     style: GoogleFonts.hindSiliguri(
                         color: Colors.white70, fontSize: 12)),
               ],
@@ -259,7 +259,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           IconButton(
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            tooltip: 'রিফ্রেশ',
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -268,10 +268,10 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   Widget _summary(bool isDark) {
     final cards = [
-      ('কৃষক ভিজিট', '$_farmerCount', Icons.grass_rounded, const Color(0xFF2E9B67)),
-      ('ডিলার ভিজিট', '$_dealerCount', Icons.storefront_rounded, const Color(0xFF2477C5)),
-      ('দেখানো হয়েছে', '${_filtered.length}', Icons.assignment_rounded, const Color(0xFF7B4FC9)),
-      ('এই মাসে', '$_monthCount', Icons.calendar_month_rounded, AppTheme.warning),
+      ('Farmer Visits', '$_farmerCount', Icons.grass_rounded, const Color(0xFF2E9B67)),
+      ('Dealer Visits', '$_dealerCount', Icons.storefront_rounded, const Color(0xFF2477C5)),
+      ('Shown', '${_filtered.length}', Icons.assignment_rounded, const Color(0xFF7B4FC9)),
+      ('This Month', '$_monthCount', Icons.calendar_month_rounded, AppTheme.warning),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -340,7 +340,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                 child: TextField(
                   onChanged: (value) => setState(() => _search = value),
                   decoration: const InputDecoration(
-                    hintText: 'কর্মী, নাম বা দোকান খুঁজুন',
+                    hintText: 'Search officer, name or shop',
                     prefixIcon: Icon(Icons.search_rounded),
                     isDense: true,
                   ),
@@ -356,7 +356,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   foregroundColor: AppTheme.primaryAccent,
                 ),
                 icon: const Icon(Icons.filter_alt_rounded),
-                tooltip: 'তারিখ ফিল্টার',
+                tooltip: 'Date Filter',
               ),
             ],
           ),
@@ -369,8 +369,8 @@ class _SurveyScreenState extends State<SurveyScreen> {
             ),
             child: Row(
               children: [
-                _tabButton('farmer', 'কৃষক ভিজিট', Icons.grass_rounded),
-                _tabButton('dealer', 'ডিলার ভিজিট', Icons.storefront_rounded),
+                _tabButton('farmer', 'Farmer Visit', Icons.grass_rounded),
+                _tabButton('dealer', 'Dealer Visit', Icons.storefront_rounded),
               ],
             ),
           ),
@@ -385,7 +385,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                     Chip(
                       avatar: const Icon(Icons.date_range_rounded, size: 15),
                       label: Text(
-                        '${_fromDate == null ? 'শুরু নেই' : DateFormat('dd/MM/yy').format(_fromDate!)} — ${_toDate == null ? 'শেষ নেই' : DateFormat('dd/MM/yy').format(_toDate!)}',
+                        '${_fromDate == null ? 'No start' : DateFormat('dd/MM/yy').format(_fromDate!)} — ${_toDate == null ? 'No end' : DateFormat('dd/MM/yy').format(_toDate!)}',
                         style: GoogleFonts.hindSiliguri(fontSize: 11),
                       ),
                       onDeleted: () => setState(() {
@@ -444,7 +444,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('তারিখ দিয়ে ফিল্টার',
+            Text('Filter by Date',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
@@ -455,19 +455,19 @@ class _SurveyScreenState extends State<SurveyScreen> {
                     onPressed: () => _pickDate(from: true),
                     icon: const Icon(Icons.calendar_today_rounded, size: 16),
                     label: Text(_fromDate == null
-                        ? 'শুরু'
+                        ? 'Start'
                         : DateFormat('dd MMM yyyy').format(_fromDate!)),
                   ),
                 ),
                 const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('থেকে')),
+                    child: Text('to')),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _pickDate(from: false),
                     icon: const Icon(Icons.event_rounded, size: 16),
                     label: Text(_toDate == null
-                        ? 'শেষ'
+                        ? 'End'
                         : DateFormat('dd MMM yyyy').format(_toDate!)),
                   ),
                 ),
@@ -484,7 +484,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   });
                   Navigator.pop(context);
                 },
-                child: const Text('ফিল্টার পরিষ্কার করুন'),
+                child: const Text('Clear Filter'),
               ),
             ),
           ],
@@ -508,11 +508,11 @@ class _SurveyScreenState extends State<SurveyScreen> {
               color: AppTheme.primaryAccent.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 12),
-            Text('কোনো $title পাওয়া যায়নি',
+            Text('No $title found',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('নতুন ভিজিট রেকর্ড যোগ করতে নিচের বাটনে চাপুন',
+            Text('Tap the button below to add a new visit record',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12, color: AppTheme.textGrey)),
@@ -541,8 +541,8 @@ class _SurveyCard extends StatelessWidget {
     final isFarmer = survey.type == SurveyModel.typeFarmer;
     final accent = isFarmer ? const Color(0xFF2E9B67) : const Color(0xFF2477C5);
     final name = isFarmer
-        ? (survey.farmName.isEmpty ? 'কৃষকের নাম দেওয়া হয়নি' : survey.farmName)
-        : (survey.shopName.isEmpty ? 'দোকানের নাম দেওয়া হয়নি' : survey.shopName);
+        ? (survey.farmName.isEmpty ? 'Farmer name not provided' : survey.farmName)
+        : (survey.shopName.isEmpty ? 'Shop name not provided' : survey.shopName);
     final person = isFarmer ? survey.farmerMobile : survey.dealerName;
     final location = isFarmer ? survey.village : survey.bazarName;
     return Card(
@@ -586,7 +586,7 @@ class _SurveyCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       [
-                        survey.workerName.isEmpty ? 'কর্মী নেই' : survey.workerName,
+                        survey.workerName.isEmpty ? 'No officer' : survey.workerName,
                         if (person.isNotEmpty) person,
                         if (location.isNotEmpty) location,
                       ].join('  •  '),
@@ -614,7 +614,7 @@ class _SurveyCard extends StatelessWidget {
                         child: Row(
                           children: [
                             if (survey.wintechStock.isNotEmpty)
-                              _tag('স্টক: ${survey.wintechStock}', accent),
+                              _tag('Stock: ${survey.wintechStock}', accent),
                             if (survey.collectionAmount != null) ...[
                               const SizedBox(width: 5),
                               _tag(
@@ -635,9 +635,9 @@ class _SurveyCard extends StatelessWidget {
                   if (value == 'delete') onDelete();
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'view', child: Text('বিস্তারিত দেখুন')),
-                  PopupMenuItem(value: 'edit', child: Text('এডিট করুন')),
-                  PopupMenuItem(value: 'delete', child: Text('মুছে ফেলুন')),
+                  PopupMenuItem(value: 'view', child: Text('View Details')),
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
                 icon: const Icon(Icons.more_vert_rounded),
               ),
@@ -791,11 +791,11 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     if (_type == SurveyModel.typeFarmer &&
         _farmName.text.trim().isEmpty &&
         _farmerMobile.text.trim().isEmpty) {
-      _message('ফার্মের নাম অথবা মোবাইল নম্বর দিন');
+      _message('Please enter farm name or mobile number');
       return;
     }
     if (_type == SurveyModel.typeDealer && _shopName.text.trim().isEmpty) {
-      _message('দোকানের নাম দিন');
+      _message('Please enter shop name');
       return;
     }
     setState(() => _saving = true);
@@ -847,7 +847,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
         children: [
           Expanded(
             child: Text(
-              '${widget.existing == null ? 'নতুন' : 'এডিট'} ${isFarmer ? 'কৃষক' : 'ডিলার'} ভিজিট',
+              '${widget.existing == null ? 'New' : 'Edit'} ${isFarmer ? 'Farmer' : 'Dealer'} Visit',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 19, fontWeight: FontWeight.w800),
             ),
@@ -866,14 +866,14 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _section('ভিজিট তথ্য'),
+                _section('Visit Info'),
                 Row(
                   children: [
                     Expanded(child: _workerField()),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _field(_posting, 'Posting / ID',
-                          hint: 'কর্মী আইডি'),
+                          hint: 'Officer ID'),
                     ),
                   ],
                 ),
@@ -883,29 +883,29 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   borderRadius: BorderRadius.circular(12),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                        labelText: 'ভিজিটের তারিখ',
+                        labelText: 'Visit Date',
                         prefixIcon: Icon(Icons.calendar_today_rounded)),
                     child: Text(_visitDate),
                   ),
                 ),
                 const SizedBox(height: 16),
-                _section(isFarmer ? 'ফার্মার তথ্য' : 'দোকান / ডিলার তথ্য'),
+                _section(isFarmer ? 'Farmer Info' : 'Shop / Dealer Info'),
                 if (isFarmer) ...[
                   Row(
                     children: [
-                      Expanded(child: _field(_farmName, 'ফার্ম / কৃষকের নাম')),
+                      Expanded(child: _field(_farmName, 'Farm / Farmer Name')),
                       const SizedBox(width: 10),
-                      Expanded(child: _field(_farmerMobile, 'মোবাইল / WhatsApp',
+                      Expanded(child: _field(_farmerMobile, 'Mobile / WhatsApp',
                           keyboard: TextInputType.phone)),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _field(_village, 'গ্রাম / ইউনিয়ন'),
+                  _field(_village, 'Village / Union'),
                   const SizedBox(height: 10),
-                  _field(_diseases, 'নতুন রোগ / সমস্যা',
+                  _field(_diseases, 'New Disease / Problem',
                       maxLines: 2, required: false),
                   const SizedBox(height: 14),
-                  Text('Wintech পণ্য ব্যবহার হয়েছে',
+                  Text('Wintech products used',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 12, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
@@ -935,32 +935,32 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   Row(
                     children: [
                       Expanded(
-                          child: _field(_shopName, 'দোকানের নাম',
+                          child: _field(_shopName, 'Shop Name',
                               required: true)),
                       const SizedBox(width: 10),
-                      Expanded(child: _field(_dealerName, 'ডিলারের নাম')),
+                      Expanded(child: _field(_dealerName, 'Dealer Name')),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
-                          child: _field(_dealerMobile, 'মোবাইল / WhatsApp',
+                          child: _field(_dealerMobile, 'Mobile / WhatsApp',
                               keyboard: TextInputType.phone)),
                       const SizedBox(width: 10),
-                      Expanded(child: _field(_bazarName, 'বাজার / মার্কেট')),
+                      Expanded(child: _field(_bazarName, 'Market / Bazar')),
                     ],
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: _stock.isEmpty ? null : _stock,
                     decoration: const InputDecoration(
-                        labelText: 'Wintech পণ্যের স্টক'),
+                        labelText: 'Wintech Stock Level'),
                     items: const [
-                      DropdownMenuItem(value: 'High', child: Text('High — পর্যাপ্ত')),
-                      DropdownMenuItem(value: 'Medium', child: Text('Medium — মাঝারি')),
-                      DropdownMenuItem(value: 'Low', child: Text('Low — কম')),
-                      DropdownMenuItem(value: 'None', child: Text('None — নেই')),
+                      DropdownMenuItem(value: 'High', child: Text('High — Adequate')),
+                      DropdownMenuItem(value: 'Medium', child: Text('Medium — Moderate')),
+                      DropdownMenuItem(value: 'Low', child: Text('Low — Scarce')),
+                      DropdownMenuItem(value: 'None', child: Text('None — Out of stock')),
                     ],
                     onChanged: (value) => setState(() => _stock = value ?? ''),
                   ),
@@ -971,17 +971,17 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                           child: _field(_competitor, 'Competitor product')),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _field(_collection, 'কালেকশন (৳)',
+                        child: _field(_collection, 'Collection (৳)',
                             keyboard: const TextInputType.numberWithOptions(
                                 decimal: true)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _field(_remarks, 'মন্তব্য', maxLines: 3, required: false),
+                  _field(_remarks, 'Remarks', maxLines: 3, required: false),
                 ],
                 const SizedBox(height: 14),
-                _section('ছবি (ঐচ্ছিক)'),
+                _section('Photo (Optional)'),
                 _photoPicker(),
               ],
             ),
@@ -991,7 +991,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       actions: [
         OutlinedButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('বাতিল'),
+          child: const Text('Cancel'),
         ),
         FilledButton.icon(
           onPressed: _saving ? null : _save,
@@ -1055,12 +1055,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                         height: 15,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.add_a_photo_rounded, size: 17),
-                label: Text(hasPhoto ? 'ছবি পরিবর্তন করুন' : 'ছবি যোগ করুন'),
+                label: Text(hasPhoto ? 'Change Photo' : 'Add Photo'),
               ),
               if (hasPhoto)
                 TextButton(
                   onPressed: () => setState(() => _photo = ''),
-                  child: const Text('ছবি সরিয়ে দিন'),
+                  child: const Text('Remove Photo'),
                 ),
             ],
           ),
@@ -1080,12 +1080,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_camera_rounded),
-                title: const Text('ক্যামেরা দিয়ে তুলুন'),
+                title: const Text('Take with Camera'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('গ্যালারি থেকে নিন'),
+                title: const Text('Choose from Gallery'),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
             ],
@@ -1107,14 +1107,14 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   Widget _workerField() {
     return DropdownButtonFormField<String>(
       value: _employees.any((e) => e.name == _worker.text) ? _worker.text : null,
-      decoration: const InputDecoration(labelText: 'কর্মীর নাম *'),
-      hint: const Text('কর্মী বাছাই করুন'),
+      decoration: const InputDecoration(labelText: 'Officer Name *'),
+      hint: const Text('Select Officer'),
       items: _employees
           .map((employee) =>
               DropdownMenuItem(value: employee.name, child: Text(employee.name)))
           .toList(),
       onChanged: (value) => setState(() => _worker.text = value ?? ''),
-      validator: (_) => _worker.text.trim().isEmpty ? 'প্রয়োজন' : null,
+      validator: (_) => _worker.text.trim().isEmpty ? 'Required' : null,
     );
   }
 
@@ -1129,7 +1129,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       maxLines: maxLines,
       decoration: InputDecoration(labelText: required ? '$label *' : label, hintText: hint),
       validator: required
-          ? (value) => value == null || value.trim().isEmpty ? 'প্রয়োজন' : null
+          ? (value) => value == null || value.trim().isEmpty ? 'Required' : null
           : null,
     );
   }
@@ -1144,34 +1144,34 @@ class _SurveyDetailsDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFarmer = survey.type == SurveyModel.typeFarmer;
     final items = <MapEntry<String, String>>[
-      MapEntry('কর্মী', survey.workerName),
+      MapEntry('Officer', survey.workerName),
       MapEntry('Posting / ID', survey.postingId),
-      MapEntry('ভিজিটের তারিখ', _SurveyCard._formatDate(survey.visitDate)),
+      MapEntry('Visit Date', _SurveyCard._formatDate(survey.visitDate)),
       if (isFarmer) ...[
-        MapEntry('ফার্ম / কৃষকের নাম', survey.farmName),
-        MapEntry('মোবাইল', survey.farmerMobile),
-        MapEntry('গ্রাম / ইউনিয়ন', survey.village),
-        MapEntry('রোগ / সমস্যা', survey.diseases),
-        MapEntry('ব্যবহৃত পণ্য', survey.wintechProducts.join(', ')),
+        MapEntry('Farm / Farmer Name', survey.farmName),
+        MapEntry('Mobile', survey.farmerMobile),
+        MapEntry('Village / Union', survey.village),
+        MapEntry('Disease / Problem', survey.diseases),
+        MapEntry('Products Used', survey.wintechProducts.join(', ')),
         MapEntry('Recommendation', survey.prescription),
       ] else ...[
-        MapEntry('দোকানের নাম', survey.shopName),
-        MapEntry('ডিলারের নাম', survey.dealerName),
-        MapEntry('মোবাইল', survey.dealerMobile),
-        MapEntry('বাজার / মার্কেট', survey.bazarName),
+        MapEntry('Shop Name', survey.shopName),
+        MapEntry('Dealer Name', survey.dealerName),
+        MapEntry('Mobile', survey.dealerMobile),
+        MapEntry('Market / Bazar', survey.bazarName),
         MapEntry('Wintech stock', survey.wintechStock),
         MapEntry('Competitor product', survey.competitorProduct),
         MapEntry('Collection', survey.collectionAmount == null
             ? ''
             : '৳${NumberFormat('#,##0').format(survey.collectionAmount)}'),
-        MapEntry('মন্তব্য', survey.remarks),
+        MapEntry('Remarks', survey.remarks),
       ],
     ];
     return AlertDialog(
       title: Row(
         children: [
           Expanded(
-            child: Text(isFarmer ? 'কৃষক ভিজিট বিস্তারিত' : 'ডিলার ভিজিট বিস্তারিত',
+            child: Text(isFarmer ? 'Farmer Visit Details' : 'Dealer Visit Details',
                 style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w800)),
           ),
           IconButton(
@@ -1198,7 +1198,7 @@ class _SurveyDetailsDialog extends StatelessWidget {
                         height: 70,
                         alignment: Alignment.center,
                         color: AppTheme.lightAccent,
-                        child: Text('ছবিটি এই ডিভাইসে আর পাওয়া যাচ্ছে না',
+                        child: Text('Photo no longer available on this device',
                             style: GoogleFonts.hindSiliguri(
                                 color: AppTheme.textGrey, fontSize: 12)),
                       ),
@@ -1234,7 +1234,7 @@ class _SurveyDetailsDialog extends StatelessWidget {
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('বন্ধ করুন'),
+          child: const Text('Close'),
         ),
       ],
     );

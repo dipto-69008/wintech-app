@@ -52,7 +52,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
     HapticFeedback.lightImpact();
     Clipboard.setData(ClipboardData(text: _user?.id ?? ''));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('আইডি কপি হয়েছে!',
+      content: Text('ID copied!',
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
       backgroundColor: AppTheme.success,
       behavior: SnackBarBehavior.floating,
@@ -64,7 +64,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
   void _share() {
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('কার্ড শেয়ার হচ্ছে...',
+      content: Text('Sharing card...',
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
       backgroundColor: AppTheme.primaryAccent,
       behavior: SnackBarBehavior.floating,
@@ -85,7 +85,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
         ),
-        title: Text('ডিজিটাল আইডি কার্ড',
+        title: Text('Digital ID Card',
             style: GoogleFonts.hindSiliguri(
                 fontWeight: FontWeight.w700, color: Colors.white)),
         actions: [
@@ -196,7 +196,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white)),
-                        Text('সেলস পার্টনার কার্ড',
+                        Text('Sales Partner Card',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 10, color: Colors.white60)),
                       ],
@@ -295,7 +295,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                 if (user.zela.isNotEmpty || user.thana.isNotEmpty)
                   const SizedBox(height: 8),
                 if (user.teamName.isNotEmpty)
-                  _cardRow(Icons.group_rounded, 'টিম: ${user.teamName}'),
+                  _cardRow(Icons.group_rounded, 'Team: ${user.teamName}'),
 
                 const SizedBox(height: 16),
                 // ID row with copy
@@ -329,7 +329,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                           const Icon(Icons.copy_rounded,
                               color: Colors.white, size: 12),
                           const SizedBox(width: 4),
-                          Text('কপি',
+                          Text('Copy',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -377,18 +377,18 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('পারফরম্যান্স',
+          Text('Performance',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: isDark ? AppTheme.darkText : AppTheme.textDark)),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: _statTile('মোট বিক্রি',
+            Expanded(child: _statTile('Total Sales',
                 _formatTaka(user.totalSales),
                 Icons.trending_up_rounded, AppTheme.success, isDark)),
             const SizedBox(width: 10),
-            Expanded(child: _statTile('কমিশন রেট',
+            Expanded(child: _statTile('Commission Rate',
                 '${(user.commissionRate * 100).toStringAsFixed(1)}%',
                 Icons.percent_rounded, AppTheme.primaryAccent, isDark)),
           ]),
@@ -408,7 +408,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
                             color: user.badgeColor)),
                     const Spacer(),
                     if (user.totalSales < 5000000)
-                      Text('পরবর্তী: ${user.nextBadgeName}',
+                      Text('Next: ${user.nextBadgeName}',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 11,
                               color: isDark ? AppTheme.darkTextGrey : AppTheme.textGrey)),
@@ -459,7 +459,7 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
       Expanded(
         child: _actionBtn(
           icon: Icons.share_rounded,
-          label: 'কার্ড শেয়ার করুন',
+          label: 'Share Card',
           color: AppTheme.primaryAccent,
           onTap: _share,
         ),
@@ -468,10 +468,10 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
       Expanded(
         child: _actionBtn(
           icon: Icons.download_rounded,
-          label: 'ডাউনলোড করুন',
+          label: 'Download',
           color: AppTheme.success,
           onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('শীঘ্রই আসছে...',
+            content: Text('Coming soon...',
                 style: GoogleFonts.hindSiliguri()),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -516,8 +516,8 @@ class _DigitalIdCardScreenState extends State<DigitalIdCardScreen>
   }
 
   String _formatTaka(double v) {
-    if (v >= 10000000) return '৳${(v / 10000000).toStringAsFixed(1)} কোটি';
-    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)} লক্ষ';
+    if (v >= 10000000) return '৳${(v / 10000000).toStringAsFixed(1)} Crore';
+    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)} Lakh';
     if (v >= 1000) return '৳${(v / 1000).toStringAsFixed(1)}K';
     return '৳${v.toStringAsFixed(0)}';
   }

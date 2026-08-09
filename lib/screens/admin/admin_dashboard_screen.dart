@@ -85,9 +85,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 slivers: [
                   SliverToBoxAdapter(child: _buildHeader(isDark)),
                   SliverToBoxAdapter(child: _buildSummaryRow(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('এস.আর. পারফরম্যান্স', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('Officer Performance', isDark)),
                   SliverToBoxAdapter(child: _buildSRPerformance(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('সাম্প্রতিক অর্ডার', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('Recent Orders', isDark)),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => _buildOrderTile(_orders[i], isDark),
@@ -103,7 +103,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildHeader(bool isDark) {
     final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'সুপ্রভাত' : hour < 17 ? 'শুভ অপরাহ্ন' : 'শুভ সন্ধ্যা';
+    final greet = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.primaryAccent,
@@ -130,7 +130,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$greet, ${_user?.name ?? 'অ্যাডমিন'}! 👋',
+                Text('$greet, ${_user?.name ?? 'Admin'}! 👋',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -143,7 +143,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6)),
-                    child: Text('Wintech Agro — অ্যাডমিন',
+                    child: Text('Wintech Agro — Admin',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11,
                             color: Colors.white,
@@ -198,7 +198,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('এই মাসের মোট বিক্রয়',
+                Text('This Month\'s Total Sales',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 13, color: Colors.white70)),
                 const SizedBox(height: 6),
@@ -210,13 +210,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 Row(children: [
                   _headerChip(Icons.receipt_long_rounded,
-                      '${_thisMonthOrders.length} অর্ডার'),
+                      '${_thisMonthOrders.length} Orders'),
                   const SizedBox(width: 10),
                   _headerChip(Icons.people_rounded,
-                      '${stats.length} এস.আর.'),
+                      '${stats.length} Officers'),
                   const SizedBox(width: 10),
                   _headerChip(Icons.account_balance_wallet_rounded,
-                      '৳ ${_fmt.format(_totalOutstanding)} বকেয়া'),
+                      '৳ ${_fmt.format(_totalOutstanding)} Due'),
                 ]),
               ],
             ),
@@ -226,17 +226,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(children: [
             Expanded(
                 child: _statCard(
-                    cardBg, 'মোট অর্ডার', '${_orders.length}',
+                    cardBg, 'Total Orders', '${_orders.length}',
                     Icons.receipt_rounded, AppTheme.primaryAccent, isDark)),
             const SizedBox(width: 10),
             Expanded(
                 child: _statCard(
-                    cardBg, 'এস.আর. সংখ্যা', '${_employees.where((e) => e.isEmployee).length}',
+                    cardBg, 'Officers', '${_employees.where((e) => e.isEmployee).length}',
                     Icons.badge_rounded, const Color(0xFF1565C0), isDark)),
             const SizedBox(width: 10),
             Expanded(
                 child: _statCard(
-                    cardBg, 'কাস্টমার', '${_employees.where((e) => e.isCustomer).length}',
+                    cardBg, 'Customers', '${_employees.where((e) => e.isCustomer).length}',
                     Icons.storefront_rounded, AppTheme.success, isDark)),
           ]),
         ],
@@ -331,7 +331,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           decoration: BoxDecoration(
               color: cardBg, borderRadius: BorderRadius.circular(14)),
           child: Center(
-            child: Text('এই মাসে কোনো অর্ডার নেই',
+            child: Text('No orders this month',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: AppTheme.textGrey)),
           ),
@@ -378,7 +378,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600)),
-                        Text('${e.value.orders} টি অর্ডার',
+                        Text('${e.value.orders} orders',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12,
                                 color: AppTheme.textGrey)),
@@ -440,7 +440,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               Text(
-                  'SR: ${order.srName} · ${order.items.length} আইটেম',
+                  'Officer: ${order.srName} · ${order.items.length} items',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

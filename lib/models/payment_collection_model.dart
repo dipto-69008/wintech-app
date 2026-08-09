@@ -31,19 +31,19 @@ class PaymentCollectionModel {
 
   String get statusLabel {
     switch (status) {
-      case statusConfirmed: return 'নিশ্চিত';
-      case statusRejected:  return 'বাতিল';
-      default:              return 'অপেক্ষমাণ';
+      case statusConfirmed: return 'Confirmed';
+      case statusRejected:  return 'Rejected';
+      default:              return 'Pending';
     }
   }
 
   String get methodLabel {
     switch (paymentMethod) {
-      case 'cheque': return 'চেক';
-      case 'bKash':  return 'বিকাশ';
-      case 'nagad':  return 'নগদ';
-      case 'bank':   return 'ব্যাংক';
-      default:       return 'নগদ';
+      case 'cheque': return 'Cheque';
+      case 'bKash':  return 'bKash';
+      case 'nagad':  return 'Nagad';
+      case 'bank':   return 'Bank';
+      default:       return 'Cash';
     }
   }
 

@@ -33,36 +33,36 @@ class _MoreScreenState extends State<MoreScreen> {
 
   static const _modules = [
     _ModuleDef(
-      title: 'স্টক ট্রান্সফার',
-      subtitle: 'গুদাম থেকে গুদামে পণ্য স্থানান্তর',
+      title: 'Stock Transfer',
+      subtitle: 'Transfer products between warehouses',
       icon: Icons.swap_horiz_rounded,
       color: AppTheme.primaryAccent,
       tag: 'stock',
     ),
     _ModuleDef(
-      title: 'এক্সপেন্স / TA-DA',
-      subtitle: 'TA বিল, DA, মটরসাইকেল লগ, আউট স্টেশন',
+      title: 'Expense / TA-DA',
+      subtitle: 'TA bill, DA, motorcycle log, out station',
       icon: Icons.receipt_rounded,
       color: Color(0xFF6A1B9A),
       tag: 'expense',
     ),
     _ModuleDef(
-      title: 'পেমেন্ট কালেকশন',
-      subtitle: 'কাস্টমারের কাছ থেকে টাকা সংগ্রহ',
+      title: 'Payment Collection',
+      subtitle: 'Collect payments from customers',
       icon: Icons.payments_rounded,
       color: Color(0xFF2E7D32),
       tag: 'payment',
     ),
     _ModuleDef(
-      title: 'ছুটির আবেদন',
-      subtitle: 'নৈমিত্তিক, চিকিৎসা, বার্ষিক ছুটি',
+      title: 'Leave Application',
+      subtitle: 'Casual, medical, annual leave',
       icon: Icons.beach_access_rounded,
       color: Color(0xFFE65100),
       tag: 'leave',
     ),
     _ModuleDef(
-      title: 'সার্ভে',
-      subtitle: 'মাঠ পর্যায়ের জরিপ তৈরি করুন',
+      title: 'Survey',
+      subtitle: 'Create field-level surveys',
       icon: Icons.assignment_rounded,
       color: Color(0xFF1565C0),
       tag: 'survey',
@@ -131,14 +131,14 @@ class _MoreScreenState extends State<MoreScreen> {
         Row(children: [
           const Icon(Icons.grid_view_rounded, color: Colors.white, size: 22),
           const SizedBox(width: 10),
-          Text('আরো মডিউল',
+          Text('More Modules',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: Colors.white)),
         ]),
         const SizedBox(height: 6),
-        Text('সকল সুবিধা এক জায়গায়',
+        Text('All features in one place',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
         if (_user != null) ...[

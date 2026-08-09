@@ -78,20 +78,20 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('মুছে ফেলুন?',
+        title: Text('Delete?',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('এই কালেকশন মুছে ফেলা হবে।',
+        content: Text('This collection will be deleted.',
             style: GoogleFonts.hindSiliguri()),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('না', style: GoogleFonts.hindSiliguri())),
+              child: Text('No', style: GoogleFonts.hindSiliguri())),
           ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.error,
                   minimumSize: const Size(80, 40)),
-              child: Text('হ্যাঁ', style: GoogleFonts.hindSiliguri())),
+              child: Text('Yes', style: GoogleFonts.hindSiliguri())),
         ],
       ),
     );
@@ -134,7 +134,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
         onPressed: () => _openDialog(),
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('নতুন কালেকশন',
+        label: Text('New Collection',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -153,15 +153,21 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 14, 20, 20),
       child: Row(children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(Icons.arrow_back_rounded,
+              color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
         const Icon(Icons.payments_rounded, color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('পেমেন্ট কালেকশন',
+        Text('Payment Collection',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
-        Text('মোট: ${_payments.length}',
+        Text('Total: ${_payments.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -172,11 +178,11 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        _chip('all', 'সব', isDark),
+        _chip('all', 'All', isDark),
         const SizedBox(width: 8),
-        _chip('today', 'আজকের', isDark),
+        _chip('today', 'Today', isDark),
         const SizedBox(width: 8),
-        _chip('month', 'এই মাস', isDark),
+        _chip('month', 'This Month', isDark),
       ]),
     );
   }
@@ -222,7 +228,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
           const Icon(Icons.payments_rounded,
               color: AppTheme.primaryAccent, size: 18),
           const SizedBox(width: 8),
-          Text('${_filtered.length} কালেকশন · ',
+          Text('${_filtered.length} collections · ',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey)),
           Text('৳ ${_fmt.format(_filteredTotal)}',
@@ -244,11 +250,11 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
               size: 64,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 14),
-          Text('কোনো কালেকশন নেই',
+          Text('No collections',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('নতুন কালেকশন দিতে + বোতাম চাপুন',
+          Text('Tap + to add a new collection',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -395,11 +401,11 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   bool _saving = false;
 
   static const _methods = [
-    ('cash',   'নগদ'),
-    ('cheque', 'চেক'),
-    ('bKash',  'বিকাশ'),
-    ('nagad',  'নগদ (Nagad)'),
-    ('bank',   'ব্যাংক'),
+    ('cash',   'Cash'),
+    ('cheque', 'Cheque'),
+    ('bKash',  'bKash'),
+    ('nagad',  'Nagad'),
+    ('bank',   'Bank'),
   ];
 
   @override
@@ -479,32 +485,32 @@ class _CollectionDialogState extends State<_CollectionDialog> {
             const SizedBox(height: 16),
             Text(
                 widget.existing == null
-                    ? 'নতুন পেমেন্ট কালেকশন'
-                    : 'কালেকশন সম্পাদনা',
+                    ? 'New Payment Collection'
+                    : 'Edit Collection',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            _label('কাস্টমারের নাম'),
+            _label('Customer Name'),
             TextFormField(
               controller: _customerCtrl,
-              decoration: const InputDecoration(hintText: 'কাস্টমারের নাম'),
+              decoration: const InputDecoration(hintText: 'Customer Name'),
               validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'প্রয়োজনীয়' : null,
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 12),
-            _label('পরিমাণ (টাকা)'),
+            _label('Amount (Taka)'),
             TextFormField(
               controller: _amountCtrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(hintText: '০.০০'),
+              decoration: const InputDecoration(hintText: '0.00'),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'প্রয়োজনীয়';
-                if (double.tryParse(v.trim()) == null) return 'সংখ্যা লিখুন';
+                if (v == null || v.trim().isEmpty) return 'Required';
+                if (double.tryParse(v.trim()) == null) return 'Enter a number';
                 return null;
               },
             ),
             const SizedBox(height: 12),
-            _label('পেমেন্ট পদ্ধতি'),
+            _label('Payment Method'),
             DropdownButtonFormField<String>(
               value: _method,
               items: _methods
@@ -518,15 +524,15 @@ class _CollectionDialogState extends State<_CollectionDialog> {
             ),
             if (_method == 'cheque') ...[
               const SizedBox(height: 12),
-              _label('চেক নম্বর'),
+              _label('Cheque Number'),
               TextFormField(
                 controller: _chequeCtrl,
                 decoration:
-                    const InputDecoration(hintText: 'চেক নম্বর লিখুন'),
+                    const InputDecoration(hintText: 'Enter cheque number'),
               ),
             ],
             const SizedBox(height: 12),
-            _label('তারিখ'),
+            _label('Date'),
             GestureDetector(
               onTap: _pickDate,
               child: Container(
@@ -547,12 +553,12 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            _label('নোট (ঐচ্ছিক)'),
+            _label('Notes (optional)'),
             TextFormField(
               controller: _notesCtrl,
               maxLines: 2,
               decoration:
-                  const InputDecoration(hintText: 'অতিরিক্ত তথ্য...'),
+                  const InputDecoration(hintText: 'Additional info...'),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -565,8 +571,8 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                           strokeWidth: 2, color: Colors.white))
                   : Text(
                       widget.existing == null
-                          ? 'সংরক্ষণ করুন'
-                          : 'আপডেট করুন',
+                          ? 'Save'
+                          : 'Update',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 16, fontWeight: FontWeight.w700)),
             ),

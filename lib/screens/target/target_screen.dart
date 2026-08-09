@@ -118,8 +118,8 @@ class _TargetScreenState extends State<TargetScreen> {
               const SizedBox(height: 20),
               Text(
                 forMember != null
-                    ? '${forMember.name} এর টার্গেট সেট করুন'
-                    : 'টার্গেট সেট করুন',
+                    ? 'Set Target for ${forMember.name}'
+                    : 'Set Target',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -135,7 +135,7 @@ class _TargetScreenState extends State<TargetScreen> {
                         : AppTheme.textGrey),
               ),
               const SizedBox(height: 20),
-              Text('টার্গেট পরিমাণ (৳)',
+              Text('Target Amount (৳)',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -146,7 +146,7 @@ class _TargetScreenState extends State<TargetScreen> {
                 keyboardType: TextInputType.number,
                 style: GoogleFonts.hindSiliguri(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'যেমন: 100000',
+                  hintText: 'e.g. 100000',
                   hintStyle: GoogleFonts.hindSiliguri(
                       fontSize: 14, color: AppTheme.textGrey),
                   prefixText: '৳ ',
@@ -166,7 +166,7 @@ class _TargetScreenState extends State<TargetScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              Text('কমিশন হার (%)',
+              Text('Commission Rate (%)',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -177,7 +177,7 @@ class _TargetScreenState extends State<TargetScreen> {
                 keyboardType: TextInputType.number,
                 style: GoogleFonts.hindSiliguri(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'যেমন: 20',
+                  hintText: 'e.g. 20',
                   hintStyle: GoogleFonts.hindSiliguri(
                       fontSize: 14, color: AppTheme.textGrey),
                   suffixText: '%',
@@ -198,7 +198,7 @@ class _TargetScreenState extends State<TargetScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'ধরুন ${forMember?.name ?? "কর্মী"} এই মাসে ৳${amountCtrl.text.isNotEmpty ? amountCtrl.text : "১,০০,০০০"} বিক্রি করলে ${commCtrl.text}% কমিশন পাবে।',
+                'If ${forMember?.name ?? "the officer"} sells ৳${amountCtrl.text.isNotEmpty ? amountCtrl.text : "1,00,000"} this month, they earn ${commCtrl.text}% commission.',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     color: isDark ? AppTheme.darkTextGrey : AppTheme.textGrey,
@@ -235,7 +235,7 @@ class _TargetScreenState extends State<TargetScreen> {
                     Navigator.pop(context);
                     _load();
                   },
-                  child: Text('সংরক্ষণ করুন',
+                  child: Text('Save',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -251,7 +251,7 @@ class _TargetScreenState extends State<TargetScreen> {
   }
 
   String _formatTaka(double v) {
-    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)} লক্ষ';
+    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)}L';
     if (v >= 1000) return '৳${(v / 1000).toStringAsFixed(1)}K';
     return '৳${v.toStringAsFixed(0)}';
   }
@@ -265,7 +265,7 @@ class _TargetScreenState extends State<TargetScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('টার্গেট',
+        title: Text('Target',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -274,7 +274,7 @@ class _TargetScreenState extends State<TargetScreen> {
             IconButton(
               icon: const Icon(Icons.add_rounded),
               onPressed: () => _showSetTargetDialog(),
-              tooltip: 'নিজের টার্গেট সেট করুন',
+              tooltip: 'Set my target',
             ),
         ],
       ),
@@ -286,12 +286,12 @@ class _TargetScreenState extends State<TargetScreen> {
               children: [
                 // ── My Target ────────────────────────────────────────
                 if (myTarget != null) ...[
-                  _sectionTitle('📌 আমার টার্গেট — ${_monthLabel(_currentMonth())}', isDark),
+                  _sectionTitle('📌 My Target — ${_monthLabel(_currentMonth())}', isDark),
                   const SizedBox(height: 10),
                   _myTargetCard(myTarget, isDark),
                   const SizedBox(height: 24),
                 ] else ...[
-                  _sectionTitle('📌 আমার টার্গেট — ${_monthLabel(_currentMonth())}', isDark),
+                  _sectionTitle('📌 My Target — ${_monthLabel(_currentMonth())}', isDark),
                   const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
@@ -311,7 +311,7 @@ class _TargetScreenState extends State<TargetScreen> {
                           size: 40,
                           color: AppTheme.primaryAccent.withValues(alpha: 0.3)),
                       const SizedBox(height: 10),
-                      Text('এই মাসে কোনো টার্গেট সেট করা হয়নি',
+                      Text('No target set for this month',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 14,
                               color: isDark
@@ -324,7 +324,7 @@ class _TargetScreenState extends State<TargetScreen> {
                           onPressed: () => _showSetTargetDialog(),
                           icon: const Icon(Icons.add_rounded,
                               color: AppTheme.primaryAccent),
-                          label: Text('টার্গেট সেট করুন',
+                          label: Text('Set Target',
                               style: GoogleFonts.hindSiliguri(
                                   color: AppTheme.primaryAccent,
                                   fontWeight: FontWeight.w700)),
@@ -337,7 +337,7 @@ class _TargetScreenState extends State<TargetScreen> {
 
                 // ── Team Targets (managers only) ──────────────────────
                 if (user?.canManageTeam == true && _teamMembers.isNotEmpty) ...[
-                  _sectionTitle('👥 টিম মেম্বারদের টার্গেট', isDark),
+                  _sectionTitle('👥 Team Members\' Targets', isDark),
                   const SizedBox(height: 10),
                   ..._teamMembers.map((m) {
                     TargetModel? mt;
@@ -380,7 +380,7 @@ class _TargetScreenState extends State<TargetScreen> {
                 color: Colors.white, size: 22),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('টার্গেট: ${_formatTaka(t.targetAmount)}',
+              child: Text('Target: ${_formatTaka(t.targetAmount)}',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -392,7 +392,7 @@ class _TargetScreenState extends State<TargetScreen> {
               decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12)),
-              child: Text('${t.commissionPercent.toStringAsFixed(0)}% কমিশন',
+              child: Text('${t.commissionPercent.toStringAsFixed(0)}% Commission',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -405,7 +405,7 @@ class _TargetScreenState extends State<TargetScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('বিক্রি হয়েছে',
+                    Text('Sold',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 12, color: Colors.white70)),
                     Text(_formatTaka(_user?.totalSales ?? 0),
@@ -422,7 +422,7 @@ class _TargetScreenState extends State<TargetScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('আনুমানিক কমিশন',
+                    Text('Est. Commission',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 12, color: Colors.white70)),
                     Text(_formatTaka(earned),
@@ -446,7 +446,7 @@ class _TargetScreenState extends State<TargetScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${(progress * 100).clamp(0, 100).toStringAsFixed(1)}% সম্পন্ন',
+            '${(progress * 100).clamp(0, 100).toStringAsFixed(1)}% complete',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 12, color: Colors.white70),
           ),
@@ -496,7 +496,7 @@ class _TargetScreenState extends State<TargetScreen> {
                 if (mt != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'টার্গেট: ${_formatTaka(mt.targetAmount)} • ${mt.commissionPercent.toStringAsFixed(0)}% কমিশন',
+                    'Target: ${_formatTaka(mt.targetAmount)} • ${mt.commissionPercent.toStringAsFixed(0)}% Commission',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 12,
                         color: isDark
@@ -517,7 +517,7 @@ class _TargetScreenState extends State<TargetScreen> {
                   ),
                 ] else ...[
                   const SizedBox(height: 3),
-                  Text('টার্গেট সেট করা হয়নি',
+                  Text('No target set',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 12,
                           color: isDark

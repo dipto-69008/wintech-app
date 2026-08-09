@@ -31,9 +31,9 @@ class StockTransferModel {
 
   String get statusLabel {
     switch (status) {
-      case statusApproved: return 'অনুমোদিত';
-      case statusRejected: return 'বাতিল';
-      default:             return 'অপেক্ষমাণ';
+      case statusApproved: return 'Approved';
+      case statusRejected: return 'Rejected';
+      default:             return 'Pending';
     }
   }
 

@@ -54,10 +54,10 @@ class _HomeShellState extends State<HomeShell> {
       ];
 
   static const _adminNavItems = [
-    _NavDef(Icons.analytics_rounded, 'রিপোর্টিং'),
-    _NavDef(Icons.badge_rounded, 'এস.আর. তালিকা'),
-    _NavDef(Icons.assignment_rounded, 'সার্ভে'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.analytics_rounded, 'Reports'),
+    _NavDef(Icons.badge_rounded, 'Officers'),
+    _NavDef(Icons.assignment_rounded, 'Survey'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   // ── Employee / SR (5 tabs) ────────────────────────────────────────────
@@ -73,11 +73,11 @@ class _HomeShellState extends State<HomeShell> {
       ];
 
   static const _srNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
-    _NavDef(Icons.receipt_long_rounded, 'অর্ডার'),
-    _NavDef(Icons.flag_rounded, 'টার্গেট'),
-    _NavDef(Icons.grid_view_rounded, 'আরো'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
+    _NavDef(Icons.receipt_long_rounded, 'Orders'),
+    _NavDef(Icons.flag_rounded, 'Targets'),
+    _NavDef(Icons.grid_view_rounded, 'More'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   // ── Customer (3 tabs) ─────────────────────────────────────────────────
@@ -88,9 +88,9 @@ class _HomeShellState extends State<HomeShell> {
       ];
 
   static const _customerNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
-    _NavDef(Icons.campaign_rounded, 'ঘোষণা'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
+    _NavDef(Icons.campaign_rounded, 'Announcements'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   bool get _isAdmin => _user?.isAdmin ?? false;

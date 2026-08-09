@@ -95,7 +95,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             Navigator.pushNamed(context, '/pos-order').then((_) => _load()),
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('নতুন অর্ডার',
+        label: Text('New Order',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -117,13 +117,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
         const Icon(Icons.receipt_long_rounded,
             color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('অর্ডার তালিকা',
+        Text('Order List',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
-        Text('মোট: ${_orders.length}',
+        Text('Total: ${_orders.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -134,11 +134,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        _filterChip('all', 'সব', isDark),
+        _filterChip('all', 'All', isDark),
         const SizedBox(width: 8),
-        _filterChip('today', 'আজকের', isDark),
+        _filterChip('today', 'Today', isDark),
         const SizedBox(width: 8),
-        _filterChip('month', 'এই মাস', isDark),
+        _filterChip('month', 'This Month', isDark),
       ]),
     );
   }
@@ -186,7 +186,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           const Icon(Icons.payments_rounded,
               color: AppTheme.primaryAccent, size: 18),
           const SizedBox(width: 8),
-          Text('${_filtered.length} অর্ডার · ',
+          Text('${_filtered.length} orders · ',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey)),
           Text('৳ ${_fmt.format(_filteredTotal)}',
@@ -208,11 +208,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
               size: 64,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 14),
-          Text('কোনো অর্ডার নেই',
+          Text('No orders found',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('নতুন অর্ডার দিতে + বোতাম চাপুন',
+          Text('Tap + to place a new order',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -275,7 +275,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               Text(
-                  '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} আইটেম',
+                  '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} items',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

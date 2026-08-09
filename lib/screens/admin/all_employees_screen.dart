@@ -76,7 +76,7 @@ class _AllEmployeesScreenState extends State<AllEmployeesScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('সকল কর্মী',
+        title: Text('All Employees',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -91,7 +91,7 @@ class _AllEmployeesScreenState extends State<AllEmployeesScreen> {
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text('${_filtered.length} জন',
+                child: Text('${_filtered.length} people',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -115,7 +115,7 @@ class _AllEmployeesScreenState extends State<AllEmployeesScreen> {
                       TextField(
                         style: GoogleFonts.hindSiliguri(fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'নাম বা নম্বর দিয়ে খুঁজুন...',
+                          hintText: 'Search by name or number...',
                           hintStyle: GoogleFonts.hindSiliguri(
                               fontSize: 14, color: AppTheme.textGrey),
                           prefixIcon: const Icon(Icons.search_rounded,
@@ -141,7 +141,7 @@ class _AllEmployeesScreenState extends State<AllEmployeesScreen> {
                         child: ListView(
                           scrollDirection: Axis.horizontal,
                           children: [
-                            _filterChip('সব জেলা', null, isDark),
+                            _filterChip('All Districts', null, isDark),
                             ..._districts
                                 .map((d) => _filterChip(d, d, isDark)),
                           ],
@@ -162,7 +162,7 @@ class _AllEmployeesScreenState extends State<AllEmployeesScreen> {
                                   color: AppTheme.primaryAccent
                                       .withValues(alpha: 0.3)),
                               const SizedBox(height: 12),
-                              Text('কোনো কর্মী পাওয়া যায়নি',
+                              Text('No employees found',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 15,
                                       color: isDark

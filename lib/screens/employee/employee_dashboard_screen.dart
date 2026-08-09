@@ -88,7 +88,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                   SliverToBoxAdapter(child: _buildTargetCard(isDark)),
                   SliverToBoxAdapter(child: _buildTodayStats(isDark)),
                   SliverToBoxAdapter(child: _buildQuickActions(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('সাম্প্রতিক অর্ডার', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('Recent Orders', isDark)),
                   if (_orders.isEmpty)
                     SliverToBoxAdapter(child: _buildEmpty(isDark))
                   else
@@ -108,10 +108,10 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   Widget _buildHeader(bool isDark) {
     final hour = DateTime.now().hour;
     final greet = hour < 12
-        ? 'সুপ্রভাত'
+        ? 'Good Morning'
         : hour < 17
-            ? 'শুভ অপরাহ্ন'
-            : 'শুভ সন্ধ্যা';
+            ? 'Good Afternoon'
+            : 'Good Evening';
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.primaryAccent,
@@ -137,7 +137,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$greet, ${_user?.name ?? 'এস.আর.'}! 👋',
+              Text('$greet, ${_user?.name ?? 'Officer'}! 👋',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -150,7 +150,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6)),
                 child: Text(
-                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'সেলস রিপ্রেজেন্টেটিভ'}',
+                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'Sales Officer'}',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,
@@ -221,7 +221,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
             Row(children: [
               const Icon(Icons.flag_rounded, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
-              Text('মাসিক টার্গেট প্রগ্রেস',
+              Text('Monthly Target Progress',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: Colors.white70)),
               const Spacer(),
@@ -245,11 +245,11 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
             Row(children: [
               _targetChip(
                   Icons.check_circle_rounded,
-                  'অর্জিত: ৳${_fmt.format(achieved)}'),
+                  'Achieved: ৳${_fmt.format(achieved)}'),
               const SizedBox(width: 10),
               _targetChip(
                   Icons.schedule_rounded,
-                  target > 0 ? 'বাকি: ৳${_fmt.format(remaining)}' : 'টার্গেট সেট করুন'),
+                  target > 0 ? 'Remaining: ৳${_fmt.format(remaining)}' : 'Set a target'),
             ]),
           ],
         ),
@@ -281,17 +281,17 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(children: [
         Expanded(
-            child: _statCard(cardBg, 'আজকের অর্ডার',
+            child: _statCard(cardBg, 'Today\'s Orders',
                 '${_todayOrders.length}', Icons.receipt_long_rounded,
                 AppTheme.primaryAccent, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'আজকের বিক্রয়',
+            child: _statCard(cardBg, 'Today\'s Sales',
                 '৳${_fmt.format(_todayRevenue)}',
                 Icons.payments_rounded, AppTheme.success, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'মাসিক মোট',
+            child: _statCard(cardBg, 'Monthly Total',
                 '৳${_fmt.format(_monthRevenue)}',
                 Icons.bar_chart_rounded,
                 const Color(0xFF1565C0), isDark)),
@@ -357,7 +357,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                 const Icon(Icons.point_of_sale_rounded,
                     color: Colors.white, size: 22),
                 const SizedBox(width: 8),
-                Text('নতুন অর্ডার (POS)',
+                Text('New Order (POS)',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -381,7 +381,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               const Icon(Icons.flag_rounded,
                   color: AppTheme.primaryAccent, size: 24),
               const SizedBox(height: 4),
-              Text('টার্গেট',
+              Text('Target',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -422,11 +422,11 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               size: 60,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 12),
-          Text('কোনো অর্ডার নেই',
+          Text('No orders yet',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 14, color: AppTheme.textGrey)),
           const SizedBox(height: 8),
-          Text('POS থেকে নতুন অর্ডার যোগ করুন',
+          Text('Add a new order from POS',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -472,7 +472,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               Text(order.customerName,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
-              Text('${order.items.length} আইটেম',
+              Text('${order.items.length} items',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

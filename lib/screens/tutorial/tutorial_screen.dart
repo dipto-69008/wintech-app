@@ -17,7 +17,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   List<TutorialModel> _filtered = [];
   UserModel? _currentUser;
   bool _loading = true;
-  String _selectedCategory = 'সব';
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
@@ -39,7 +39,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   }
 
   void _applyFilter() {
-    if (_selectedCategory == 'সব') {
+    if (_selectedCategory == 'All') {
       setState(() => _filtered = List.from(_all));
     } else {
       setState(() => _filtered =
@@ -57,7 +57,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
         TextEditingController(text: existing?.description ?? '');
     final urlCtrl =
         TextEditingController(text: existing?.videoUrl ?? '');
-    String category = existing?.category ?? 'সাধারণ';
+    String category = existing?.category ?? 'General';
     int duration = existing?.durationMinutes ?? 0;
 
     showModalBottomSheet(
@@ -84,8 +84,8 @@ class _TutorialScreenState extends State<TutorialScreen> {
                     Expanded(
                       child: Text(
                           existing != null
-                              ? 'টিউটোরিয়াল সম্পাদনা'
-                              : 'নতুন টিউটোরিয়াল',
+                              ? 'Edit Tutorial'
+                              : 'New Tutorial',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -97,15 +97,15 @@ class _TutorialScreenState extends State<TutorialScreen> {
                             const Icon(Icons.close_rounded, size: 22)),
                   ]),
                   const SizedBox(height: 16),
-                  _field(titleCtrl, 'শিরোনাম *', 'টিউটোরিয়ালের নাম'),
+                  _field(titleCtrl, 'Title *', 'Tutorial name'),
                   const SizedBox(height: 12),
-                  _field(descCtrl, 'বিবরণ', 'টিউটোরিয়াল সম্পর্কে',
+                  _field(descCtrl, 'Description', 'About this tutorial',
                       maxLines: 3),
                   const SizedBox(height: 12),
-                  _field(urlCtrl, 'ভিডিও লিংক',
+                  _field(urlCtrl, 'Video Link',
                       'https://youtube.com/watch?v=...'),
                   const SizedBox(height: 12),
-                  Text('বিভাগ',
+                  Text('Category',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
@@ -158,7 +158,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                         _load();
                       },
                       child: Text(
-                          existing != null ? 'আপডেট করুন' : 'যোগ করুন',
+                          existing != null ? 'Update' : 'Add',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 15,
                               fontWeight: FontWeight.w700)),
@@ -216,7 +216,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final categories = ['সব', ...TutorialModel.categoryOptions];
+    final categories = ['All', ...TutorialModel.categoryOptions];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -235,12 +235,12 @@ class _TutorialScreenState extends State<TutorialScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('টিউটোরিয়াল',
+                        Text('Tutorials',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white)),
-                        Text('অ্যাপ ব্যবহারের গাইড',
+                        Text('App usage guide',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12, color: Colors.white70)),
                       ],
@@ -260,7 +260,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                           const Icon(Icons.add_rounded,
                               color: Colors.white, size: 18),
                           const SizedBox(width: 4),
-                          Text('যোগ করুন',
+                          Text('Add',
                               style: GoogleFonts.hindSiliguri(
                                   color: Colors.white,
                                   fontSize: 13,
@@ -318,7 +318,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                         color: AppTheme.primaryAccent))
                 : _filtered.isEmpty
                     ? Center(
-                        child: Text('কোনো টিউটোরিয়াল নেই',
+                        child: Text('No tutorials found',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 15,
                                 color: isDark
@@ -410,7 +410,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                         const Icon(Icons.play_arrow_rounded,
                             color: Colors.white, size: 16),
                         const SizedBox(width: 4),
-                        Text('দেখুন',
+                        Text('Watch',
                             style: GoogleFonts.hindSiliguri(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -470,11 +470,11 @@ class _TutorialScreenState extends State<TutorialScreen> {
 
   void _openVideo(String url) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('ভিডিও লিংক: $url',
+      content: Text('Video link: $url',
           style: GoogleFonts.hindSiliguri()),
       behavior: SnackBarBehavior.floating,
       action: SnackBarAction(
-          label: 'ঠিক আছে',
+          label: 'OK',
           onPressed: () {}),
     ));
   }

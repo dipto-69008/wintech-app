@@ -35,7 +35,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
   }
 
   String _formatTaka(double v) {
-    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)} লক্ষ';
+    if (v >= 100000) return '৳${(v / 100000).toStringAsFixed(1)}L';
     if (v >= 1000) return '৳${(v / 1000).toStringAsFixed(1)}K';
     return '৳${v.toStringAsFixed(0)}';
   }
@@ -47,7 +47,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('কমিশন বিবরণী',
+        title: Text('Commission Statement',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -78,7 +78,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('কমিশন সারসংক্ষেপ',
+                      Text('Commission Summary',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -89,7 +89,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('মোট কমিশন',
+                              Text('Total Commission',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 12, color: Colors.white70)),
                               const SizedBox(height: 4),
@@ -110,7 +110,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('বকেয়া কমিশন',
+                              Text('Pending Commission',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 12, color: Colors.white70)),
                               const SizedBox(height: 4),
@@ -136,7 +136,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                               color: Colors.white, size: 16),
                           const SizedBox(width: 8),
                           Text(
-                            '${user?.badge ?? "ব্রোঞ্জ"} ব্যাজ • কমিশন হার: ${((user?.commissionRate ?? 0.015) * 100).toStringAsFixed(1)}%',
+                            '${user?.badge ?? "Bronze"} Badge • Commission Rate: ${((user?.commissionRate ?? 0.015) * 100).toStringAsFixed(1)}%',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12, color: Colors.white),
                           ),
@@ -149,7 +149,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                 const SizedBox(height: 24),
 
                 // ── History ──────────────────────────────────────────
-                Text('📋 কমিশন ইতিহাস',
+                Text('📋 Commission History',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -169,14 +169,14 @@ class _CommissionScreenState extends State<CommissionScreen> {
                           size: 44,
                           color: AppTheme.primaryAccent.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
-                      Text('এখনো কোনো কমিশন নেই',
+                      Text('No commission yet',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 14,
                               color: isDark
                                   ? AppTheme.darkTextGrey
                                   : AppTheme.textGrey)),
                       const SizedBox(height: 6),
-                      Text('সফল বিক্রয়ের পর কমিশন এখানে দেখাবে',
+                      Text('Commission will appear here after successful sales',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 12,
                               color: isDark
@@ -196,7 +196,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
     final amount = (h['commission'] as num?)?.toDouble() ?? 0;
     final source = h['source'] as String? ?? '';
     final date = DateTime.tryParse(h['date'] as String? ?? '') ?? DateTime.now();
-    final type = h['type'] as String? ?? 'বিক্রয়';
+    final type = h['type'] as String? ?? 'Sales';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),

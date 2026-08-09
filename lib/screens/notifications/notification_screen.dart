@@ -14,41 +14,41 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _NotifItem(
       icon: Icons.receipt_long_rounded,
       color: AppTheme.primaryAccent,
-      title: 'নতুন অর্ডার প্রাপ্ত',
-      body: 'মেসার্স আল-আমিন ট্রেডার্স থেকে ৳৩২,৫০০ এর একটি নতুন অর্ডার এসেছে।',
-      time: '৫ মিনিট আগে',
+      title: 'New Order Received',
+      body: 'A new order of ৳32,500 has been placed by Messrs Al-Amin Traders.',
+      time: '5 minutes ago',
       isRead: false,
     ),
     _NotifItem(
       icon: Icons.payments_rounded,
       color: AppTheme.success,
-      title: 'পেমেন্ট নিশ্চিত হয়েছে',
-      body: 'নিউ ঢাকা এন্টারপ্রাইজের ৳১৮,০০০ পেমেন্ট সফলভাবে গ্রহণ করা হয়েছে।',
-      time: '২ ঘণ্টা আগে',
+      title: 'Payment Confirmed',
+      body: '৳18,000 payment from New Dhaka Enterprise has been successfully received.',
+      time: '2 hours ago',
       isRead: false,
     ),
     _NotifItem(
       icon: Icons.emoji_events_rounded,
       color: const Color(0xFFF57F17),
-      title: 'মাসিক টার্গেট অর্জন',
-      body: 'অভিনন্দন! এই মাসে আপনি ৮৫% টার্গেট অর্জন করেছেন।',
-      time: 'আজ সকাল ৯টা',
+      title: 'Monthly Target Achieved',
+      body: 'Congratulations! You have achieved 85% of your target this month.',
+      time: 'Today 9:00 AM',
       isRead: true,
     ),
     _NotifItem(
       icon: Icons.local_shipping_rounded,
       color: const Color(0xFF1565C0),
-      title: 'ডেলিভারি সম্পন্ন',
-      body: 'রহমান স্টোর্সের অর্ডার (ORD-২০৪৫) সফলভাবে ডেলিভারি হয়েছে।',
-      time: 'গতকাল বিকেল ৪টা',
+      title: 'Delivery Completed',
+      body: 'Order for Rahman Stores (ORD-2045) has been successfully delivered.',
+      time: 'Yesterday 4:00 PM',
       isRead: true,
     ),
     _NotifItem(
       icon: Icons.bar_chart_rounded,
       color: const Color(0xFF6A1B9A),
-      title: 'সাপ্তাহিক বিক্রয় রিপোর্ট',
-      body: 'এই সপ্তাহে মোট ১২টি অর্ডার এবং ৳৪৮,৫০০ বিক্রয় সম্পন্ন হয়েছে।',
-      time: '২ দিন আগে',
+      title: 'Weekly Sales Report',
+      body: 'This week a total of 12 orders and ৳48,500 in sales were completed.',
+      time: '2 days ago',
       isRead: true,
     ),
   ];
@@ -102,7 +102,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'নোটিফিকেশন',
+                          'Notifications',
                           style: GoogleFonts.hindSiliguri(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
@@ -111,7 +111,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         ),
                         if (unreadCount > 0)
                           Text(
-                            '$unreadCount টি অপঠিত',
+                            '$unreadCount unread',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12, color: Colors.white70),
                           ),
@@ -122,7 +122,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     TextButton(
                       onPressed: _markAllRead,
                       child: Text(
-                        'সব পড়া হয়েছে',
+                        'Mark all read',
                         style: GoogleFonts.hindSiliguri(
                           fontSize: 12,
                           color: Colors.white70,

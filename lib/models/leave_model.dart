@@ -41,20 +41,20 @@ class LeaveModel {
 
   String get typeLabel {
     switch (leaveType) {
-      case typeCasual:     return 'নৈমিত্তিক ছুটি';
-      case typeMedical:    return 'চিকিৎসা ছুটি';
-      case typeAnnual:     return 'বার্ষিক ছুটি';
-      case typeEarn:       return 'অর্জিত ছুটি';
-      case typeWithoutPay: return 'বিনা বেতনে ছুটি';
-      default:             return 'অন্যান্য ছুটি';
+      case typeCasual:     return 'Casual Leave';
+      case typeMedical:    return 'Medical Leave';
+      case typeAnnual:     return 'Annual Leave';
+      case typeEarn:       return 'Earned Leave';
+      case typeWithoutPay: return 'Leave Without Pay';
+      default:             return 'Other Leave';
     }
   }
 
   String get statusLabel {
     switch (status) {
-      case statusApproved: return 'অনুমোদিত';
-      case statusRejected: return 'প্রত্যাখ্যাত';
-      default:             return 'অপেক্ষমাণ';
+      case statusApproved: return 'Approved';
+      case statusRejected: return 'Rejected';
+      default:             return 'Pending';
     }
   }
 
