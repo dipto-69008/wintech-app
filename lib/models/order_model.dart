@@ -3,12 +3,14 @@ class OrderItem {
   final double quantity;
   final String unit;
   final double unitPrice;
+  final bool isBonus;
 
   const OrderItem({
     required this.productName,
     required this.quantity,
     required this.unit,
     required this.unitPrice,
+    this.isBonus = false,
   });
 
   double get total => quantity * unitPrice;
@@ -18,6 +20,7 @@ class OrderItem {
         'quantity': quantity,
         'unit': unit,
         'unitPrice': unitPrice,
+        'isBonus': isBonus,
       };
 
   factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
@@ -25,6 +28,7 @@ class OrderItem {
         quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
         unit: m['unit'] ?? 'পিস',
         unitPrice: (m['unitPrice'] as num?)?.toDouble() ?? 0,
+        isBonus: m['isBonus'] == true,
       );
 }
 
@@ -39,6 +43,12 @@ class OrderModel {
   final DateTime date;
   final String status; // pending | confirmed | delivered | cancelled
   final String notes;
+  final String invoiceNo;
+  final String paymentType;
+  final double paidAmount;
+  final double dueAmount;
+  final String probablePaymentDate;
+  final String branch;
 
   const OrderModel({
     required this.id,
@@ -51,6 +61,12 @@ class OrderModel {
     required this.date,
     this.status = 'pending',
     this.notes = '',
+    this.invoiceNo = '',
+    this.paymentType = 'Cash',
+    this.paidAmount = 0,
+    this.dueAmount = 0,
+    this.probablePaymentDate = '',
+    this.branch = '',
   });
 
   static String get statusPending => 'pending';
@@ -78,6 +94,12 @@ class OrderModel {
         'date': date.toIso8601String(),
         'status': status,
         'notes': notes,
+        'invoiceNo': invoiceNo,
+        'paymentType': paymentType,
+        'paidAmount': paidAmount,
+        'dueAmount': dueAmount,
+        'probablePaymentDate': probablePaymentDate,
+        'branch': branch,
       };
 
   factory OrderModel.fromMap(Map<String, dynamic> m) => OrderModel(
@@ -93,9 +115,24 @@ class OrderModel {
         date: DateTime.tryParse(m['date'] ?? '') ?? DateTime.now(),
         status: m['status'] ?? 'pending',
         notes: m['notes'] ?? '',
+        invoiceNo: m['invoiceNo'] ?? '',
+        paymentType: m['paymentType'] ?? 'Cash',
+        paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+        dueAmount: (m['dueAmount'] as num?)?.toDouble() ?? 0,
+        probablePaymentDate: m['probablePaymentDate'] ?? '',
+        branch: m['branch'] ?? '',
       );
 
-  OrderModel copyWith({String? status, String? notes}) => OrderModel(
+  OrderModel copyWith({
+    String? status,
+    String? notes,
+    String? invoiceNo,
+    String? paymentType,
+    double? paidAmount,
+    double? dueAmount,
+    String? probablePaymentDate,
+    String? branch,
+  }) => OrderModel(
         id: id,
         srId: srId,
         srName: srName,
@@ -106,5 +143,12 @@ class OrderModel {
         date: date,
         status: status ?? this.status,
         notes: notes ?? this.notes,
+        invoiceNo: invoiceNo ?? this.invoiceNo,
+        paymentType: paymentType ?? this.paymentType,
+        paidAmount: paidAmount ?? this.paidAmount,
+        dueAmount: dueAmount ?? this.dueAmount,
+        probablePaymentDate:
+            probablePaymentDate ?? this.probablePaymentDate,
+        branch: branch ?? this.branch,
       );
 }

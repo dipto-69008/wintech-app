@@ -28,6 +28,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   // Notes
   final _notesCtrl = TextEditingController();
+  final _invoiceCtrl = TextEditingController();
+  DateTime _saleDate = DateTime.now();
+  DateTime? _probablePaymentDate;
+  String _paymentType = 'Cash';
 
   // Demo customers list
   final List<Map<String, String>> _customers = [
@@ -71,6 +75,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   void initState() {
     super.initState();
     _loadUser();
+    _invoiceCtrl.text =
+        'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     _addItem(); // start with one empty item
   }
 
@@ -93,6 +99,14 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   double get _total => _items.fold(0.0, (s, r) => s + r.lineTotal);
 
+  double get _paidAmount =>
+      _paymentType == 'Cash' ? _total : 0;
+
+  double get _dueAmount => (_total - _paidAmount).clamp(0, double.infinity);
+
+  int get _bonusCount => _items.fold(
+      0, (sum, item) => sum + (item.bonusEnabled ? item.bonusQuantity : 0));
+
   Future<void> _submitOrder() async {
     if (_selectedCustomerId.isEmpty) {
       _showError('কাস্টমার বেছে নিন');
@@ -112,6 +126,17 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           unit: i.unit,
           unitPrice: double.tryParse(i.priceCtrl.text) ?? 0,
         )).toList();
+    for (final item in validItems) {
+      if (item.bonusEnabled && item.bonusQuantity > 0) {
+        orderItems.add(OrderItem(
+          productName: item.nameCtrl.text.trim(),
+          quantity: item.bonusQuantity.toDouble(),
+          unit: item.unit,
+          unitPrice: 0,
+          isBonus: true,
+        ));
+      }
+    }
 
     final order = OrderModel(
       id: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
@@ -121,9 +146,17 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       customerName: _selectedCustomerName,
       items: orderItems,
       total: _total,
-      date: DateTime.now(),
-      status: OrderModel.statusConfirmed,
+      date: _saleDate,
+      status: OrderModel.statusPending,
       notes: _notesCtrl.text.trim(),
+      invoiceNo: _invoiceCtrl.text.trim(),
+      paymentType: _paymentType,
+      paidAmount: _paidAmount,
+      dueAmount: _dueAmount,
+      branch: _user?.branch ?? '',
+      probablePaymentDate: _probablePaymentDate == null
+          ? ''
+          : DateFormat('yyyy-MM-dd').format(_probablePaymentDate!),
     );
 
     await LocalStorageService.saveOrder(order);
@@ -178,7 +211,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              ..._customers.map((c) => ListTile(
+               ..._customers.map((c) => ListTile(
                     leading: const CircleAvatar(
                       backgroundColor: AppTheme.lightAccent,
                       child: Icon(Icons.store_rounded,
@@ -310,6 +343,9 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                   ),
                   const SizedBox(height: 20),
 
+                  _buildOrderInfoCard(isDark, cardBg),
+                  const SizedBox(height: 20),
+
                   // Items header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -429,6 +465,165 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildOrderInfoCard(bool isDark, Color cardBg) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.description_rounded,
+                  color: AppTheme.primaryAccent, size: 19),
+              const SizedBox(width: 8),
+              Text('অর্ডার তথ্য',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 15, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _invoiceCtrl,
+                  style: GoogleFonts.hindSiliguri(fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Invoice No',
+                    prefixIcon: const Icon(Icons.tag_rounded, size: 18),
+                    isDense: true,
+                    labelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  onTap: _pickSaleDate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Sale Date',
+                      prefixIcon:
+                          const Icon(Icons.calendar_today_rounded, size: 18),
+                      isDense: true,
+                      labelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+                    ),
+                    child: Text(DateFormat('dd MMM yyyy').format(_saleDate),
+                        style: GoogleFonts.hindSiliguri(fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _paymentType,
+                  decoration: InputDecoration(
+                    labelText: 'Payment Type',
+                    prefixIcon: const Icon(Icons.payments_rounded, size: 18),
+                    isDense: true,
+                    labelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                    DropdownMenuItem(
+                        value: 'Bank Transfer', child: Text('Bank Transfer')),
+                    DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
+                    DropdownMenuItem(
+                        value: 'Mobile Banking', child: Text('Mobile Banking')),
+                    DropdownMenuItem(value: 'Credit', child: Text('Credit')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _paymentType = value ?? 'Cash'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  onTap: _pickProbablePaymentDate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Probable Payment Date',
+                      prefixIcon:
+                          const Icon(Icons.event_available_rounded, size: 18),
+                      isDense: true,
+                      labelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+                    ),
+                    child: Text(
+                      _probablePaymentDate == null
+                          ? 'তারিখ দিন'
+                          : DateFormat('dd MMM yyyy')
+                              .format(_probablePaymentDate!),
+                      style: GoogleFonts.hindSiliguri(
+                        fontSize: 13,
+                        color: _probablePaymentDate == null
+                            ? AppTheme.textGrey
+                            : (isDark ? AppTheme.darkText : AppTheme.textDark),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_probablePaymentDate != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _probablePaymentDate = null),
+                icon: const Icon(Icons.close_rounded, size: 14),
+                label: const Text('তারিখ সরান'),
+              ),
+            ),
+          if ((_user?.branch ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.store_mall_directory_rounded,
+                      size: 16, color: AppTheme.textGrey),
+                  const SizedBox(width: 6),
+                  Text('Sale Branch: ${_user!.branch}',
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 12, color: AppTheme.textGrey)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickSaleDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _saleDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (date != null) setState(() => _saleDate = date);
+  }
+
+  Future<void> _pickProbablePaymentDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _probablePaymentDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (date != null) setState(() => _probablePaymentDate = date);
   }
 
   Widget _buildItemCard(
