@@ -12,6 +12,7 @@ import 'screens/customer/customer_settings_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/employee/order_list_screen.dart';
 import 'screens/notifications/notification_screen.dart';
+import 'screens/survey/survey_screen.dart';
 
 class HomeShell extends StatefulWidget {
   final ValueChanged<bool> onThemeToggle;
@@ -43,20 +44,22 @@ class _HomeShellState extends State<HomeShell> {
 
   void _switchTab(int index) => setState(() => _currentIndex = index);
 
-  // ── Admin (3 tabs) ────────────────────────────────────────────────────
+  // ── Admin (4 tabs) ────────────────────────────────────────────────────
   List<Widget> get _adminPages => [
         const AdminDashboardScreen(),
         const AllEmployeesScreen(),
+        const SurveyScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
   static const _adminNavItems = [
     _NavDef(Icons.analytics_rounded, 'রিপোর্টিং'),
     _NavDef(Icons.badge_rounded, 'এস.আর. তালিকা'),
+    _NavDef(Icons.assignment_rounded, 'সার্ভে'),
     _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 
-  // ── Employee / SR (4 tabs) ────────────────────────────────────────────
+  // ── Employee / SR (5 tabs) ────────────────────────────────────────────
   List<Widget> get _srPages => [
         EmployeeDashboardScreen(
           onGoToOrders: () => _switchTab(1),
@@ -64,6 +67,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
         const OrderListScreen(),
         const TargetAchievementScreen(),
+        const SurveyScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
@@ -71,6 +75,7 @@ class _HomeShellState extends State<HomeShell> {
     _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
     _NavDef(Icons.receipt_long_rounded, 'অর্ডার'),
     _NavDef(Icons.flag_rounded, 'টার্গেট'),
+    _NavDef(Icons.assignment_rounded, 'সার্ভে'),
     _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 

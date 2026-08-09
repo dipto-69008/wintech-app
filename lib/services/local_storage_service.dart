@@ -13,6 +13,7 @@ class LocalStorageService {
   static const _keyCurrentUser = 'currentUser';
   static const _keyDarkMode = 'darkMode';
   static const _keyTeamMembers = 'teamMembers';
+  static const _keySurveys = 'wintech_surveys';
 
   // ── Demo accounts ────────────────────────────────────────────────────
   static const Map<String, Map<String, String>> _demoAccounts = {
@@ -256,6 +257,42 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keyTutorials, jsonEncode(list.map((x) => x.toMap()).toList()));
+  }
+
+  // ── Field surveys (farmer / dealer visits) ────────────────────────────
+  static Future<List<SurveyModel>> getSurveys() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keySurveys);
+    if (raw == null) return [];
+    final list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .map((item) => SurveyModel.fromMap(Map<String, dynamic>.from(item as Map)))
+        .toList();
+  }
+
+  static Future<void> saveSurvey(SurveyModel survey) async {
+    final surveys = await getSurveys();
+    final index = surveys.indexWhere((item) => item.id == survey.id);
+    if (index >= 0) {
+      surveys[index] = survey;
+    } else {
+      surveys.insert(0, survey);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _keySurveys,
+      jsonEncode(surveys.map((item) => item.toMap()).toList()),
+    );
+  }
+
+  static Future<void> deleteSurvey(String id) async {
+    final surveys = await getSurveys();
+    surveys.removeWhere((item) => item.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _keySurveys,
+      jsonEncode(surveys.map((item) => item.toMap()).toList()),
+    );
   }
 
   static List<TutorialModel> _defaultTutorials() => [
