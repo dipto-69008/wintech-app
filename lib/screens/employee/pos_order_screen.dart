@@ -29,6 +29,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   // Notes
   final _notesCtrl = TextEditingController();
   final _invoiceCtrl = TextEditingController();
+  final _paidAmountCtrl = TextEditingController();
   DateTime _saleDate = DateTime.now();
   DateTime? _probablePaymentDate;
   String _paymentType = 'Cash';
@@ -99,13 +100,17 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   double get _total => _items.fold(0.0, (s, r) => s + r.lineTotal);
 
-  double get _paidAmount =>
-      _paymentType == 'Cash' ? _total : 0;
+  double get _paidAmount {
+    final entered = double.tryParse(_paidAmountCtrl.text.trim());
+    if (entered == null) return _paymentType == 'Cash' ? _total : 0;
+    return entered.clamp(0, _total).toDouble();
+  }
 
-  double get _dueAmount => (_total - _paidAmount).clamp(0, double.infinity);
+  double get _dueAmount =>
+      (_total - _paidAmount).clamp(0, double.infinity).toDouble();
 
-  int get _bonusCount => _items.fold(
-      0, (sum, item) => sum + (item.bonusEnabled ? item.bonusQuantity : 0));
+  double get _bonusCount => _items.fold(
+      0.0, (sum, item) => sum + (item.bonusEnabled ? item.bonusQuantity : 0));
 
   Future<void> _submitOrder() async {
     if (_selectedCustomerId.isEmpty) {
@@ -127,7 +132,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           unitPrice: double.tryParse(i.priceCtrl.text) ?? 0,
         )).toList();
     for (final item in validItems) {
-      if (item.bonusEnabled && item.bonusQuantity > 0) {
+      if (item.hasBonus) {
         orderItems.add(OrderItem(
           productName: item.nameCtrl.text.trim(),
           quantity: item.bonusQuantity.toDouble(),
@@ -439,6 +444,31 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                             color: AppTheme.primaryAccent)),
                   ],
                 ),
+                if (_bonusCount > 0) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('🎁 Bonus / Free',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 12, color: AppTheme.warning)),
+                      Text('${_fmt.format(_bonusCount)} ইউনিট',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.warning)),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 5),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Paid ৳${_fmt.format(_paidAmount)} · Due ৳${_fmt.format(_dueAmount)}',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -587,6 +617,25 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                 label: const Text('তারিখ সরান'),
               ),
             ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _paidAmountCtrl,
+            onChanged: (_) => setState(() {}),
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+            ],
+            style: GoogleFonts.hindSiliguri(fontSize: 13),
+            decoration: InputDecoration(
+              labelText: 'Paid Amount (৳)',
+              prefixIcon: const Icon(Icons.account_balance_wallet_rounded,
+                  size: 18),
+              hintText: _paymentType == 'Cash' ? _fmt.format(_total) : '0',
+              isDense: true,
+              labelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+            ),
+          ),
           if ((_user?.branch ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -760,6 +809,99 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           ]),
           if (item.isValid) ...[
             const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: item.bonusEnabled
+                    ? AppTheme.warning.withValues(alpha: 0.09)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.03)
+                        : Colors.black.withValues(alpha: 0.02)),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: item.bonusEnabled
+                      ? AppTheme.warning.withValues(alpha: 0.45)
+                      : AppTheme.divider,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: item.bonusEnabled,
+                    activeColor: AppTheme.warning,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (value) => setState(() {
+                      item.bonusEnabled = value ?? false;
+                      if (!item.bonusEnabled) item.bonusQtyCtrl.clear();
+                    }),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Bonus offer',
+                      style: GoogleFonts.hindSiliguri(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: item.bonusEnabled
+                            ? AppTheme.warning
+                            : (isDark
+                                ? AppTheme.darkText
+                                : AppTheme.textDark),
+                      ),
+                    ),
+                  ),
+                  if (item.bonusEnabled) ...[
+                    SizedBox(
+                      width: 86,
+                      child: TextField(
+                        controller: item.bonusQtyCtrl,
+                        onChanged: (_) => setState(() {}),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}'))
+                        ],
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.hindSiliguri(fontSize: 12),
+                        decoration: InputDecoration(
+                          labelText: 'ফ্রি পরিমাণ',
+                          labelStyle:
+                              GoogleFonts.hindSiliguri(fontSize: 10),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'ফ্রি',
+                      style: GoogleFonts.hindSiliguri(
+                        fontSize: 11,
+                        color: AppTheme.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (item.hasBonus)
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '🎁 ${_fmt.format(item.bonusQuantity)} ${item.unit} bonus — ৳0',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11,
+                        color: AppTheme.warning,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
             Align(
               alignment: Alignment.centerRight,
               child: Text(
@@ -780,6 +922,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   void dispose() {
     _customerCtrl.dispose();
     _notesCtrl.dispose();
+    _invoiceCtrl.dispose();
+    _paidAmountCtrl.dispose();
     for (final i in _items) {
       i.dispose();
     }
@@ -995,7 +1139,9 @@ class _ItemRow {
   final nameCtrl = TextEditingController();
   final qtyCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
+  final bonusQtyCtrl = TextEditingController();
   String unit = 'পিস';
+  bool bonusEnabled = false;
 
   bool get isValid {
     final name = nameCtrl.text.trim();
@@ -1010,9 +1156,14 @@ class _ItemRow {
     return qty * price;
   }
 
+  double get bonusQuantity => double.tryParse(bonusQtyCtrl.text) ?? 0;
+
+  bool get hasBonus => bonusEnabled && bonusQuantity > 0;
+
   void dispose() {
     nameCtrl.dispose();
     qtyCtrl.dispose();
     priceCtrl.dispose();
+    bonusQtyCtrl.dispose();
   }
 }
