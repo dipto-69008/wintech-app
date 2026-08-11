@@ -1,7 +1,7 @@
 # Wintech Agro — Flutter Mobile App
 
 ## What This Project Is
-**Wintech Agro** is a Flutter (Dart) mobile application for Bengali-speaking business users. It is a role-based ERP system with POS order entry, sales analytics, target tracking, commission management, and customer credit management. The UI is in Bengali (Hind Siliguri font) with a Wintech blue theme.
+**Wintech Agro** is a Flutter (Dart) mobile application for business users. It is a role-based ERP system with POS order entry, sales analytics, target tracking, commission management, and customer credit management. The UI is in English with a Wintech blue theme.
 
 **This is a Flutter project — it cannot run directly on Replit.** Development and builds happen locally or via CI (e.g. GitHub Actions, Codemagic). On Replit, you can read and edit code; use a local Flutter environment or CI to run/build it.
 
@@ -27,15 +27,15 @@
 ## User Roles & Demo Accounts
 | Role | Demo Email | Features |
 |------|-----------|----------|
-| অ্যাডমিন (Admin) | admin@gmail.com | Sales reporting dashboard, SR performance, order analytics |
-| এস.আর. (Sales Rep) | sr@wintech.com | Dashboard (shows branch), POS order entry, target/achievement tracking, commissions |
-| কাস্টমার (Customer) | customer@gmail.com | Credit limit view, purchase history, monthly purchases |
-| সুপার অ্যাডমিন (Super Admin) | superadmin@gmail.com | CEO-level analytics view |
+| Admin | admin@gmail.com | Sales reporting dashboard, SR performance, order analytics |
+| Sales Rep | sr@wintech.com | Dashboard (shows branch), POS order entry, target/achievement tracking, commissions |
+| Customer | customer@gmail.com | Credit limit view, purchase history, monthly purchases |
+| Super Admin | superadmin@gmail.com | CEO-level analytics view |
 
 **Demo OTP**: `123456` · **Demo Password**: any value
 
 ## SR Branch Display
-SR users have a `branch` field on their profile (`UserModel.branch`). The employee dashboard header displays the branch name (e.g. "Wintech Agro — ঢাকা সেন্ট্রাল"). Set in `lib/services/local_storage_service.dart` demo data and `lib/models/user_model.dart`.
+SR users have a `branch` field on their profile (`UserModel.branch`). The employee dashboard header displays the branch name (e.g. "Wintech Agro — Dhaka Central"). Set in `lib/services/local_storage_service.dart` demo data and `lib/models/user_model.dart`.
 
 ## Key Files
 - **Entry point**: `lib/main.dart` → `WintechAgroApp`
@@ -53,7 +53,7 @@ flutter build apk --release
 ```
 
 ## User Preferences
-- Bengali UI throughout (Hind Siliguri font)
+- English UI throughout
 - App is developed locally (VS Code / Android Studio), not run on Replit
 - Keep existing Flutter project structure
 - Do not rename or restructure packages without explicit request

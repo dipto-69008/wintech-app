@@ -1,6 +1,6 @@
 // ── Survey Model ──────────────────────────────────────────────────────────────
 // Two survey types: 'farmer' (Farmer Visit) and 'dealer' (Dealer Visit)
-// Mirrors the structure from the web survey/page.tsx reference.
+// Survey models used by the Flutter field-survey screens.
 
 class SurveyModel {
   static const typeFarmer = 'farmer';

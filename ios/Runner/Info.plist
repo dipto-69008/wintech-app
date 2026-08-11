@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>প্রপার্টির ছবি যোগ করতে ফটো লাইব্রেরি অ্যাক্সেস প্রয়োজন।</string>
+	<string>Photo library access is required to add property photos.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>প্রপার্টির ছবি তুলতে ক্যামেরা অ্যাক্সেস প্রয়োজন।</string>
+	<string>Camera access is required to take property photos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>ছবি সংরক্ষণ করতে ফটো লাইব্রেরি অ্যাক্সেস প্রয়োজন।</string>
+	<string>Photo library access is required to save photos.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
