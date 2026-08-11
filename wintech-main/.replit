@@ -1,0 +1,72 @@
+run = "npm run dev"
+entrypoint = "index.js"
+modules = ["nodejs-20", "web"]
+hidden = [".config", "package-lock.json", ".next", ".swc"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["gh", "texinfoInteractive", "unzipNLS"]
+
+[env]
+NEXT_TELEMETRY_DISABLED = "1"
+
+[deployment]
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5303
+
+[agent]
+expertMode = true
+stack = "BEST_EFFORT_FALLBACK"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "dev-server-5000"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+CLOUDINARY_CLOUD_NAME = "dqkaseoio"
+EMAIL_FROM = "fariasdipto@gmail.com"
+EMAIL_FROM_NAME = "Dip To"
+POLYGON_RPC_URL = "https://polygon-rpc.com"
+SSL_SMS_URL = "https://smsplus.sslwireless.com"
+SSL_SMS_SID = "MOONGALLERYBULK"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
