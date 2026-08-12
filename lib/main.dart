@@ -25,21 +25,9 @@ import 'screens/employee/payment_collection_screen.dart';
 import 'screens/survey/survey_screen.dart';
 import 'home_shell.dart';
 
-Future<void> _requestLocationOnStartup() async {
-  try {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      await Geolocator.requestPermission();
-    }
-  } catch (_) {}
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalStorageService.seedDemoData();
-  await _requestLocationOnStartup();
   final isDark = await LocalStorageService.isDarkMode();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -65,6 +53,55 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
   void initState() {
     super.initState();
     _themeMode = widget.initialDarkMode ? ThemeMode.dark : ThemeMode.light;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestStartupPermissions();
+    });
+  }
+
+  Future<void> _requestStartupPermissions() async {
+    // This invokes the real Android notification permission dialog on
+    // Android 13+. Older Android versions grant it at install time.
+    try {
+      await const MethodChannel('wintech/permissions')
+          .invokeMethod<bool>('requestNotificationPermission');
+    } catch (_) {
+      // Keep startup usable if the native permission channel is unavailable.
+    }
+
+    if (!mounted) return;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled && mounted) {
+        final openSettings = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Location is turned off'),
+            content: const Text(
+                'Location is needed for field activities. Please turn on location to continue.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Not now'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Turn on'),
+              ),
+            ],
+          ),
+        );
+        if (openSettings == true) {
+          await Geolocator.openLocationSettings();
+        }
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+    } catch (_) {}
   }
 
   void _onThemeToggle(bool isDark) {

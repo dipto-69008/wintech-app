@@ -25,7 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     final identifier = _emailCtrl.text.trim();
-    final password = _passCtrl.text;
+    // Trim to guard against invisible spaces added by mobile keyboards
+    // (autocomplete often appends a trailing space) — a common cause of
+    // "Invalid email or password" even when the typed password looks right.
+    final password = _passCtrl.text.trim();
 
     // 1) Try real ERP login — real-time connection to the ERP database.
     try {
@@ -143,9 +146,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: 'Employee ID / Email',
                       hint: 'e.g. SR-001 or email@wintech.com',
                       prefixIcon: Icons.badge_outlined,
-                      keyboardType: TextInputType.text,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
                       validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Employee ID বা Email দিন' : null,
+                          (v == null || v.trim().isEmpty) ? 'Employee ID বা Email দিন' : null,
                     ),
                     const SizedBox(height: 16),
                     BanglaTextField(
@@ -154,6 +160,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       hint: '••••••••',
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: _obscurePass,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
+                      keyboardType: TextInputType.visiblePassword,
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePass
