@@ -13,7 +13,7 @@ import 'screens/support/support_screen.dart';
 import 'screens/settings/edit_profile_screen.dart';
 import 'screens/settings/digital_id_card_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
-import 'screens/target/target_screen.dart';
+import 'screens/employee/target_achievement_screen.dart';
 import 'screens/commission/commission_screen.dart';
 import 'models/order_model.dart';
 import 'screens/employee/pos_order_screen.dart';
@@ -107,7 +107,7 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
           case '/all-employees':
             return _slide(const AllEmployeesScreen(), settings);
           case '/target':
-            return _slide(const TargetScreen(), settings);
+            return _slide(const TargetAchievementScreen(), settings);
           case '/more-modules':
             return _slide(const MoreScreen(), settings);
           case '/expense':
