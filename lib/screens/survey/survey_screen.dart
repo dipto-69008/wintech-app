@@ -8,7 +8,9 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/survey_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
 class SurveyScreen extends StatefulWidget {
   const SurveyScreen({super.key});
@@ -23,6 +25,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   DateTime? _fromDate;
   DateTime? _toDate;
   bool _loading = true;
+  bool _erpConnected = false;
   List<SurveyModel> _surveys = [];
 
   @override
@@ -33,10 +36,34 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final surveys = await LocalStorageService.getSurveys();
+    final local = await LocalStorageService.getSurveys();
+    var all = local;
+    var erp = false;
+
+    // ERP-first: fetch live surveys, merge with local-only records.
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.surveys();
+        final remote = data.map((m) {
+          final map = Map<String, dynamic>.from(m);
+          map['id'] ??= map['_id']?.toString();
+          return SurveyModel.fromMap(map);
+        }).toList();
+        final remoteIds = remote.map((s) => s.id).toSet();
+        all = [
+          ...remote,
+          ...local.where((s) => !remoteIds.contains(s.id)),
+        ];
+        erp = true;
+      } catch (_) {
+        // Offline or endpoint unavailable — keep local data.
+      }
+    }
+
     if (!mounted) return;
     setState(() {
-      _surveys = surveys;
+      _surveys = all;
+      _erpConnected = erp;
       _loading = false;
     });
   }
@@ -250,9 +277,18 @@ class _SurveyScreenState extends State<SurveyScreen> {
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w800)),
-                Text('Officer field visit reports',
-                    style: GoogleFonts.hindSiliguri(
-                        color: Colors.white70, fontSize: 12)),
+                Row(children: [
+                  Icon(
+                      _erpConnected
+                          ? Icons.cloud_done_rounded
+                          : Icons.wifi_off_rounded,
+                      size: 12,
+                      color: Colors.white70),
+                  const SizedBox(width: 4),
+                  Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন মোড',
+                      style: GoogleFonts.hindSiliguri(
+                          color: Colors.white70, fontSize: 12)),
+                ]),
               ],
             ),
           ),
@@ -825,6 +861,27 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       createdAt: existing?.createdAt ?? DateTime.now().toIso8601String(),
     );
     await LocalStorageService.saveSurvey(survey);
+    // Only push brand-new surveys to the ERP (edits stay local).
+    if (existing == null) {
+      var sent = false;
+      if (await ApiService.isConnected) {
+        try {
+          await ApiService.createSurvey(survey.toMap());
+          sent = true;
+          // The survey now lives in the ERP (with a server id) —
+          // drop the local copy so it doesn't show up twice.
+          await LocalStorageService.deleteSurvey(survey.id);
+        } catch (_) {}
+      }
+      if (!sent) {
+        await OfflineQueueService.enqueueSurvey(survey.toMap());
+      }
+      if (mounted) {
+        _message(sent
+            ? '✅ সার্ভে ERP-তে জমা হয়েছে!'
+            : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+      }
+    }
     if (!mounted) return;
     Navigator.pop(context, true);
   }

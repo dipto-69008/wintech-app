@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/payment_collection_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
 class PaymentCollectionScreen extends StatefulWidget {
   const PaymentCollectionScreen({super.key});
@@ -18,6 +20,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
   UserModel? _user;
   List<PaymentCollectionModel> _payments = [];
   bool _loading = true;
+  bool _erpConnected = false;
   String _filter = 'all';
   final _fmt = NumberFormat('#,##0', 'en_US');
 
@@ -30,10 +33,34 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
-    final all = await LocalStorageService.getPaymentCollections();
+    final local = await LocalStorageService.getPaymentCollections();
+    var all = local;
+    var erp = false;
+
+    // ERP-first: fetch live collections, merge local-only entries.
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.paymentCollections();
+        final remote = data.map((m) {
+          final map = Map<String, dynamic>.from(m);
+          map['id'] ??= map['_id']?.toString();
+          return PaymentCollectionModel.fromMap(map);
+        }).toList();
+        final remoteIds = remote.map((p) => p.id).toSet();
+        all = [
+          ...remote,
+          ...local.where((p) => !remoteIds.contains(p.id)),
+        ];
+        erp = true;
+      } catch (_) {
+        // Offline or endpoint unavailable — keep local data.
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _user = user;
+      _erpConnected = erp;
       _payments = (user?.isAdmin ?? false)
           ? all
           : all.where((p) => p.srId == (user?.id ?? '')).toList();
@@ -68,10 +95,39 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
         existing: edit,
         onSave: (p) async {
           await LocalStorageService.savePaymentCollection(p);
+          // Only push brand-new collections to the ERP (edits stay local).
+          if (edit == null) {
+            var sent = false;
+            if (await ApiService.isConnected) {
+              try {
+                await ApiService.createPaymentCollection(p.toMap());
+                sent = true;
+                // The collection now lives in the ERP (with a server id) —
+                // drop the local copy so it doesn't show up twice.
+                await LocalStorageService.deletePaymentCollection(p.id);
+              } catch (_) {}
+            }
+            if (!sent) {
+              await OfflineQueueService.enqueuePaymentCollection(p.toMap());
+            }
+            _snack(sent
+                ? '✅ কালেকশন ERP-তে জমা হয়েছে!'
+                : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+          }
           await _load();
         },
       ),
     );
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _delete(PaymentCollectionModel p) async {
@@ -167,6 +223,26 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(
+                _erpConnected
+                    ? Icons.cloud_done_rounded
+                    : Icons.wifi_off_rounded,
+                size: 13,
+                color: Colors.white),
+            const SizedBox(width: 4),
+            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.white)),
+          ]),
+        ),
+        const SizedBox(width: 8),
         Text('Total: ${_payments.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),

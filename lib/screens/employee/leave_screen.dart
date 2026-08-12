@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../models/leave_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
 class LeaveScreen extends StatefulWidget {
   const LeaveScreen({super.key});
@@ -18,6 +20,7 @@ class _LeaveScreenState extends State<LeaveScreen>
   UserModel? _user;
   List<LeaveModel> _leaves = [];
   bool _loading = true;
+  bool _erpConnected = false;
   late TabController _tabCtrl;
 
   @override
@@ -36,10 +39,34 @@ class _LeaveScreenState extends State<LeaveScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
-    final all = await LocalStorageService.getLeaves();
+    final local = await LocalStorageService.getLeaves();
+    var all = local;
+    var erp = false;
+
+    // ERP-first: fetch live leave applications, merge local-only entries.
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.leaves();
+        final remote = data.map((m) {
+          final map = Map<String, dynamic>.from(m);
+          map['id'] ??= map['_id']?.toString();
+          return LeaveModel.fromMap(map);
+        }).toList();
+        final remoteIds = remote.map((l) => l.id).toSet();
+        all = [
+          ...remote,
+          ...local.where((l) => !remoteIds.contains(l.id)),
+        ];
+        erp = true;
+      } catch (_) {
+        // Offline or endpoint unavailable — keep local data.
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _user = user;
+      _erpConnected = erp;
       _leaves = (user?.isAdmin ?? false)
           ? all
           : all.where((l) => l.srId == (user?.id ?? '')).toList();
@@ -56,10 +83,36 @@ class _LeaveScreenState extends State<LeaveScreen>
         user: _user,
         onSave: (l) async {
           await LocalStorageService.saveLeave(l);
+          var sent = false;
+          if (await ApiService.isConnected) {
+            try {
+              await ApiService.createLeave(l.toMap());
+              sent = true;
+              // The application now lives in the ERP (with a server id) —
+              // drop the local copy so it doesn't show up twice.
+              await LocalStorageService.deleteLeave(l.id);
+            } catch (_) {}
+          }
+          if (!sent) {
+            await OfflineQueueService.enqueueLeave(l.toMap());
+          }
+          _snack(sent
+              ? '✅ আবেদন ERP-তে জমা হয়েছে!'
+              : '📥 অফলাইন — sync হলে ERP-তে যাবে');
           await _load();
         },
       ),
     );
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _delete(LeaveModel l) async {
@@ -172,6 +225,26 @@ class _LeaveScreenState extends State<LeaveScreen>
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(
+                _erpConnected
+                    ? Icons.cloud_done_rounded
+                    : Icons.wifi_off_rounded,
+                size: 13,
+                color: Colors.white),
+            const SizedBox(width: 4),
+            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.white)),
+          ]),
+        ),
+        const SizedBox(width: 8),
         Text('Total: ${_leaves.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),

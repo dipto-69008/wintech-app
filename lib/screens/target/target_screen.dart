@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/target_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 
 class TargetScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class _TargetScreenState extends State<TargetScreen> {
   List<UserModel> _teamMembers = [];
   List<TargetModel> _targets = [];
   bool _loading = true;
+  bool _erpConnected = false;
+  double _erpCurrentValue = 0;
 
   @override
   void initState() {
@@ -30,12 +33,53 @@ class _TargetScreenState extends State<TargetScreen> {
     final members = user?.canManageTeam == true
         ? await LocalStorageService.getTeamMembers()
         : <UserModel>[];
-    final targets = await LocalStorageService.getTargets();
+    var targets = await LocalStorageService.getTargets();
+    var erp = false;
+    var erpCurrent = 0.0;
+
+    // ERP-first: pull live targets assigned in the ERP for this user.
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.targets();
+        final month =
+            '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+        final remote = data.map((t) {
+          return TargetModel(
+            id: t['_id']?.toString() ?? t['id']?.toString() ?? '',
+            userId: user?.id ?? '',
+            userName: user?.name ?? '',
+            setById: '',
+            setByName: t['setByName']?.toString() ?? 'ERP',
+            targetAmount: (t['targetValue'] as num?)?.toDouble() ?? 0,
+            commissionPercent:
+                (t['commissionPercent'] as num?)?.toDouble() ?? 0,
+            month: t['month']?.toString() ?? month,
+          );
+        }).toList();
+        if (data.isNotEmpty) {
+          erpCurrent =
+              (data.first['currentValue'] as num?)?.toDouble() ?? 0;
+        }
+        if (remote.isNotEmpty) {
+          final remoteIds = remote.map((t) => t.id).toSet();
+          targets = [
+            ...remote,
+            ...targets.where((t) => !remoteIds.contains(t.id)),
+          ];
+        }
+        erp = true;
+      } catch (_) {
+        // Offline or endpoint unavailable — keep local targets.
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _user = user;
       _teamMembers = members;
       _targets = targets;
+      _erpConnected = erp;
+      _erpCurrentValue = erpCurrent;
       _loading = false;
     });
   }
@@ -270,6 +314,29 @@ class _TargetScreenState extends State<TargetScreen> {
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
         actions: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(
+                    _erpConnected
+                        ? Icons.cloud_done_rounded
+                        : Icons.wifi_off_rounded,
+                    size: 13,
+                    color: Colors.white),
+                const SizedBox(width: 4),
+                Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: Colors.white)),
+              ]),
+            ),
+          ),
           if (user?.canManageTeam == true)
             IconButton(
               icon: const Icon(Icons.add_rounded),
@@ -354,8 +421,12 @@ class _TargetScreenState extends State<TargetScreen> {
   }
 
   Widget _myTargetCard(TargetModel t, bool isDark) {
-    final progress = (_user?.totalSales ?? 0) / t.targetAmount;
-    final earned = (_user?.totalSales ?? 0) * (t.commissionPercent / 100);
+    // Prefer live ERP progress when connected; fall back to local sales.
+    final sold = _erpConnected && _erpCurrentValue > 0
+        ? _erpCurrentValue
+        : (_user?.totalSales ?? 0);
+    final progress = t.targetAmount > 0 ? sold / t.targetAmount : 0.0;
+    final earned = sold * (t.commissionPercent / 100);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -408,7 +479,7 @@ class _TargetScreenState extends State<TargetScreen> {
                     Text('Sold',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 12, color: Colors.white70)),
-                    Text(_formatTaka(_user?.totalSales ?? 0),
+                    Text(_formatTaka(sold),
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,

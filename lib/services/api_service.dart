@@ -188,6 +188,34 @@ class ApiService {
     });
   }
 
+  static Future<List<Map<String, dynamic>>> expenses() async {
+    final body = await _get('/api/mobile/expenses');
+    return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Submit an expense/TA-DA bill — appears in ERP HR → Expenses.
+  static Future<Map<String, dynamic>> createExpense(Map<String, dynamic> data) =>
+      _post('/api/mobile/expenses', data);
+
+  static Future<List<Map<String, dynamic>>> leaves() async {
+    final body = await _get('/api/mobile/leaves');
+    return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Submit a leave application — appears in ERP HR → Leave.
+  static Future<Map<String, dynamic>> createLeave(Map<String, dynamic> data) =>
+      _post('/api/mobile/leaves', data);
+
+  static Future<List<Map<String, dynamic>>> paymentCollections() async {
+    final body = await _get('/api/mobile/payment-collections');
+    return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Record a customer payment collection — appears in ERP Accounts.
+  static Future<Map<String, dynamic>> createPaymentCollection(
+          Map<String, dynamic> data) =>
+      _post('/api/mobile/payment-collections', data);
+
   /// Fetch all ERP branches (for dropdowns).
   static Future<List<Map<String, dynamic>>> branches() async {
     try {

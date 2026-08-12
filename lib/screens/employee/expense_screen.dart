@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/expense_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -18,6 +20,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   UserModel? _user;
   List<ExpenseModel> _expenses = [];
   bool _loading = true;
+  bool _erpConnected = false;
   String _typeFilter = 'all';
   late TabController _tabCtrl;
 
@@ -48,10 +51,34 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
-    final all = await LocalStorageService.getExpenses();
+    final local = await LocalStorageService.getExpenses();
+    var all = local;
+    var erp = false;
+
+    // ERP-first: fetch live expenses, merge with local-only entries.
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.expenses();
+        final remote = data.map((m) {
+          final map = Map<String, dynamic>.from(m);
+          map['id'] ??= map['_id']?.toString();
+          return ExpenseModel.fromMap(map);
+        }).toList();
+        final remoteIds = remote.map((e) => e.id).toSet();
+        all = [
+          ...remote,
+          ...local.where((e) => !remoteIds.contains(e.id)),
+        ];
+        erp = true;
+      } catch (_) {
+        // Offline or endpoint unavailable — keep local data.
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _user = user;
+      _erpConnected = erp;
       _expenses = (user?.isAdmin ?? false)
           ? all
           : all.where((e) => e.srId == (user?.id ?? '')).toList();
@@ -87,11 +114,40 @@ class _ExpenseScreenState extends State<ExpenseScreen>
           user: _user,
           onSave: (e) async {
             await LocalStorageService.saveExpense(e);
+            // Only push brand-new bills to the ERP (edits stay local).
+            if (existing == null) {
+              var sent = false;
+              if (await ApiService.isConnected) {
+                try {
+                  await ApiService.createExpense(e.toMap());
+                  sent = true;
+                  // The bill now lives in the ERP (with a server id) —
+                  // drop the local copy so it doesn't show up twice.
+                  await LocalStorageService.deleteExpense(e.id);
+                } catch (_) {}
+              }
+              if (!sent) {
+                await OfflineQueueService.enqueueExpense(e.toMap());
+              }
+              _snack(sent
+                  ? '✅ বিল ERP-তে জমা হয়েছে!'
+                  : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+            }
             await _load();
           },
         ),
       ),
     );
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _delete(ExpenseModel e) async {
@@ -185,6 +241,26 @@ class _ExpenseScreenState extends State<ExpenseScreen>
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
         const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(
+                _erpConnected
+                    ? Icons.cloud_done_rounded
+                    : Icons.wifi_off_rounded,
+                size: 13,
+                color: Colors.white),
+            const SizedBox(width: 4),
+            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.white)),
+          ]),
+        ),
+        const SizedBox(width: 8),
         Text('Total: ${_expenses.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),

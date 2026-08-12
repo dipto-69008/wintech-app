@@ -18,6 +18,11 @@ import 'screens/commission/commission_screen.dart';
 import 'models/order_model.dart';
 import 'screens/employee/pos_order_screen.dart';
 import 'screens/employee/order_detail_screen.dart';
+import 'screens/employee/more_screen.dart';
+import 'screens/employee/expense_screen.dart';
+import 'screens/employee/leave_screen.dart';
+import 'screens/employee/payment_collection_screen.dart';
+import 'screens/survey/survey_screen.dart';
 import 'home_shell.dart';
 
 Future<void> _requestLocationOnStartup() async {
@@ -103,6 +108,16 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
             return _slide(const AllEmployeesScreen(), settings);
           case '/target':
             return _slide(const TargetScreen(), settings);
+          case '/more-modules':
+            return _slide(const MoreScreen(), settings);
+          case '/expense':
+            return _slide(const ExpenseScreen(), settings);
+          case '/leave':
+            return _slide(const LeaveScreen(), settings);
+          case '/payment-collection':
+            return _slide(const PaymentCollectionScreen(), settings);
+          case '/survey':
+            return _slide(const SurveyScreen(), settings);
           case '/commission':
             return _slide(const CommissionScreen(), settings);
           case '/order-detail':

@@ -383,6 +383,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   },
                                 ),
                               ),
+                              if (_user?.isEmployee == true) ...[
+                                _divider(),
+                                _settingTile(
+                                  icon: Icons.grid_view_rounded,
+                                  label: 'আরও মডিউল (খরচ, ছুটি, সার্ভে...)',
+                                  iconColor: AppTheme.primaryAccent,
+                                  isDark: isDark,
+                                  onTap: () => Navigator.pushNamed(
+                                      context, '/more-modules'),
+                                ),
+                              ],
                               _divider(),
                               _settingTile(
                                 icon: Icons.headset_mic_rounded,
