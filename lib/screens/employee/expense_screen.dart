@@ -130,8 +130,8 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                 await OfflineQueueService.enqueueExpense(e.toMap());
               }
               _snack(sent
-                  ? '✅ বিল ERP-তে জমা হয়েছে!'
-                  : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+                  ? '✅ Bill submitted to ERP!'
+                  : '📥 Offline — will sync to ERP when connected');
             }
             await _load();
           },
@@ -255,7 +255,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                 size: 13,
                 color: Colors.white),
             const SizedBox(width: 4),
-            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+            Text(_erpConnected ? 'ERP Connected' : 'Offline',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11, color: Colors.white)),
           ]),

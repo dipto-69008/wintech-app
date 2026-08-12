@@ -107,7 +107,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
     final val = double.tryParse(_targetCtrl.text.replaceAll(',', ''));
     if (val == null || val <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('সঠিক টার্গেট পরিমাণ দিন',
+        content: Text('Please enter a valid target amount',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
         backgroundColor: AppTheme.error,
         behavior: SnackBarBehavior.floating,
@@ -123,7 +123,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
       _editingTarget = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ টার্গেট আপডেট হয়েছে!',
+      content: Text('✅ Target updated successfully!',
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
       backgroundColor: AppTheme.success,
       behavior: SnackBarBehavior.floating,
@@ -132,11 +132,11 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   }
 
   String get _achievementBadge {
-    if (_progress >= 1.0) return '🏆 টার্গেট অর্জিত!';
-    if (_progress >= 0.75) return '🔥 দারুণ চলছে!';
-    if (_progress >= 0.5) return '💪 অর্ধেক পার!';
-    if (_progress >= 0.25) return '🚀 এগিয়ে চলুন!';
-    return '🎯 শুরু হোক!';
+    if (_progress >= 1.0) return '🏆 Target Achieved!';
+    if (_progress >= 0.75) return '🔥 Excellent Progress!';
+    if (_progress >= 0.5) return '💪 Halfway There!';
+    if (_progress >= 0.25) return '🚀 Keep Going!';
+    return '🎯 Let\'s Start!';
   }
 
   Color get _progressColor {
@@ -188,7 +188,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
           Row(children: [
             const Icon(Icons.flag_rounded, color: Colors.white, size: 24),
             const SizedBox(width: 10),
-            Text('টার্গেট ও অর্জন',
+            Text('Target & Achievement',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -233,8 +233,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
             const SizedBox(height: 4),
             Text(
                 _target > 0
-                    ? 'এই মাসের টার্গেট: ৳ ${_fmt.format(_target)}'
-                    : 'টার্গেট এখনো সেট করা হয়নি',
+                    ? 'This Month\'s Target: ৳ ${_fmt.format(_target)}'
+                    : 'Target not set yet',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: Colors.white70)),
             const SizedBox(height: 16),
@@ -251,7 +251,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('৳ ${_fmt.format(_monthRevenue)} অর্জিত',
+                Text('৳ ${_fmt.format(_monthRevenue)} achieved',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 13, color: Colors.white)),
                 Text('${(_progress * 100).toStringAsFixed(1)}%',
@@ -272,15 +272,15 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        Expanded(child: _statCard(cardBg, 'মাসের অর্ডার',
+        Expanded(child: _statCard(cardBg, 'Monthly Orders',
             '${_monthOrders.length}', Icons.receipt_long_rounded,
             AppTheme.primaryAccent, isDark)),
         const SizedBox(width: 10),
-        Expanded(child: _statCard(cardBg, 'অর্জিত',
+        Expanded(child: _statCard(cardBg, 'Achieved',
             '৳${_fmt.format(_monthRevenue)}', Icons.payments_rounded,
             AppTheme.success, isDark)),
         const SizedBox(width: 10),
-        Expanded(child: _statCard(cardBg, 'বাকি',
+        Expanded(child: _statCard(cardBg, 'Remaining',
             _target > 0 ? '৳${_fmt.format(_remaining)}' : 'N/A',
             Icons.schedule_rounded, AppTheme.warning, isDark)),
       ]),
@@ -342,7 +342,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               const Icon(Icons.edit_rounded,
                   color: AppTheme.primaryAccent, size: 18),
               const SizedBox(width: 8),
-              Text('মাসিক টার্গেট সেট করুন',
+              Text('Set Monthly Target',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w700)),
               const Spacer(),
@@ -350,7 +350,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                 TextButton(
                   onPressed: () =>
                       setState(() => _editingTarget = true),
-                  child: Text('পরিবর্তন',
+                  child: Text('Change',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 13,
                           color: AppTheme.primaryAccent,
@@ -367,7 +367,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                 ],
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'টার্গেট পরিমাণ (৳)',
+                  labelText: 'Target Amount (৳)',
                   labelStyle: GoogleFonts.hindSiliguri(fontSize: 13),
                   prefixText: '৳ ',
                   border: OutlineInputBorder(
@@ -386,7 +386,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                           borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text('বাতিল',
+                    child: Text('Cancel',
                         style: GoogleFonts.hindSiliguri(
                             fontWeight: FontWeight.w600,
                             color: AppTheme.primaryAccent)),
@@ -402,7 +402,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                           borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text('সংরক্ষণ',
+                    child: Text('Save',
                         style: GoogleFonts.hindSiliguri(
                             fontWeight: FontWeight.w600,
                             color: Colors.white)),
@@ -413,8 +413,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               const SizedBox(height: 8),
               Text(
                   _target > 0
-                      ? 'বর্তমান টার্গেট: ৳ ${_fmt.format(_target)}'
-                      : 'টার্গেট সেট করুন',
+                      ? 'Current Target: ৳ ${_fmt.format(_target)}'
+                      : 'Set your target',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13,
                       color: _target > 0
@@ -448,7 +448,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                     color: AppTheme.primaryAccent,
                     borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
-            Text('মাসিক পারফরম্যান্স',
+            Text('Monthly Performance',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -485,7 +485,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                               decoration: BoxDecoration(
                                   color: AppTheme.success.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20)),
-                              child: Text('✅ অর্জিত',
+                              child: Text('✅ Achieved',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 11,
                                       color: AppTheme.success,
@@ -523,8 +523,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
 
   String _monthName(int m) {
     const names = [
-      '', 'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
     ];
     return names[m.clamp(1, 12)];
   }

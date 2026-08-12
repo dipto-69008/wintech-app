@@ -9,7 +9,7 @@ import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/employee/employee_dashboard_screen.dart';
 import 'screens/employee/target_achievement_screen.dart';
-import 'screens/employee/stock_transfer_screen.dart';
+import 'screens/employee/more_screen.dart';
 import 'screens/customer/customer_dashboard_screen.dart';
 import 'screens/customer/customer_settings_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -62,7 +62,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       if (result.synced > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              '🔄 ${result.synced}টি অফলাইন আইটেম ERP-তে sync হয়েছে',
+              '🔄 ${result.synced} offline item(s) synced to ERP',
               style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
           backgroundColor: AppTheme.success,
           behavior: SnackBarBehavior.floating,
@@ -92,29 +92,29 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ];
 
   static const _adminNavItems = [
-    _NavDef(Icons.analytics_rounded, 'রিপোর্টিং'),
-    _NavDef(Icons.badge_rounded, 'এস.আর. তালিকা'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.analytics_rounded, 'Reports'),
+    _NavDef(Icons.badge_rounded, 'SR List'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   // ── Employee / SR (5 tabs) ────────────────────────────────────────────
   List<Widget> get _srPages => [
         EmployeeDashboardScreen(
           onGoToOrders: () => _switchTab(1),
-          onGoToTargets: () => _switchTab(3),
+          onGoToTargets: () => _switchTab(2),
         ),
         const OrderListScreen(),
-        const StockTransferScreen(),
         const TargetAchievementScreen(),
+        const MoreScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
   static const _srNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
-    _NavDef(Icons.receipt_long_rounded, 'অর্ডার'),
-    _NavDef(Icons.swap_horiz_rounded, 'ট্রান্সফার'),
-    _NavDef(Icons.flag_rounded, 'টার্গেট'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
+    _NavDef(Icons.receipt_long_rounded, 'Orders'),
+    _NavDef(Icons.flag_rounded, 'Target'),
+    _NavDef(Icons.grid_view_rounded, 'More'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   // ── Customer (3 tabs) ─────────────────────────────────────────────────
@@ -125,9 +125,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ];
 
   static const _customerNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
-    _NavDef(Icons.campaign_rounded, 'ঘোষণা'),
-    _NavDef(Icons.settings_rounded, 'সেটিং'),
+    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
+    _NavDef(Icons.campaign_rounded, 'Notices'),
+    _NavDef(Icons.settings_rounded, 'Settings'),
   ];
 
   bool get _isAdmin => _user?.isAdmin ?? false;

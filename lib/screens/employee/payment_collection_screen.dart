@@ -111,8 +111,8 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
               await OfflineQueueService.enqueuePaymentCollection(p.toMap());
             }
             _snack(sent
-                ? '✅ কালেকশন ERP-তে জমা হয়েছে!'
-                : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+                ? '✅ Collection submitted to ERP!'
+                : '📥 Offline — will sync to ERP when connected');
           }
           await _load();
         },
@@ -237,7 +237,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                 size: 13,
                 color: Colors.white),
             const SizedBox(width: 4),
-            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+            Text(_erpConnected ? 'ERP Connected' : 'Offline',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11, color: Colors.white)),
           ]),

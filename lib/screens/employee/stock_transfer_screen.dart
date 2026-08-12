@@ -34,7 +34,7 @@ class _StockTransferScreenState extends State<StockTransferScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('স্টক ট্রান্সফার',
+        title: Text('Stock Transfer',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -45,7 +45,7 @@ class _StockTransferScreenState extends State<StockTransferScreen>
           unselectedLabelColor: Colors.white60,
           labelStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700, fontSize: 13),
           unselectedLabelStyle: GoogleFonts.hindSiliguri(fontSize: 13),
-          tabs: const [Tab(text: 'তালিকা'), Tab(text: 'নতুন ট্রান্সফার')],
+          tabs: const [Tab(text: 'List'), Tab(text: 'New Transfer')],
         ),
       ),
       body: TabBarView(
@@ -124,7 +124,7 @@ class _TransferListTabState extends State<_TransferListTab>
     final all = [
       ..._queued.map((q) => {'_queued': true, ...q.payload,
         'date': q.createdAt.toIso8601String(),
-        'transferredBy': 'অপেক্ষমাণ (অফলাইন)',
+        'transferredBy': 'Pending (Offline)',
       }),
       ..._transfers,
     ];
@@ -135,11 +135,11 @@ class _TransferListTabState extends State<_TransferListTab>
           Icon(Icons.swap_horiz_rounded, size: 64,
               color: AppTheme.textGrey.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
-          Text('কোনো ট্রান্সফার নেই',
+          Text('No transfers found',
               style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey, fontSize: 15)),
           const SizedBox(height: 8),
           TextButton(onPressed: _load,
-              child: Text('রিফ্রেশ', style: GoogleFonts.hindSiliguri())),
+              child: Text('Refresh', style: GoogleFonts.hindSiliguri())),
         ]),
       );
     }
@@ -161,7 +161,7 @@ class _TransferListTabState extends State<_TransferListTab>
               child: Row(children: [
                 const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 18),
                 const SizedBox(width: 8),
-                Expanded(child: Text('অফলাইন মোড — ERP-তে সংযোগ নেই',
+                Expanded(child: Text('Offline Mode — No ERP connection',
                     style: GoogleFonts.hindSiliguri(fontSize: 12, color: Colors.orange))),
               ]),
             ),
@@ -206,7 +206,7 @@ class _TransferCard extends StatelessWidget {
                   : AppTheme.primaryAccent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(queued ? 'অফলাইন' : 'ERP ✓',
+            child: Text(queued ? 'Offline' : 'ERP ✓',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -326,12 +326,12 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   Future<void> _submit() async {
     final productName = _selectedProduct?['name']?.toString() ??
         _productSearchCtrl.text.trim();
-    if (productName.isEmpty) { _snack('পণ্য বেছে নিন', error: true); return; }
-    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('উৎস শাখা বেছে নিন', error: true); return; }
-    if (_toBranch == null || _toBranch!.isEmpty) { _snack('গন্তব্য শাখা বেছে নিন', error: true); return; }
-    if (_fromBranch == _toBranch) { _snack('উৎস ও গন্তব্য শাখা একই হতে পারবে না', error: true); return; }
+    if (productName.isEmpty) { _snack('Please select a product', error: true); return; }
+    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source branch', error: true); return; }
+    if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination branch', error: true); return; }
+    if (_fromBranch == _toBranch) { _snack('Source and destination branch cannot be the same', error: true); return; }
     final qty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    if (qty <= 0) { _snack('পরিমাণ দিন', error: true); return; }
+    if (qty <= 0) { _snack('Please enter quantity', error: true); return; }
 
     setState(() => _saving = true);
 
@@ -373,8 +373,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     setState(() => _saving = false);
 
     _snack(sentToErp
-        ? '✅ ট্রান্সফার ERP-তে জমা হয়েছে!'
-        : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+        ? '✅ Transfer submitted to ERP!'
+        : '📥 Offline — will sync to ERP when connected');
 
     // Reset form
     setState(() {
@@ -460,7 +460,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
               Icon(_erpConnected ? Icons.cloud_done_rounded : Icons.wifi_off_rounded,
                   size: 14, color: _erpConnected ? AppTheme.success : Colors.orange),
               const SizedBox(width: 5),
-              Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন মোড',
+              Text(_erpConnected ? 'ERP Connected' : 'Offline Mode',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, fontWeight: FontWeight.w600,
                       color: _erpConnected ? AppTheme.success : Colors.orange)),
@@ -492,20 +492,20 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                 controller: _productSearchCtrl,
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'পণ্যের নাম লিখুন',
+                  hintText: 'Enter product name',
                   hintStyle: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: AppTheme.textGrey),
                   border: InputBorder.none, isDense: true,
                 ),
               )
                   : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('পণ্য *',
+                Text('Product *',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11, color: AppTheme.textGrey)),
                 const SizedBox(height: 2),
                 Text(
                   _selectedProduct == null
-                      ? 'পণ্য বেছে নিন'
+                      ? 'Select a product'
                       : [_selectedProduct!['name'],
                     if ((_selectedProduct!['packSize'] ?? '').toString().isNotEmpty)
                       _selectedProduct!['packSize'],
@@ -529,12 +529,12 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         const SizedBox(height: 14),
 
         // From branch
-        _branchDropdown('উৎস শাখা (From) *', _fromBranch,
+        _branchDropdown('Source Branch (From) *', _fromBranch,
                 (v) => setState(() => _fromBranch = v)),
         const SizedBox(height: 14),
 
         // To branch
-        _branchDropdown('গন্তব্য শাখা (To) *', _toBranch,
+        _branchDropdown('Destination Branch (To) *', _toBranch,
                 (v) => setState(() => _toBranch = v)),
         const SizedBox(height: 14),
 
@@ -552,7 +552,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
             ],
             style: GoogleFonts.hindSiliguri(fontSize: 15),
             decoration: InputDecoration(
-              labelText: 'পরিমাণ *',
+              labelText: 'Quantity *',
               labelStyle: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey),
               border: InputBorder.none,
@@ -573,7 +573,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
             maxLines: 2,
             style: GoogleFonts.hindSiliguri(fontSize: 14),
             decoration: InputDecoration(
-              labelText: 'নোট (ঐচ্ছিক)',
+              labelText: 'Notes (optional)',
               labelStyle: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey),
               border: InputBorder.none,
@@ -601,7 +601,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                 : const Icon(Icons.swap_horiz_rounded,
                 size: 20, color: Colors.white),
             label: Text(
-                _saving ? 'জমা হচ্ছে...' : 'ট্রান্সফার জমা দিন',
+                _saving ? 'Submitting...' : 'Submit Transfer',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 16, fontWeight: FontWeight.w700,
                     color: Colors.white)),
@@ -666,7 +666,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               onChanged: (v) => setState(() => _q = v),
               style: GoogleFonts.hindSiliguri(fontSize: 14),
               decoration: InputDecoration(
-                hintText: 'পণ্য খুঁজুন...',
+                hintText: 'Search product...',
                 hintStyle: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: AppTheme.textGrey),
                 prefixIcon: const Icon(Icons.search_rounded,

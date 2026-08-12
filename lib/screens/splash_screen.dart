@@ -98,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'এন্টারপ্রাইজ রিসোর্স ম্যানেজমেন্ট',
+                  'Enterprise Resource Management',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,

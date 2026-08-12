@@ -36,7 +36,7 @@ class UserModel {
     this.phone = '',
     this.company = '',
     this.designation = '',
-    this.role = 'টিম মেম্বার',
+    this.role = 'Team Member',
     this.zela = '',
     this.thana = '',
     this.myReferralCode = '',
@@ -56,12 +56,12 @@ class UserModel {
     this.investorType = 'zero',
   });
 
-  static const String roleSuperAdmin = 'সুপার অ্যাডমিন';
-  static const String roleAdmin = 'অ্যাডমিন';
-  static const String roleTeamLeader = 'টিম লিডার';
-  static const String roleTeamMember = 'টিম মেম্বার';
-  static const String roleInvestor = 'ইনভেস্টর';
-  static const String roleCustomer = 'কাস্টমার';
+  static const String roleSuperAdmin = 'Super Admin';
+  static const String roleAdmin = 'Admin';
+  static const String roleTeamLeader = 'Team Leader';
+  static const String roleTeamMember = 'Team Member';
+  static const String roleInvestor = 'Investor';
+  static const String roleCustomer = 'Customer';
 
   bool get isSuperAdmin => role == roleSuperAdmin;
   bool get isAdmin => role == roleAdmin || role == roleSuperAdmin;
@@ -84,36 +84,36 @@ class UserModel {
 
   // ── Badge System ────────────────────────────────────────────────────
   String get badge {
-    if (totalSales >= 5000000) return 'প্লাটিনাম';
-    if (totalSales >= 2000000) return 'গোল্ড';
-    if (totalSales >= 500000) return 'সিলভার';
-    return 'ব্রোঞ্জ';
+    if (totalSales >= 5000000) return 'Platinum';
+    if (totalSales >= 2000000) return 'Gold';
+    if (totalSales >= 500000) return 'Silver';
+    return 'Bronze';
   }
 
   Color get badgeColor {
     switch (badge) {
-      case 'প্লাটিনাম': return const Color(0xFF7B1FA2);
-      case 'গোল্ড':     return const Color(0xFFF57F17);
-      case 'সিলভার':    return const Color(0xFF546E7A);
-      default:          return const Color(0xFF6D4C41);
+      case 'Platinum': return const Color(0xFF7B1FA2);
+      case 'Gold':     return const Color(0xFFF57F17);
+      case 'Silver':   return const Color(0xFF546E7A);
+      default:         return const Color(0xFF6D4C41);
     }
   }
 
   IconData get badgeIcon {
     switch (badge) {
-      case 'প্লাটিনাম': return Icons.diamond_rounded;
-      case 'গোল্ড':     return Icons.workspace_premium_rounded;
-      case 'সিলভার':    return Icons.military_tech_rounded;
-      default:          return Icons.emoji_events_rounded;
+      case 'Platinum': return Icons.diamond_rounded;
+      case 'Gold':     return Icons.workspace_premium_rounded;
+      case 'Silver':   return Icons.military_tech_rounded;
+      default:         return Icons.emoji_events_rounded;
     }
   }
 
   double get commissionRate {
     switch (badge) {
-      case 'প্লাটিনাম': return 0.03;
-      case 'গোল্ড':     return 0.025;
-      case 'সিলভার':    return 0.02;
-      default:          return 0.015;
+      case 'Platinum': return 0.03;
+      case 'Gold':     return 0.025;
+      case 'Silver':   return 0.02;
+      default:         return 0.015;
     }
   }
 
@@ -136,10 +136,10 @@ class UserModel {
   }
 
   String get nextBadgeName {
-    if (totalSales >= 5000000) return 'সর্বোচ্চ পর্যায়';
-    if (totalSales >= 2000000) return 'প্লাটিনাম';
-    if (totalSales >= 500000) return 'গোল্ড';
-    return 'সিলভার';
+    if (totalSales >= 5000000) return 'Top Level';
+    if (totalSales >= 2000000) return 'Platinum';
+    if (totalSales >= 500000) return 'Gold';
+    return 'Silver';
   }
 
   Map<String, dynamic> toMap() => {
@@ -246,20 +246,20 @@ class UserModel {
         investorType: investorType ?? this.investorType,
       );
 
-  /// Bangladesh — 64 districts
+  /// Bangladesh — 64 districts (Romanized)
   static const List<String> zelaList = [
-    'ঢাকা', 'গাজীপুর', 'নারায়ণগঞ্জ', 'মুন্সিগঞ্জ', 'মানিকগঞ্জ',
-    'নরসিংদী', 'টাঙ্গাইল', 'কিশোরগঞ্জ', 'ফরিদপুর', 'গোপালগঞ্জ',
-    'মাদারীপুর', 'রাজবাড়ী', 'শরীয়তপুর', 'ময়মনসিংহ', 'নেত্রকোণা',
-    'জামালপুর', 'শেরপুর', 'চট্টগ্রাম', 'কক্সবাজার', 'কুমিল্লা',
-    'ফেনী', 'ব্রাহ্মণবাড়িয়া', 'রাঙ্গামাটি', 'নোয়াখালী', 'চাঁদপুর',
-    'লক্ষ্মীপুর', 'খাগড়াছড়ি', 'বান্দরবান', 'রাজশাহী', 'নাটোর',
-    'চাঁপাইনবাবগঞ্জ', 'পাবনা', 'সিরাজগঞ্জ', 'বগুড়া', 'জয়পুরহাট',
-    'নওগাঁ', 'খুলনা', 'বাগেরহাট', 'সাতক্ষীরা', 'যশোর', 'ঝিনাইদহ',
-    'মাগুরা', 'নড়াইল', 'কুষ্টিয়া', 'মেহেরপুর', 'চুয়াডাঙ্গা',
-    'বরিশাল', 'পটুয়াখালী', 'ভোলা', 'পিরোজপুর', 'ঝালকাঠি',
-    'বরগুনা', 'সিলেট', 'মৌলভীবাজার', 'হবিগঞ্জ', 'সুনামগঞ্জ',
-    'রংপুর', 'দিনাজপুর', 'গাইবান্ধা', 'কুড়িগ্রাম', 'লালমনিরহাট',
-    'নীলফামারী', 'ঠাকুরগাঁও', 'পঞ্চগড়',
+    'Dhaka', 'Gazipur', 'Narayanganj', 'Munshiganj', 'Manikganj',
+    'Narsingdi', 'Tangail', 'Kishoreganj', 'Faridpur', 'Gopalganj',
+    'Madaripur', 'Rajbari', 'Shariatpur', 'Mymensingh', 'Netrokona',
+    'Jamalpur', 'Sherpur', 'Chattogram', 'Cox\'s Bazar', 'Cumilla',
+    'Feni', 'Brahmanbaria', 'Rangamati', 'Noakhali', 'Chandpur',
+    'Lakshmipur', 'Khagrachhari', 'Bandarban', 'Rajshahi', 'Natore',
+    'Chapainawabganj', 'Pabna', 'Sirajganj', 'Bogura', 'Joypurhat',
+    'Naogaon', 'Khulna', 'Bagerhat', 'Satkhira', 'Jashore', 'Jhenaidah',
+    'Magura', 'Narail', 'Kushtia', 'Meherpur', 'Chuadanga',
+    'Barishal', 'Patuakhali', 'Bhola', 'Pirojpur', 'Jhalokathi',
+    'Barguna', 'Sylhet', 'Moulvibazar', 'Habiganj', 'Sunamganj',
+    'Rangpur', 'Dinajpur', 'Gaibandha', 'Kurigram', 'Lalmonirhat',
+    'Nilphamari', 'Thakurgaon', 'Panchagarh',
   ];
 }

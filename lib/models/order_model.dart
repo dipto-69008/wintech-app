@@ -3,28 +3,32 @@ class OrderItem {
   final double quantity;
   final String unit;
   final double unitPrice;
+  final bool isBonus; // free bonus item — not charged
 
   const OrderItem({
     required this.productName,
     required this.quantity,
     required this.unit,
     required this.unitPrice,
+    this.isBonus = false,
   });
 
-  double get total => quantity * unitPrice;
+  double get total => isBonus ? 0 : quantity * unitPrice;
 
   Map<String, dynamic> toMap() => {
         'productName': productName,
         'quantity': quantity,
         'unit': unit,
         'unitPrice': unitPrice,
+        'isBonus': isBonus,
       };
 
   factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
         productName: m['productName'] ?? '',
         quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
-        unit: m['unit'] ?? 'পিস',
+        unit: m['unit'] ?? 'Pcs',
         unitPrice: (m['unitPrice'] as num?)?.toDouble() ?? 0,
+        isBonus: m['isBonus'] == true,
       );
 }
 
@@ -60,10 +64,10 @@ class OrderModel {
 
   String get statusLabel {
     switch (status) {
-      case 'confirmed': return 'নিশ্চিত';
-      case 'delivered': return 'ডেলিভারি হয়েছে';
-      case 'cancelled': return 'বাতিল';
-      default: return 'অপেক্ষমাণ';
+      case 'confirmed': return 'Confirmed';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      default: return 'Pending';
     }
   }
 

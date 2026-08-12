@@ -67,34 +67,34 @@ class _SupportScreenState extends State<SupportScreen> {
                           borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
-                  Text('নতুন সাপোর্ট টিকেট',
+                  Text('New Support Ticket',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: AppTheme.primaryAccent)),
                   const SizedBox(height: 4),
-                  Text('সমস্যা জানান — আমরা সাহায্য করব',
+                  Text('Describe your issue — we will help you',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 13, color: AppTheme.textGrey)),
                   const SizedBox(height: 20),
-                  _formField(nameCtrl, 'আপনার নাম *', 'পূর্ণ নাম',
+                  _formField(nameCtrl, 'Your Name *', 'Full name',
                       Icons.person_outline_rounded,
                       validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'নাম দিন' : null),
+                          (v == null || v.trim().isEmpty) ? 'Enter name' : null),
                   const SizedBox(height: 12),
-                  _formField(emailCtrl, 'ইমেইল *', 'example@email.com',
+                  _formField(emailCtrl, 'Email *', 'example@email.com',
                       Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) => (v == null || !v.contains('@'))
-                          ? 'সঠিক ইমেইল দিন'
+                          ? 'Enter a valid email'
                           : null),
                   const SizedBox(height: 12),
-                  _formField(problemCtrl, 'সমস্যার বিবরণ *',
-                      'আপনার সমস্যা বিস্তারিত লিখুন...',
+                  _formField(problemCtrl, 'Problem Description *',
+                      'Describe your issue in detail...',
                       Icons.bug_report_outlined,
                       maxLines: 5,
                       validator: (v) => (v == null || v.trim().length < 10)
-                          ? 'অন্তত ১০ অক্ষর লিখুন'
+                          ? 'Enter at least 10 characters'
                           : null),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -112,14 +112,14 @@ class _SupportScreenState extends State<SupportScreen> {
                         Navigator.pop(context);
                         _load();
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('টিকেট তৈরি হয়েছে! শীঘ্রই যোগাযোগ করা হবে।',
+                          content: Text('Ticket created! We will contact you shortly.',
                               style: GoogleFonts.hindSiliguri()),
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: AppTheme.success,
                         ));
                       },
                       icon: const Icon(Icons.send_rounded, color: Colors.white),
-                      label: Text('টিকেট জমা দিন',
+                      label: Text('Submit Ticket',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
@@ -190,7 +190,7 @@ class _SupportScreenState extends State<SupportScreen> {
     return Scaffold(
       backgroundColor: AppTheme.primaryBg,
       appBar: AppBar(
-        title: Text('সাপোর্ট ও টিকেট',
+        title: Text('Support & Tickets',
             style:
                 GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
@@ -221,12 +221,12 @@ class _SupportScreenState extends State<SupportScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('আমরা সাহায্যের জন্য আছি',
+                          Text('We are here to help',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white)),
-                          Text('টিকেট খুলুন, যত দ্রুত সম্ভব সমাধান করা হবে',
+                          Text('Open a ticket and we will resolve it as soon as possible',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 12, color: Colors.white70)),
                         ],
@@ -240,7 +240,7 @@ class _SupportScreenState extends State<SupportScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(children: [
                     Expanded(
-                      child: Text('আমার টিকেট (${_tickets.length})',
+                      child: Text('My Tickets (${_tickets.length})',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
@@ -259,11 +259,11 @@ class _SupportScreenState extends State<SupportScreen> {
                                   color: AppTheme.primaryAccent
                                       .withValues(alpha: 0.3)),
                               const SizedBox(height: 12),
-                              Text('কোনো টিকেট নেই',
+                              Text('No tickets yet',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 15, color: AppTheme.textGrey)),
                               const SizedBox(height: 6),
-                              Text('নিচের বোতামে সমস্যা জানান',
+                              Text('Use the button below to report an issue',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 13, color: AppTheme.textGrey)),
                             ],
@@ -286,7 +286,7 @@ class _SupportScreenState extends State<SupportScreen> {
         onPressed: _showCreateTicket,
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('নতুন টিকেট',
+        label: Text('New Ticket',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -294,7 +294,7 @@ class _SupportScreenState extends State<SupportScreen> {
   }
 
   Widget _buildTicketCard(Map<String, dynamic> ticket) {
-    final status = ticket['status'] as String? ?? 'অপেক্ষমাণ';
+    final status = ticket['status'] as String? ?? 'Pending';
     final createdAt = ticket['createdAt'] != null
         ? DateTime.tryParse(ticket['createdAt'].toString())
         : null;
@@ -304,10 +304,12 @@ class _SupportScreenState extends State<SupportScreen> {
 
     Color statusColor;
     switch (status) {
-      case 'সমাধান হয়েছে':
+      case 'Resolved':
+      case 'resolved':
         statusColor = AppTheme.success;
         break;
-      case 'প্রক্রিয়াধীন':
+      case 'In Progress':
+      case 'in_progress':
         statusColor = AppTheme.warning;
         break;
       default:

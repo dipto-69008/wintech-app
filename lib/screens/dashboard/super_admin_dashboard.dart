@@ -218,7 +218,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('CEO ড্যাশবোর্ড',
+                  Text('CEO Dashboard',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -236,7 +236,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text('সুপার অ্যাডমিন',
+              child: Text('Super Admin',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -245,10 +245,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
           ]),
           const SizedBox(height: 16),
           Row(children: [
-            _headerChip(Icons.people_rounded, '${_allEmployees.length} কর্মী'),
+            _headerChip(Icons.people_rounded, '${_allEmployees.length} Staff'),
             const SizedBox(width: 8),
             _headerChip(Icons.shopping_bag_rounded,
-                '$_todayOrderCount আজকের অর্ডার'),
+                "$_todayOrderCount Today's Orders"),
             const SizedBox(width: 8),
             _headerChip(Icons.attach_money_rounded,
                 '৳${_fmt.format(_totalRevenue.toInt())}'),
@@ -280,10 +280,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
   // ── 2. Date filter ───────────────────────────────────────────────────
   Widget _buildDateFilter(bool isDark) {
     final filters = [
-      ('today', 'আজকে', Icons.today_rounded),
-      ('week', 'এই সপ্তাহ', Icons.date_range_rounded),
-      ('month', 'এই মাস', Icons.calendar_month_rounded),
-      ('all', 'সব সময়', Icons.all_inclusive_rounded),
+      ('today', 'Today', Icons.today_rounded),
+      ('week', 'This Week', Icons.date_range_rounded),
+      ('month', 'This Month', Icons.calendar_month_rounded),
+      ('all', 'All Time', Icons.all_inclusive_rounded),
     ];
     return _fade(0, Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -353,13 +353,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
   // ── 3. KPI row ───────────────────────────────────────────────────────
   Widget _buildKpiRow(bool isDark) {
     final kpis = [
-      _KpiData('মোট অর্ডার', '${_filtered.length}',
+      _KpiData('Total Orders', '${_filtered.length}',
           Icons.receipt_long_rounded, AppTheme.primaryAccent),
-      _KpiData('রাজস্ব', '৳${_fmt.format(_totalRevenue.toInt())}',
+      _KpiData('Revenue', '৳${_fmt.format(_totalRevenue.toInt())}',
           Icons.account_balance_wallet_rounded, AppTheme.success),
-      _KpiData('ডেলিভারি', '$_deliveredCount',
+      _KpiData('Delivered', '$_deliveredCount',
           Icons.local_shipping_rounded, const Color(0xFF1565C0)),
-      _KpiData('কর্মী', '${_allEmployees.length}',
+      _KpiData('Staff', '${_allEmployees.length}',
           Icons.badge_rounded, const Color(0xFF7B1FA2)),
     ];
     return _fade(1, Padding(
@@ -437,7 +437,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            _sectionLabel('📅 মাসিক অর্ডার ট্রেন্ড', isDark),
+            _sectionLabel('📅 Monthly Order Trend', isDark),
             const Spacer(),
             Row(children: [
               Container(
@@ -447,7 +447,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                       color: AppTheme.primaryAccent,
                       borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
-              Text('অর্ডার',
+              Text('Orders',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 10, color: AppTheme.textGrey)),
               const SizedBox(width: 10),
@@ -458,7 +458,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                       color: AppTheme.success,
                       borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
-              Text('রাজস্ব',
+              Text('Revenue',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 10, color: AppTheme.textGrey)),
             ]),
@@ -528,7 +528,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: _sectionLabel('🗺️ জেলা ফিল্টার', isDark),
+          child: _sectionLabel('🗺️ District Filter', isDark),
         ),
         SizedBox(
           height: 38,
@@ -539,7 +539,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
               if (i == 0) {
-                return _zelaChip('সব জেলা', _zelaFilter == null, isDark,
+                return _zelaChip('All Districts', _zelaFilter == null, isDark,
                     () => setState(() => _zelaFilter = null));
               }
               final z = zelas[i - 1];
@@ -601,7 +601,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-          child: _sectionLabel('🏙️ জেলা ভিত্তিক পারফরম্যান্স', isDark),
+          child: _sectionLabel('🏙️ District-wise Performance', isDark),
         ),
         SizedBox(
           height: 110,
@@ -645,7 +645,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                               ? AppTheme.darkTextGrey
                               : AppTheme.textGrey),
                       const SizedBox(width: 4),
-                      Text('$emp কর্মী',
+                      Text('$emp Staff',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 11,
                               color: isDark
@@ -657,7 +657,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                       Icon(Icons.receipt_rounded,
                           size: 12, color: const Color(0xFF1565C0)),
                       const SizedBox(width: 4),
-                      Text('$orders অর্ডার',
+                      Text('$orders Orders',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -698,7 +698,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('👤 SR পারফরম্যান্স', isDark),
+          _sectionLabel('👤 SR Performance', isDark),
           const SizedBox(height: 14),
           ...sorted.take(8).map((emp) {
             final count = counts[emp.id] ?? 0;
@@ -778,9 +778,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
           child: Row(children: [
-            _sectionLabel('📋 সাম্প্রতিক অর্ডার', isDark),
+            _sectionLabel('📋 Recent Orders', isDark),
             const Spacer(),
-            Text('${_filtered.length} টি',
+            Text('${_filtered.length} total',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     color: AppTheme.primaryAccent,
@@ -796,7 +796,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                     size: 48,
                     color: AppTheme.primaryAccent.withValues(alpha: 0.3)),
                 const SizedBox(height: 12),
-                Text('কোনো অর্ডার নেই',
+                Text('No orders found',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 14, color: AppTheme.textGrey)),
               ]),
@@ -857,7 +857,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
                 Text('SR: ${order.srName}',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 10, color: AppTheme.primaryAccent)),
-              Text('${order.items.length} টি পণ্য',
+              Text('${order.items.length} Items',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 10,
                       color: isDark

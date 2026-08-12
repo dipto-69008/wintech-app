@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
+import '../../data/wintech_catalog.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
 
+/// Wintech Agro order entry — modeled after the ERP web "Orders Entry" page:
+/// party search with previous-due badge, product search with pack sizes,
+/// locked TP price, per-line totals, bonus (free) items, payment + paid amount.
 class PosOrderScreen extends StatefulWidget {
   const PosOrderScreen({super.key});
 
@@ -16,66 +19,62 @@ class PosOrderScreen extends StatefulWidget {
   State<PosOrderScreen> createState() => _PosOrderScreenState();
 }
 
+class _LineItem {
+  String productId = '';
+  String productName = '';
+  String packSize = '';
+  double rate = 0;
+  double quantity = 1;
+  bool isBonus = false;
+  List<Map<String, dynamic>> packOptions = [];
+
+  bool get isValid => productName.isNotEmpty && quantity > 0;
+  double get total => isBonus ? 0 : quantity * rate;
+  String get displayName =>
+      packSize.isEmpty ? productName : '$productName $packSize';
+}
+
 class _PosOrderScreenState extends State<PosOrderScreen> {
   UserModel? _user;
   bool _saving = false;
   bool _erpConnected = false;
 
-  // Customer
-  String _selectedCustomerId = '';
-  String _selectedCustomerName = '';
-  final _customerCtrl = TextEditingController();
+  // Party
+  String _partyId = '';
+  String _partyName = '';
+  String _partyZone = '';
+  double _partyDue = 0;
 
-  // Order items
-  final List<_ItemRow> _items = [];
+  // Lines
+  final List<_LineItem> _lines = [];
 
-  // Notes
+  // Payment
+  String _paymentType = 'Cash';
+  final _paidCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-
-  // Customers: replaced by live ERP parties when connected
-  List<Map<String, String>> _customers = [
-    {'id': 'cust-001', 'name': 'মেসার্স আল-আমিন ট্রেডার্স'},
-    {'id': 'cust-002', 'name': 'নিউ ঢাকা এন্টারপ্রাইজ'},
-    {'id': 'cust-003', 'name': 'রহমান স্টোর্স'},
-    {'id': 'cust-004', 'name': 'বাংলাদেশ মার্চেন্টস'},
-    {'id': 'cust-005', 'name': 'সিটি ট্রেডিং কোম্পানি'},
-    {'id': 'cust-006', 'name': 'মেসার্স করিম ব্রাদার্স'},
-    {'id': 'cust-007', 'name': 'নর্থ বেঙ্গল ট্রেডার্স'},
-    {'id': 'cust-008', 'name': 'ইস্ট ওয়েস্ট সাপ্লাই'},
+  static const _paymentTypes = [
+    'Cash', 'Bank Transfer', 'Cheque', 'Mobile Banking', 'Credit'
   ];
 
-  // Products: replaced by live ERP catalog when connected
-  List<Map<String, dynamic>> _productSuggestions = [
-    {'name': 'সয়াবিন তেল ৫ লিটার', 'unit': 'কার্টন', 'price': 3200.0},
-    {'name': 'সয়াবিন তেল ১ লিটার', 'unit': 'কার্টন', 'price': 2800.0},
-    {'name': 'চিনি ১ কেজি', 'unit': 'বস্তা', 'price': 4500.0},
-    {'name': 'আটা ২ কেজি', 'unit': 'বস্তা', 'price': 2200.0},
-    {'name': 'ময়দা ১ কেজি', 'unit': 'বস্তা', 'price': 1800.0},
-    {'name': 'লবণ ১ কেজি', 'unit': 'কার্টন', 'price': 650.0},
-    {'name': 'মসুর ডাল ১ কেজি', 'unit': 'বস্তা', 'price': 5200.0},
-    {'name': 'ছোলার ডাল ১ কেজি', 'unit': 'বস্তা', 'price': 4800.0},
-    {'name': 'গুঁড়া দুধ ৪০০ গ্রাম', 'unit': 'কার্টন', 'price': 3600.0},
-    {'name': 'টমেটো সস ৩২০ গ্রাম', 'unit': 'কার্টন', 'price': 1200.0},
-    {'name': 'সরিষার তেল ১ লিটার', 'unit': 'কার্টন', 'price': 2200.0},
-    {'name': 'হলুদ গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 980.0},
-    {'name': 'মরিচ গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 1100.0},
-    {'name': 'ধনিয়া গুঁড়া ২০০ গ্রাম', 'unit': 'কার্টন', 'price': 850.0},
-    {'name': 'বিস্কুট (প্যাকেট)', 'unit': 'কার্টন', 'price': 1440.0},
-    {'name': 'চানাচুর ২৫০ গ্রাম', 'unit': 'কার্টন', 'price': 960.0},
-    {'name': 'সাবান (বার)', 'unit': 'কার্টন', 'price': 780.0},
-    {'name': 'শ্যাম্পু ৩৪০ মিলি', 'unit': 'ডজন', 'price': 1560.0},
-    {'name': 'টুথপেস্ট ১০০ গ্রাম', 'unit': 'ডজন', 'price': 1200.0},
-    {'name': 'ডিটারজেন্ট পাউডার ১ কেজি', 'unit': 'কার্টন', 'price': 2400.0},
-  ];
+  final _invoiceNo = 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
 
-  final _fmt = NumberFormat('#,##0.00', 'en_US');
+  // Wintech catalog (offline/demo) — replaced by live ERP data when connected
+  List<Map<String, dynamic>> _parties = WintechCatalog.parties
+      .map((p) => <String, dynamic>{...p})
+      .toList();
+  List<Map<String, dynamic>> _products = WintechCatalog.products
+      .map((p) => <String, dynamic>{...p})
+      .toList();
+
+  final _fmt = NumberFormat('#,##0', 'en_US');
+  final _fmt2 = NumberFormat('#,##0.00', 'en_US');
 
   @override
   void initState() {
     super.initState();
     _loadUser();
     _loadErpData();
-    _addItem(); // start with one empty item
+    _lines.add(_LineItem());
   }
 
   Future<void> _loadUser() async {
@@ -84,7 +83,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     setState(() => _user = user);
   }
 
-  /// Pull live customers + product catalog from the ERP (real-time).
+  /// Pull live parties + product catalog from the ERP (real-time).
   Future<void> _loadErpData() async {
     if (!await ApiService.isConnected) return;
     try {
@@ -96,111 +95,228 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       setState(() {
         _erpConnected = true;
         if (results[0].isNotEmpty) {
-          _customers = results[0]
-              .map((p) => {
+          _parties = results[0]
+              .map((p) => <String, dynamic>{
                     'id': p['_id']?.toString() ?? '',
                     'name': p['name']?.toString() ?? '',
+                    'zone': p['branchName']?.toString() ??
+                        p['zone']?.toString() ?? '',
+                    'previousDue':
+                        (p['previousDue'] as num?)?.toDouble() ?? 0,
                   })
               .toList();
         }
         if (results[1].isNotEmpty) {
-          _productSuggestions = results[1]
+          _products = results[1]
               .map((p) => <String, dynamic>{
                     'id': p['_id']?.toString() ?? '',
-                    'name': [
-                      p['name']?.toString() ?? '',
-                      if ((p['packSize'] ?? '').toString().isNotEmpty)
-                        p['packSize'].toString(),
-                    ].join(' '),
-                    'unit': p['unit']?.toString() ?? 'পিস',
+                    'name': p['name']?.toString() ?? '',
+                    'packSize': p['packSize']?.toString() ?? '',
+                    'unit': p['unit']?.toString() ?? 'Pcs',
                     'price': (p['sellingPrice'] as num?)?.toDouble() ?? 0.0,
                   })
               .toList();
         }
       });
     } catch (_) {
-      // ERP unreachable — keep local demo lists (offline mode)
+      // ERP unreachable — keep Wintech offline catalog
     }
   }
 
-  void _addItem() {
-    setState(() {
-      _items.add(_ItemRow());
-    });
+  // ── Totals ────────────────────────────────────────────────────────────
+  List<_LineItem> get _validLines => _lines.where((l) => l.isValid).toList();
+  List<_LineItem> get _chargedLines =>
+      _validLines.where((l) => !l.isBonus).toList();
+  List<_LineItem> get _bonusLines =>
+      _validLines.where((l) => l.isBonus).toList();
+  double get _subTotal => _chargedLines.fold(0.0, (s, l) => s + l.total);
+  double get _paid => double.tryParse(_paidCtrl.text) ?? 0;
+  double get _due => (_subTotal - _paid).clamp(0, double.infinity);
+
+  // ── Pickers ───────────────────────────────────────────────────────────
+  void _pickParty() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SearchSheet(
+        title: 'Select Party',
+        hint: 'Search party name or zone…',
+        items: _parties,
+        itemBuilder: (p, isDark) {
+          final due = (p['previousDue'] as num?)?.toDouble() ?? 0;
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+            leading: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.store_rounded,
+                  color: AppTheme.primaryAccent, size: 20),
+            ),
+            title: Text(p['name'] as String,
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: Text(p['zone'] as String? ?? '',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: AppTheme.textGrey)),
+            trailing: due > 0
+                ? Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('Due ৳${_fmt.format(due)}',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.error)),
+                  )
+                : null,
+          );
+        },
+        matcher: (p, q) =>
+            (p['name'] as String).toLowerCase().contains(q) ||
+            (p['zone'] as String? ?? '').toLowerCase().contains(q),
+        onSelect: (p) => setState(() {
+          _partyId = p['id']?.toString() ?? '';
+          _partyName = p['name'] as String;
+          _partyZone = p['zone'] as String? ?? '';
+          _partyDue = (p['previousDue'] as num?)?.toDouble() ?? 0;
+        }),
+      ),
+    );
   }
 
-  void _removeItem(int index) {
-    if (_items.length == 1) return;
-    setState(() => _items.removeAt(index));
+  void _pickProduct(int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SearchSheet(
+        title: 'Select Product',
+        hint: 'Search Wintech products…',
+        items: _products,
+        itemBuilder: (p, isDark) => ListTile(
+          contentPadding: const EdgeInsets.symmetric(vertical: 2),
+          leading: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.science_rounded,
+                color: AppTheme.primaryAccent, size: 20),
+          ),
+          title: Text(p['name'] as String,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 14, fontWeight: FontWeight.w600)),
+          subtitle: Text(
+              [
+                if ((p['packSize'] as String? ?? '').isNotEmpty)
+                  p['packSize'] as String,
+                'TP ৳${_fmt.format((p['price'] as num?) ?? 0)}',
+              ].join(' · '),
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11, color: AppTheme.textGrey)),
+          trailing: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('Add',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    color: AppTheme.primaryAccent,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ),
+        matcher: (p, q) =>
+            (p['name'] as String).toLowerCase().contains(q) ||
+            (p['packSize'] as String? ?? '').toLowerCase().contains(q),
+        onSelect: (p) => setState(() {
+          final line = _lines[index];
+          line.productId = p['id']?.toString() ?? '';
+          line.productName = p['name'] as String;
+          line.packSize = p['packSize'] as String? ?? '';
+          line.rate = (p['price'] as num?)?.toDouble() ?? 0;
+          if (line.quantity <= 0) line.quantity = 1;
+          // Pack-size variants of the same base product
+          line.packOptions = _products
+              .where((x) => x['name'] == p['name'])
+              .toList();
+          // Auto-append an empty row (web behavior)
+          if (index == _lines.length - 1) _lines.add(_LineItem());
+        }),
+      ),
+    );
   }
 
-  double get _total => _items.fold(0.0, (s, r) => s + r.lineTotal);
-
+  // ── Submit ────────────────────────────────────────────────────────────
   Future<void> _submitOrder() async {
-    if (_selectedCustomerId.isEmpty) {
-      _showError('কাস্টমার বেছে নিন');
+    if (_partyName.isEmpty) {
+      _showError('Please select a party');
       return;
     }
-    final validItems = _items.where((i) => i.isValid).toList();
-    if (validItems.isEmpty) {
-      _showError('কমপক্ষে একটি পণ্য যোগ করুন');
+    if (_chargedLines.isEmpty) {
+      _showError('Add at least one (non-bonus) product');
       return;
     }
 
     setState(() => _saving = true);
 
-    final orderItems = validItems.map((i) => OrderItem(
-          productName: i.nameCtrl.text.trim(),
-          quantity: double.tryParse(i.qtyCtrl.text) ?? 0,
-          unit: i.unit,
-          unitPrice: double.tryParse(i.priceCtrl.text) ?? 0,
-        )).toList();
+    final apiItems = _validLines
+        .map((l) => {
+              if (l.productId.isNotEmpty) 'productId': l.productId,
+              'productName': l.displayName + (l.isBonus ? ' (Bonus)' : ''),
+              'quantity': l.quantity,
+              'rate': l.isBonus ? 0 : l.rate,
+              'unit': 'Pcs',
+            })
+        .toList();
+    final partyId = _partyId.startsWith('WP-') || _partyId.isEmpty
+        ? null
+        : _partyId;
+    final payload = {
+      if (partyId != null) 'partyId': partyId,
+      'partyName': _partyName,
+      'items': apiItems,
+      'paymentType': _paymentType,
+      'paidAmount': _paid,
+      'notes': _notesCtrl.text.trim(),
+    };
 
-    // 1) Try to push the order to the ERP (real-time) when connected.
+    // 1) Push to ERP live when connected; queue offline otherwise.
     bool sentToErp = false;
     bool queuedOffline = false;
     String? erpError;
-    final apiItems = validItems
-        .map((i) => {
-              'productName': i.nameCtrl.text.trim(),
-              'quantity': double.tryParse(i.qtyCtrl.text) ?? 0,
-              'rate': double.tryParse(i.priceCtrl.text) ?? 0,
-              'unit': i.unit,
-            })
-        .toList();
-    final partyId = _selectedCustomerId.startsWith('cust-')
-        ? null
-        : _selectedCustomerId;
-
     if (await ApiService.isConnected) {
       try {
         await ApiService.createOrder(
           partyId: partyId,
-          partyName: _selectedCustomerName,
+          partyName: _partyName,
           items: apiItems,
+          paymentType: _paymentType,
+          paidAmount: _paid,
           notes: _notesCtrl.text.trim(),
         );
         sentToErp = true;
       } on ApiException catch (e) {
         erpError = e.message; // e.g. credit limit full
       } catch (_) {
-        // Network problem — queue for automatic upload when back online.
-        await OfflineQueueService.enqueueOrder({
-          if (partyId != null) 'partyId': partyId,
-          'partyName': _selectedCustomerName,
-          'items': apiItems,
-          'notes': _notesCtrl.text.trim(),
-        });
+        await OfflineQueueService.enqueueOrder(payload);
         queuedOffline = true;
       }
     } else if (await ApiService.getToken() != null) {
-      // Logged into ERP before but currently offline — queue it.
-      await OfflineQueueService.enqueueOrder({
-        if (partyId != null) 'partyId': partyId,
-        'partyName': _selectedCustomerName,
-        'items': apiItems,
-        'notes': _notesCtrl.text.trim(),
-      });
+      await OfflineQueueService.enqueueOrder(payload);
       queuedOffline = true;
     }
 
@@ -213,18 +329,25 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
     // 2) Always keep a local copy for offline viewing.
     final order = OrderModel(
-      id: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
+      id: _invoiceNo,
       srId: _user?.id ?? '',
       srName: _user?.name ?? '',
-      customerId: _selectedCustomerId,
-      customerName: _selectedCustomerName,
-      items: orderItems,
-      total: _total,
+      customerId: _partyId,
+      customerName: _partyName,
+      items: _validLines
+          .map((l) => OrderItem(
+                productName: l.displayName,
+                quantity: l.quantity,
+                unit: 'Pcs',
+                unitPrice: l.isBonus ? 0 : l.rate,
+                isBonus: l.isBonus,
+              ))
+          .toList(),
+      total: _subTotal,
       date: DateTime.now(),
-      status: OrderModel.statusConfirmed,
+      status: OrderModel.statusPending,
       notes: _notesCtrl.text.trim(),
     );
-
     await LocalStorageService.saveOrder(order);
 
     if (!mounted) return;
@@ -233,10 +356,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
           sentToErp
-              ? '✅ অর্ডার ERP-তে জমা হয়েছে!'
+              ? '✅ Order submitted to ERP!'
               : queuedOffline
-                  ? '📥 অফলাইন — sync হলে অর্ডার ERP-তে যাবে'
-                  : '✅ অর্ডার সংরক্ষিত হয়েছে (অফলাইন)!',
+                  ? '📥 Offline — order will sync to ERP automatically'
+                  : '✅ Order saved (offline)!',
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
       backgroundColor: AppTheme.success,
       behavior: SnackBarBehavior.floating,
@@ -255,84 +378,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     ));
   }
 
-  void _pickCustomer() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkCard : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                      color: AppTheme.divider,
-                      borderRadius: BorderRadius.circular(4))),
-              Text('কাস্টমার বেছে নিন',
-                  style: GoogleFonts.hindSiliguri(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              ..._customers.map((c) => ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppTheme.lightAccent,
-                      child: Icon(Icons.store_rounded,
-                          color: AppTheme.primaryAccent, size: 18),
-                    ),
-                    title: Text(c['name']!,
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 14, fontWeight: FontWeight.w500)),
-                    trailing: _selectedCustomerId == c['id']
-                        ? const Icon(Icons.check_circle_rounded,
-                            color: AppTheme.primaryAccent)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        _selectedCustomerId = c['id']!;
-                        _selectedCustomerName = c['name']!;
-                      });
-                      Navigator.pop(ctx);
-                    },
-                  )),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _pickProduct(int index) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _ProductPickerSheet(
-        products: _productSuggestions,
-        fmt: _fmt,
-        onSelect: (p) {
-          setState(() {
-            _items[index].nameCtrl.text = p['name'] as String;
-            _items[index].priceCtrl.text =
-                (p['price'] as double).toStringAsFixed(2);
-            _items[index].unit = p['unit'] as String;
-            if (_items[index].qtyCtrl.text.isEmpty) {
-              _items[index].qtyCtrl.text = '1';
-            }
-          });
-        },
-      ),
-    );
-  }
-
+  // ── UI ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -341,120 +387,76 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('নতুন অর্ডার — POS',
-            style: GoogleFonts.hindSiliguri(
-                fontSize: 17, fontWeight: FontWeight.w700)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Orders Entry',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+            Text('#$_invoiceNo',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.white70)),
+          ],
+        ),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          if (_erpConnected)
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Row(children: [
+                const Icon(Icons.cloud_done_rounded,
+                    size: 15, color: Colors.white70),
+                const SizedBox(width: 4),
+                Text('ERP live',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: Colors.white70)),
+              ]),
+            ),
+        ],
       ),
       body: Column(
         children: [
+          // Pending banner (web parity)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppTheme.warning.withValues(alpha: 0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.info_outline_rounded,
+                  size: 15, color: AppTheme.warning),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Orders stay Pending in the ERP until an admin approves them.',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11.5, color: AppTheme.warning)),
+              ),
+            ]),
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Customer selector
-                  GestureDetector(
-                    onTap: _pickCustomer,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: _selectedCustomerId.isEmpty
-                              ? AppTheme.divider
-                              : AppTheme.primaryAccent,
-                          width: _selectedCustomerId.isEmpty ? 1.5 : 2,
-                        ),
-                      ),
-                      child: Row(children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                              color: AppTheme.primaryAccent.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.store_rounded,
-                              color: AppTheme.primaryAccent, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('কাস্টমার *',
-                                  style: GoogleFonts.hindSiliguri(
-                                      fontSize: 11, color: AppTheme.textGrey)),
-                              Text(
-                                _selectedCustomerName.isEmpty
-                                    ? 'কাস্টমার বেছে নিন'
-                                    : _selectedCustomerName,
-                                style: GoogleFonts.hindSiliguri(
-                                    fontSize: 14,
-                                    fontWeight: _selectedCustomerName.isEmpty
-                                        ? FontWeight.w400
-                                        : FontWeight.w600,
-                                    color: _selectedCustomerName.isEmpty
-                                        ? AppTheme.textGrey
-                                        : (isDark
-                                            ? AppTheme.darkText
-                                            : AppTheme.textDark)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_drop_down_rounded,
-                            color: AppTheme.primaryAccent),
-                      ]),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Items header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [
-                        Container(
-                            width: 4,
-                            height: 18,
-                            decoration: BoxDecoration(
-                                color: AppTheme.primaryAccent,
-                                borderRadius: BorderRadius.circular(2))),
-                        const SizedBox(width: 8),
-                        Text('পণ্য তালিকা',
-                            style: GoogleFonts.hindSiliguri(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? AppTheme.darkText
-                                    : AppTheme.textDark)),
-                      ]),
-                      TextButton.icon(
-                        onPressed: _addItem,
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: Text('পণ্য যোগ',
-                            style: GoogleFonts.hindSiliguri(fontSize: 13)),
-                        style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.primaryAccent),
-                      ),
-                    ],
-                  ),
+                  _buildPartyCard(isDark, cardBg),
+                  const SizedBox(height: 18),
+                  _buildLinesHeader(isDark),
                   const SizedBox(height: 8),
-
-                  // Item rows
-                  ..._items.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final item = entry.value;
-                    return _buildItemCard(i, item, isDark, cardBg);
-                  }),
-
+                  ..._lines.asMap().entries.map(
+                      (e) => _buildLineCard(e.key, e.value, isDark, cardBg)),
+                  if (_bonusLines.isNotEmpty) _buildBonusSummary(isDark),
                   const SizedBox(height: 16),
-
+                  _buildPaymentCard(isDark, cardBg),
+                  const SizedBox(height: 14),
                   // Notes
                   Container(
                     decoration: BoxDecoration(
@@ -463,10 +465,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                         border: Border.all(color: AppTheme.divider)),
                     child: TextField(
                       controller: _notesCtrl,
-                      maxLines: 3,
+                      maxLines: 2,
                       style: GoogleFonts.hindSiliguri(fontSize: 14),
                       decoration: InputDecoration(
-                        labelText: 'নোট (ঐচ্ছিক)',
+                        labelText: 'Notes (optional)',
                         labelStyle: GoogleFonts.hindSiliguri(
                             fontSize: 13, color: AppTheme.textGrey),
                         border: InputBorder.none,
@@ -474,242 +476,516 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 90),
                 ],
               ),
             ),
           ),
-
-          // Bottom total + submit
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-            decoration: BoxDecoration(
-              color: cardBg,
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4))
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('মোট পরিমাণ',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
-                    Text('৳ ${_fmt.format(_total)}',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.primaryAccent)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _saving ? null : _submitOrder,
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation(Colors.white)))
-                        : const Icon(Icons.check_circle_rounded, size: 20),
-                    label: Text(_saving ? 'সংরক্ষণ হচ্ছে...' : 'অর্ডার জমা দিন',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildBottomBar(isDark, cardBg),
         ],
       ),
     );
   }
 
-  Widget _buildItemCard(
-      int index, _ItemRow item, bool isDark, Color cardBg) {
+  Widget _buildPartyCard(bool isDark, Color cardBg) {
+    final selected = _partyName.isNotEmpty;
+    return GestureDetector(
+      onTap: _pickParty,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? AppTheme.primaryAccent : AppTheme.divider,
+            width: selected ? 2 : 1.5,
+          ),
+        ),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.store_rounded,
+                color: AppTheme.primaryAccent, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Party *',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey)),
+                Text(
+                  selected ? _partyName : 'Search & select party',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 14,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w400,
+                      color: selected
+                          ? (isDark ? AppTheme.darkText : AppTheme.textDark)
+                          : AppTheme.textGrey),
+                ),
+                if (selected && (_partyZone.isNotEmpty || _partyDue > 0))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Wrap(spacing: 6, children: [
+                      if (_partyZone.isNotEmpty)
+                        Text(_partyZone,
+                            style: GoogleFonts.hindSiliguri(
+                                fontSize: 11, color: AppTheme.textGrey)),
+                      if (_partyDue > 0)
+                        Text('Prev Due: ৳${_fmt.format(_partyDue)}',
+                            style: GoogleFonts.hindSiliguri(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.error)),
+                    ]),
+                  ),
+              ],
+            ),
+          ),
+          const Icon(Icons.arrow_drop_down_rounded,
+              color: AppTheme.primaryAccent),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildLinesHeader(bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(children: [
+          Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                  color: AppTheme.primaryAccent,
+                  borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 8),
+          Text('Products',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+        ]),
+        TextButton.icon(
+          onPressed: () => setState(() => _lines.add(_LineItem())),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text('Add Row',
+              style: GoogleFonts.hindSiliguri(fontSize: 13)),
+          style:
+              TextButton.styleFrom(foregroundColor: AppTheme.primaryAccent),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLineCard(int index, _LineItem line, bool isDark, Color cardBg) {
+    final hasProduct = line.productName.isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: line.isBonus && hasProduct
+            ? AppTheme.warning.withValues(alpha: isDark ? 0.08 : 0.06)
+            : cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: line.isBonus && hasProduct
+                ? AppTheme.warning.withValues(alpha: 0.45)
+                : AppTheme.divider),
+      ),
+      child: Column(children: [
+        // Product selector row
+        Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _pickProduct(index),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : AppTheme.primaryAccent.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Row(children: [
+                  Icon(
+                      hasProduct
+                          ? Icons.science_rounded
+                          : Icons.search_rounded,
+                      size: 17,
+                      color: hasProduct
+                          ? AppTheme.primaryAccent
+                          : AppTheme.textGrey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasProduct ? line.productName : 'Search product…',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 13.5,
+                          fontWeight: hasProduct
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: hasProduct
+                              ? (isDark
+                                  ? AppTheme.darkText
+                                  : AppTheme.textDark)
+                              : AppTheme.textGrey),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          if (_lines.length > 1) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => setState(() => _lines.removeAt(index)),
+              child: Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                      color: AppTheme.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: AppTheme.error, size: 18)),
+            ),
+          ],
+        ]),
+        if (hasProduct) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            // Pack size dropdown (variants from price list)
+            Expanded(
+              flex: 3,
+              child: line.packOptions.length > 1
+                  ? DropdownButtonFormField<String>(
+                      value: line.packSize,
+                      isDense: true,
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppTheme.darkText
+                              : AppTheme.textDark),
+                      decoration: _fieldDeco('Pack Size'),
+                      items: line.packOptions
+                          .map((o) => DropdownMenuItem(
+                                value: o['packSize'] as String,
+                                child: Text(o['packSize'] as String,
+                                    style: GoogleFonts.hindSiliguri(
+                                        fontSize: 13)),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() {
+                        final opt = line.packOptions
+                            .firstWhere((o) => o['packSize'] == v);
+                        line.packSize = v ?? '';
+                        line.productId = opt['id']?.toString() ?? '';
+                        line.rate =
+                            (opt['price'] as num?)?.toDouble() ?? 0;
+                      }),
+                    )
+                  : InputDecorator(
+                      decoration: _fieldDeco('Pack Size'),
+                      child: Text(
+                          line.packSize.isEmpty ? '—' : line.packSize,
+                          style: GoogleFonts.hindSiliguri(fontSize: 13)),
+                    ),
+            ),
+            const SizedBox(width: 8),
+            // Qty stepper
+            Expanded(
+              flex: 4,
+              child: InputDecorator(
+                decoration: _fieldDeco('Qty'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _qtyBtn(Icons.remove_rounded, () {
+                      if (line.quantity > 1) {
+                        setState(() => line.quantity--);
+                      }
+                    }),
+                    Text(line.quantity.toStringAsFixed(0),
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 15, fontWeight: FontWeight.w800)),
+                    _qtyBtn(Icons.add_rounded,
+                        () => setState(() => line.quantity++)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // TP price — locked (web parity for employees)
+            Expanded(
+              flex: 3,
+              child: InputDecorator(
+                decoration: _fieldDeco('TP ৳'),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(
+                        line.isBonus ? 'FREE' : _fmt.format(line.rate),
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: line.isBonus
+                                ? AppTheme.warning
+                                : (isDark
+                                    ? AppTheme.darkText
+                                    : AppTheme.textDark))),
+                  ),
+                  const Icon(Icons.lock_rounded,
+                      size: 11, color: AppTheme.textGrey),
+                ]),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            // Bonus tick — mark this line as a free bonus item
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => line.isBonus = !line.isBonus),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                      line.isBonus
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      size: 19,
+                      color: line.isBonus
+                          ? AppTheme.warning
+                          : AppTheme.textGrey),
+                  const SizedBox(width: 6),
+                  Text('Bonus (free — not charged)',
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 12,
+                          fontWeight: line.isBonus
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: line.isBonus
+                              ? AppTheme.warning
+                              : AppTheme.textGrey)),
+                ]),
+              ),
+            ),
+            Text(
+              line.isBonus ? '৳ 0' : '৳ ${_fmt2.format(line.total)}',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: line.isBonus
+                      ? AppTheme.warning
+                      : AppTheme.primaryAccent),
+            ),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _qtyBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 16, color: AppTheme.primaryAccent),
+      ),
+    );
+  }
+
+  InputDecoration _fieldDeco(String label) => InputDecoration(
+        labelText: label,
+        labelStyle:
+            GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey),
+        border:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        isDense: true,
+      );
+
+  Widget _buildBonusSummary(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(children: [
+        const Text('🎁', style: TextStyle(fontSize: 14)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+              '${_bonusLines.length} bonus item(s) · ${_bonusLines.fold<double>(0, (s, l) => s + l.quantity).toStringAsFixed(0)} pcs free — not charged',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.warning)),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildPaymentCard(bool isDark, Color cardBg) {
+    return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.divider),
       ),
-      child: Column(
-        children: [
-          Row(children: [
-            Expanded(
-              child: TextField(
-                controller: item.nameCtrl,
-                onChanged: (_) => setState(() {}),
-                style: GoogleFonts.hindSiliguri(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'পণ্যের নাম *',
-                  labelStyle: GoogleFonts.hindSiliguri(
-                      fontSize: 12, color: AppTheme.textGrey),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  isDense: true,
-                ),
-              ),
+      child: Column(children: [
+        Row(children: [
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: _paymentType,
+              isDense: true,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13,
+                  color: isDark ? AppTheme.darkText : AppTheme.textDark),
+              decoration: _fieldDeco('Payment Type'),
+              items: _paymentTypes
+                  .map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t,
+                          style: GoogleFonts.hindSiliguri(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) =>
+                  setState(() => _paymentType = v ?? 'Cash'),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _pickProduct(index),
-              child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                      color: AppTheme.primaryAccent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.search_rounded,
-                      color: AppTheme.primaryAccent, size: 20)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _paidCtrl,
+              onChanged: (_) => setState(() {}),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: GoogleFonts.hindSiliguri(fontSize: 13.5),
+              decoration: _fieldDeco('Paid Amount (৳)'),
             ),
-            if (_items.length > 1) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => _removeItem(index),
-                child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: AppTheme.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.delete_outline_rounded,
-                        color: AppTheme.error, size: 20)),
-              ),
-            ],
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: item.qtyCtrl,
-                onChanged: (_) => setState(() {}),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                ],
-                style: GoogleFonts.hindSiliguri(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'পরিমাণ *',
-                  labelStyle: GoogleFonts.hindSiliguri(
-                      fontSize: 12, color: AppTheme.textGrey),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: DropdownButtonFormField<String>(
-                value: item.unit,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 14,
-                    color: isDark ? AppTheme.darkText : AppTheme.textDark),
-                decoration: InputDecoration(
-                  labelText: 'একক',
-                  labelStyle: GoogleFonts.hindSiliguri(
-                      fontSize: 12, color: AppTheme.textGrey),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  isDense: true,
-                ),
-                items: ['পিস', 'কেজি', 'লিটার', 'বাক্স', 'ডজন', 'কার্টন', 'গ্রাম']
-                    .map((u) => DropdownMenuItem(
-                        value: u,
-                        child: Text(u,
-                            style: GoogleFonts.hindSiliguri(fontSize: 13))))
-                    .toList(),
-                onChanged: (v) => setState(() => item.unit = v ?? 'পিস'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: item.priceCtrl,
-                onChanged: (_) => setState(() {}),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                ],
-                style: GoogleFonts.hindSiliguri(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'একক মূল্য (৳) *',
-                  labelStyle: GoogleFonts.hindSiliguri(
-                      fontSize: 12, color: AppTheme.textGrey),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ]),
-          if (item.isValid) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'মোট: ৳ ${_fmt.format(item.lineTotal)}',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryAccent),
-              ),
-            ),
-          ],
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(
+              _due <= 0 && _subTotal > 0 ? 'Fully Paid' : 'Due Amount',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _due <= 0 && _subTotal > 0
+                      ? AppTheme.success
+                      : AppTheme.error)),
+          Text('৳ ${_fmt2.format(_due)}',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: _due <= 0 && _subTotal > 0
+                      ? AppTheme.success
+                      : AppTheme.error)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildBottomBar(bool isDark, Color cardBg) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
+      decoration: BoxDecoration(
+        color: cardBg,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4))
         ],
       ),
+      child: Column(children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+                '${_chargedLines.length} item(s)'
+                '${_bonusLines.isNotEmpty ? ' + ${_bonusLines.length} bonus' : ''}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12.5, color: AppTheme.textGrey)),
+            Text('৳ ${_fmt2.format(_subTotal)}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primaryAccent)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: _saving ? null : _submitOrder,
+            icon: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation(Colors.white)))
+                : const Icon(Icons.check_circle_rounded, size: 20),
+            label: Text(_saving ? 'Saving…' : 'Save Order',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ]),
     );
   }
 
   @override
   void dispose() {
-    _customerCtrl.dispose();
+    _paidCtrl.dispose();
     _notesCtrl.dispose();
-    for (final i in _items) {
-      i.dispose();
-    }
     super.dispose();
   }
 }
 
-// ── Product picker bottom sheet with search ──────────────────────────────
-class _ProductPickerSheet extends StatefulWidget {
-  final List<Map<String, dynamic>> products;
-  final NumberFormat fmt;
+// ── Reusable searchable bottom sheet ──────────────────────────────────────
+class _SearchSheet extends StatefulWidget {
+  final String title;
+  final String hint;
+  final List<Map<String, dynamic>> items;
+  final Widget Function(Map<String, dynamic>, bool isDark) itemBuilder;
+  final bool Function(Map<String, dynamic>, String lowercaseQuery) matcher;
   final ValueChanged<Map<String, dynamic>> onSelect;
 
-  const _ProductPickerSheet(
-      {required this.products, required this.fmt, required this.onSelect});
+  const _SearchSheet({
+    required this.title,
+    required this.hint,
+    required this.items,
+    required this.itemBuilder,
+    required this.matcher,
+    required this.onSelect,
+  });
 
   @override
-  State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
+  State<_SearchSheet> createState() => _SearchSheetState();
 }
 
-class _ProductPickerSheetState extends State<_ProductPickerSheet> {
+class _SearchSheetState extends State<_SearchSheet> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
@@ -722,26 +998,23 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final filtered = widget.products
-        .where((p) =>
-            (p['name'] as String).contains(_query) ||
-            (p['unit'] as String).contains(_query))
-        .toList();
+    final q = _query.toLowerCase().trim();
+    final filtered = q.isEmpty
+        ? widget.items
+        : widget.items.where((p) => widget.matcher(p, q)).toList();
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: 0.8,
       maxChildSize: 0.95,
       minChildSize: 0.4,
       expand: false,
       builder: (ctx, scrollCtrl) => Container(
         decoration: BoxDecoration(
           color: isDark ? AppTheme.darkCard : Colors.white,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
-            // handle
             Container(
               width: 40,
               height: 4,
@@ -752,34 +1025,37 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('পণ্য বেছে নিন',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 16, fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? AppTheme.darkText
-                                : AppTheme.textDark)),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx),
-                    child: const Icon(Icons.close_rounded,
-                        color: AppTheme.textGrey, size: 22),
-                  ),
-                ],
-              ),
+              child: Row(children: [
+                Expanded(
+                  child: Text(widget.title,
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppTheme.darkText
+                              : AppTheme.textDark)),
+                ),
+                Text('${filtered.length} results',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey)),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: const Icon(Icons.close_rounded,
+                      color: AppTheme.textGrey, size: 22),
+                ),
+              ]),
             ),
             const SizedBox(height: 12),
-            // Search box
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _searchCtrl,
+                autofocus: true,
                 style: GoogleFonts.hindSiliguri(fontSize: 14),
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
-                  hintText: 'পণ্যের নাম খুঁজুন...',
+                  hintText: widget.hint,
                   hintStyle: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: AppTheme.textGrey),
                   prefixIcon: const Icon(Icons.search_rounded,
@@ -800,13 +1076,11 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                       : AppTheme.primaryAccent.withValues(alpha: 0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppTheme.divider),
+                    borderSide: const BorderSide(color: AppTheme.divider),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppTheme.divider),
+                    borderSide: const BorderSide(color: AppTheme.divider),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -822,17 +1096,14 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
             if (filtered.isEmpty)
               Expanded(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.search_off_rounded,
-                          color: AppTheme.textGrey, size: 40),
-                      const SizedBox(height: 8),
-                      Text('কোনো পণ্য পাওয়া যায়নি',
-                          style: GoogleFonts.hindSiliguri(
-                              fontSize: 14, color: AppTheme.textGrey)),
-                    ],
-                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.search_off_rounded,
+                        color: AppTheme.textGrey, size: 40),
+                    const SizedBox(height: 8),
+                    Text('No results found',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 14, color: AppTheme.textGrey)),
+                  ]),
                 ),
               )
             else
@@ -843,85 +1114,18 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) =>
                       const Divider(height: 1, indent: 56),
-                  itemBuilder: (_, i) {
-                    final p = filtered[i];
-                    return ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 6),
-                      leading: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryAccent
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.inventory_2_rounded,
-                            color: AppTheme.primaryAccent, size: 20),
-                      ),
-                      title: Text(p['name'] as String,
-                          style: GoogleFonts.hindSiliguri(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: isDark
-                                  ? AppTheme.darkText
-                                  : AppTheme.textDark)),
-                      subtitle: Text(
-                          '৳ ${widget.fmt.format(p['price'])} / ${p['unit']}',
-                          style: GoogleFonts.hindSiliguri(
-                              fontSize: 12,
-                              color: AppTheme.textGrey)),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryAccent
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text('যোগ করুন',
-                            style: GoogleFonts.hindSiliguri(
-                                fontSize: 12,
-                                color: AppTheme.primaryAccent,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                      onTap: () {
-                        widget.onSelect(p);
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
+                  itemBuilder: (_, i) => InkWell(
+                    onTap: () {
+                      widget.onSelect(filtered[i]);
+                      Navigator.pop(ctx);
+                    },
+                    child: widget.itemBuilder(filtered[i], isDark),
+                  ),
                 ),
               ),
           ],
         ),
       ),
     );
-  }
-}
-
-class _ItemRow {
-  final nameCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController();
-  final priceCtrl = TextEditingController();
-  String unit = 'পিস';
-
-  bool get isValid {
-    final name = nameCtrl.text.trim();
-    final qty = double.tryParse(qtyCtrl.text) ?? 0;
-    final price = double.tryParse(priceCtrl.text) ?? 0;
-    return name.isNotEmpty && qty > 0 && price > 0;
-  }
-
-  double get lineTotal {
-    final qty = double.tryParse(qtyCtrl.text) ?? 0;
-    final price = double.tryParse(priceCtrl.text) ?? 0;
-    return qty * price;
-  }
-
-  void dispose() {
-    nameCtrl.dispose();
-    qtyCtrl.dispose();
-    priceCtrl.dispose();
   }
 }

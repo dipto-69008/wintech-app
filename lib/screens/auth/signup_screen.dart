@@ -73,7 +73,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       backgroundColor: AppTheme.primaryBg,
       appBar: AppBar(
-        title: Text('নিবন্ধন করুন',
+        title: Text('Register',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -87,37 +87,37 @@ class _SignupScreenState extends State<SignupScreen> {
             children: [
               BanglaTextField(
                 controller: _nameCtrl,
-                label: 'পূর্ণ নাম *',
-                hint: 'আপনার পূর্ণ নাম',
+                label: 'Full Name *',
+                hint: 'Your full name',
                 prefixIcon: Icons.person_outline_rounded,
                 validator: (v) =>
-                    (v == null || v.isEmpty) ? 'নাম দিন' : null,
+                    (v == null || v.isEmpty) ? 'Enter name' : null,
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _emailCtrl,
-                label: 'ইমেইল *',
+                label: 'Email *',
                 hint: 'example@gmail.com',
                 prefixIcon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) =>
-                    (v == null || !v.contains('@')) ? 'সঠিক ইমেইল দিন' : null,
+                    (v == null || !v.contains('@')) ? 'Enter valid email' : null,
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _phoneCtrl,
-                label: 'মোবাইল নম্বর *',
+                label: 'Mobile Number *',
                 hint: '01XXXXXXXXX',
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
                 validator: (v) =>
-                    (v == null || v.length < 11) ? 'সঠিক নম্বর দিন' : null,
+                    (v == null || v.length < 11) ? 'Enter valid number' : null,
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _companyCtrl,
-                label: 'প্রতিষ্ঠান (ঐচ্ছিক)',
-                hint: 'প্রতিষ্ঠানের নাম',
+                label: 'Company (Optional)',
+                hint: 'Company name',
                 prefixIcon: Icons.business_outlined,
               ),
               const SizedBox(height: 14),
@@ -125,7 +125,7 @@ class _SignupScreenState extends State<SignupScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('জেলা *',
+                  Text('District *',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -165,21 +165,21 @@ class _SignupScreenState extends State<SignupScreen> {
                         .toList(),
                     onChanged: (v) => setState(() => _selectedZela = v!),
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'জেলা বেছে নিন' : null,
+                        (v == null || v.isEmpty) ? 'Select district' : null,
                   ),
                 ],
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _referredByCtrl,
-                label: 'রেফারেল কোড (ঐচ্ছিক)',
-                hint: 'যে রেফার করেছে তার কোড',
+                label: 'Referral Code (Optional)',
+                hint: 'Referrer\'s code',
                 prefixIcon: Icons.card_giftcard_outlined,
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _passCtrl,
-                label: 'পাসওয়ার্ড *',
+                label: 'Password *',
                 hint: '••••••••',
                 prefixIcon: Icons.lock_outline_rounded,
                 obscureText: _obscurePass,
@@ -194,12 +194,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       setState(() => _obscurePass = !_obscurePass),
                 ),
                 validator: (v) =>
-                    (v == null || v.length < 6) ? 'কমপক্ষে ৬ অক্ষর' : null,
+                    (v == null || v.length < 6) ? 'Minimum 6 characters' : null,
               ),
               const SizedBox(height: 14),
               BanglaTextField(
                 controller: _confirmCtrl,
-                label: 'পাসওয়ার্ড নিশ্চিত করুন *',
+                label: 'Confirm Password *',
                 hint: '••••••••',
                 prefixIcon: Icons.lock_outline_rounded,
                 obscureText: _obscureConfirm,
@@ -213,7 +213,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   onPressed: () =>
                       setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
-                validator: (v) => v != _passCtrl.text ? 'পাসওয়ার্ড মিলছে না' : null,
+                validator: (v) => v != _passCtrl.text ? 'Passwords do not match' : null,
               ),
               const SizedBox(height: 28),
               SizedBox(
@@ -230,7 +230,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               valueColor:
                                   AlwaysStoppedAnimation(Colors.white)),
                         )
-                      : Text('নিবন্ধন করুন',
+                      : Text('Register',
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
@@ -239,13 +239,13 @@ class _SignupScreenState extends State<SignupScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('ইতিমধ্যে অ্যাকাউন্ট আছে? ',
+                  Text('Already have an account? ',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 14, color: AppTheme.textGrey)),
                   GestureDetector(
                     onTap: () =>
                         Navigator.pushReplacementNamed(context, '/login'),
-                    child: Text('লগইন করুন',
+                    child: Text('Login',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,

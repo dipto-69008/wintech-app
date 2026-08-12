@@ -285,7 +285,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                       size: 12,
                       color: Colors.white70),
                   const SizedBox(width: 4),
-                  Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন মোড',
+                  Text(_erpConnected ? 'ERP Connected' : 'Offline Mode',
                       style: GoogleFonts.hindSiliguri(
                           color: Colors.white70, fontSize: 12)),
                 ]),
@@ -878,8 +878,8 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       }
       if (mounted) {
         _message(sent
-            ? '✅ সার্ভে ERP-তে জমা হয়েছে!'
-            : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+            ? '✅ Survey submitted to ERP!'
+            : '📥 Offline — will sync to ERP when connected');
       }
     }
     if (!mounted) return;

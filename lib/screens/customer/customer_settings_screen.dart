@@ -39,21 +39,21 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('লগআউট',
+        title: Text('Logout',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('আপনি কি লগআউট করতে চান?',
+        content: Text('Are you sure you want to log out?',
             style: GoogleFonts.hindSiliguri(fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('না',
+            child: Text('No',
                 style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryAccent),
-            child: Text('হ্যাঁ, লগআউট',
+            child: Text('Yes, Logout',
                 style: GoogleFonts.hindSiliguri(color: Colors.white)),
           ),
         ],
@@ -100,7 +100,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
       child: Row(children: [
         const Icon(Icons.settings_rounded, color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('সেটিং',
+        Text('Settings',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -138,7 +138,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_user?.name ?? 'কাস্টমার',
+                Text(_user?.name ?? 'Customer',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 16, fontWeight: FontWeight.w700)),
                 Text(_user?.email ?? '',
@@ -151,7 +151,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   decoration: BoxDecoration(
                       color: AppTheme.primaryAccent.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20)),
-                  child: Text('কাস্টমার পোর্টাল',
+                  child: Text('Customer Portal',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 11,
                           color: AppTheme.primaryAccent,
@@ -181,7 +181,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
         child: Column(children: [
           _tile(
             Icons.dark_mode_rounded,
-            'ডার্ক মোড',
+            'Dark Mode',
             trailing: Switch(
               value: _isDarkMode,
               onChanged: (val) async {
@@ -193,14 +193,14 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
             ),
           ),
           const Divider(height: 1),
-          _tile(Icons.notifications_outlined, 'নোটিফিকেশন',
+          _tile(Icons.notifications_outlined, 'Notifications',
               onTap: () =>
                   Navigator.pushNamed(context, '/notifications')),
           const Divider(height: 1),
-          _tile(Icons.support_agent_rounded, 'সাপোর্ট',
+          _tile(Icons.support_agent_rounded, 'Support',
               onTap: () => Navigator.pushNamed(context, '/support')),
           const Divider(height: 1),
-          _tile(Icons.logout_rounded, 'লগআউট',
+          _tile(Icons.logout_rounded, 'Logout',
               color: AppTheme.error, onTap: _logout),
         ]),
       ),

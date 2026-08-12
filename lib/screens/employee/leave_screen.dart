@@ -97,8 +97,8 @@ class _LeaveScreenState extends State<LeaveScreen>
             await OfflineQueueService.enqueueLeave(l.toMap());
           }
           _snack(sent
-              ? '✅ আবেদন ERP-তে জমা হয়েছে!'
-              : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+              ? '✅ Application submitted to ERP!'
+              : '📥 Offline — will sync to ERP when connected');
           await _load();
         },
       ),
@@ -239,7 +239,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                 size: 13,
                 color: Colors.white),
             const SizedBox(width: 4),
-            Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন',
+            Text(_erpConnected ? 'ERP Connected' : 'Offline',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11, color: Colors.white)),
           ]),

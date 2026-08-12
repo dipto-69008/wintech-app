@@ -4,7 +4,7 @@ class TutorialModel {
   final String description;
   final String videoUrl; // YouTube link or direct URL
   final String thumbnailUrl;
-  final String category; // 'ড্যাশবোর্ড' | 'লিড' | 'প্রপার্টি' | 'ফলো আপ' | 'সাধারণ'
+  final String category; // 'General' | 'Dashboard' | 'Orders' | 'Commission' | 'Target' | 'Settings'
   final int durationMinutes;
   final DateTime createdAt;
 
@@ -14,18 +14,18 @@ class TutorialModel {
     this.description = '',
     this.videoUrl = '',
     this.thumbnailUrl = '',
-    this.category = 'সাধারণ',
+    this.category = 'General',
     this.durationMinutes = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
   static const List<String> categoryOptions = [
-    'সাধারণ',
-    'ড্যাশবোর্ড',
-    'লিড',
-    'প্রপার্টি',
-    'ফলো আপ',
-    'সেটিং',
+    'General',
+    'Dashboard',
+    'Orders',
+    'Commission',
+    'Target',
+    'Settings',
   ];
 
   Map<String, dynamic> toMap() => {
@@ -45,7 +45,7 @@ class TutorialModel {
         description: m['description'] ?? '',
         videoUrl: m['videoUrl'] ?? '',
         thumbnailUrl: m['thumbnailUrl'] ?? '',
-        category: m['category'] ?? 'সাধারণ',
+        category: m['category'] ?? 'General',
         durationMinutes: m['durationMinutes'] ?? 0,
         createdAt: DateTime.tryParse(m['createdAt'] ?? '') ?? DateTime.now(),
       );
