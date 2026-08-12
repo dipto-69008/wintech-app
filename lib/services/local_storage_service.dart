@@ -503,6 +503,19 @@ class LocalStorageService {
         _keyTargets, jsonEncode(list.map((e) => e.toMap()).toList()));
   }
 
+  // ── Motorcycle registration number (entered once per employee) ────────
+  static const _keyMotoReg = 'wintech_moto_reg_';
+
+  static Future<String> getMotoRegNumber(String employeeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('$_keyMotoReg$employeeId') ?? '';
+  }
+
+  static Future<void> setMotoRegNumber(String employeeId, String reg) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_keyMotoReg$employeeId', reg.trim());
+  }
+
   // ── Expenses ───────────────────────────────────────────────────────────
   static const _keyExpenses = 'wintech_expenses';
 

@@ -50,6 +50,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
 
   // Payment
   String _paymentType = 'Cash';
+  DateTime? _probablePaymentDate; // expected payment date (like ERP)
   final _paidCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   static const _paymentTypes = [
@@ -131,7 +132,14 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       _validLines.where((l) => l.isBonus).toList();
   double get _subTotal => _chargedLines.fold(0.0, (s, l) => s + l.total);
   double get _paid => double.tryParse(_paidCtrl.text) ?? 0;
-  double get _due => (_subTotal - _paid).clamp(0, double.infinity);
+
+  /// 3% cash commission — ONLY when payment type is Cash and the full
+  /// amount is paid today (the delivery/order date). Confirmed by server too.
+  double get _cashCommissionPct =>
+      _paymentType == 'Cash' && _subTotal > 0 && _paid >= _subTotal ? 3 : 0;
+  double get _commissionAmount => _subTotal * _cashCommissionPct / 100;
+  double get _grandTotal => _subTotal - _commissionAmount;
+  double get _due => (_grandTotal - _paid).clamp(0, double.infinity);
 
   // ── Pickers ───────────────────────────────────────────────────────────
   void _pickParty() {
@@ -280,6 +288,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               'quantity': l.quantity,
               'rate': l.isBonus ? 0 : l.rate,
               'unit': 'Pcs',
+              'isBonus': l.isBonus,
             })
         .toList();
     final partyId = _partyId.startsWith('WP-') || _partyId.isEmpty
@@ -292,6 +301,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       'paymentType': _paymentType,
       'paidAmount': _paid,
       'notes': _notesCtrl.text.trim(),
+      if (_probablePaymentDate != null)
+        'probablePaymentDate': _probablePaymentDate!.toIso8601String(),
     };
 
     // 1) Push to ERP live when connected; queue offline otherwise.
@@ -307,6 +318,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           paymentType: _paymentType,
           paidAmount: _paid,
           notes: _notesCtrl.text.trim(),
+          probablePaymentDate: _probablePaymentDate,
         );
         sentToErp = true;
       } on ApiException catch (e) {
@@ -347,6 +359,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       date: DateTime.now(),
       status: OrderModel.statusPending,
       notes: _notesCtrl.text.trim(),
+      probablePaymentDate: _probablePaymentDate,
+      paidAmount: _paid,
+      paymentType: _paymentType,
+      commissionPct: _cashCommissionPct,
     );
     await LocalStorageService.saveOrder(order);
 
@@ -882,6 +898,76 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             ),
           ),
         ]),
+        const SizedBox(height: 10),
+        // Probable payment date (like ERP)
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _probablePaymentDate ??
+                  DateTime.now().add(const Duration(days: 7)),
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (picked != null) {
+              setState(() => _probablePaymentDate = picked);
+            }
+          },
+          child: InputDecorator(
+            decoration: _fieldDeco('Probable Payment Date'),
+            child: Row(children: [
+              const Icon(Icons.event_rounded,
+                  size: 16, color: AppTheme.primaryAccent),
+              const SizedBox(width: 8),
+              Text(
+                  _probablePaymentDate == null
+                      ? 'Select date (optional)'
+                      : DateFormat('dd MMM yyyy')
+                          .format(_probablePaymentDate!),
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 13,
+                      color: _probablePaymentDate == null
+                          ? AppTheme.textGrey
+                          : (isDark
+                              ? AppTheme.darkText
+                              : AppTheme.textDark))),
+              const Spacer(),
+              if (_probablePaymentDate != null)
+                GestureDetector(
+                  onTap: () =>
+                      setState(() => _probablePaymentDate = null),
+                  child: const Icon(Icons.close_rounded,
+                      size: 16, color: AppTheme.textGrey),
+                ),
+            ]),
+          ),
+        ),
+        if (_cashCommissionPct > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppTheme.success.withValues(alpha: 0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.percent_rounded,
+                  size: 15, color: AppTheme.success),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Cash Commission 3% (full payment today): −৳${_fmt2.format(_commissionAmount)}',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.success)),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(

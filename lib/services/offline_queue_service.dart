@@ -165,7 +165,12 @@ class OfflineQueueService {
             partyId: p['partyId'] as String?,
             partyName: p['partyName'] as String? ?? '',
             items: List<Map<String, dynamic>>.from(p['items'] as List),
+            paymentType: p['paymentType'] as String? ?? 'Cash',
+            paidAmount: (p['paidAmount'] as num?)?.toDouble() ?? 0,
             notes: p['notes'] as String? ?? '',
+            probablePaymentDate: p['probablePaymentDate'] != null
+                ? DateTime.tryParse(p['probablePaymentDate'] as String)
+                : null,
           );
           ok = true;
         } else if (item.type == QueueItemType.stockTransfer) {
@@ -178,6 +183,15 @@ class OfflineQueueService {
             productId: p['productId'] as String?,
             packSize: p['packSize'] as String?,
             notes: p['notes'] as String? ?? '',
+            extraFields: {
+              if (p['quantityUnit'] != null) 'quantityUnit': p['quantityUnit'],
+              if (p['cartonCount'] != null) 'cartonCount': p['cartonCount'],
+              if (p['bucketCount'] != null) 'bucketCount': p['bucketCount'],
+              if (p['totalWeight'] != null) 'totalWeight': p['totalWeight'],
+              if (p['weightUnit'] != null) 'weightUnit': p['weightUnit'],
+              if (p['transferredBy'] != null)
+                'transferredBy': p['transferredBy'],
+            },
           );
           ok = true;
         } else if (item.type == QueueItemType.expense) {

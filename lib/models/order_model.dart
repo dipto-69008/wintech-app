@@ -43,6 +43,10 @@ class OrderModel {
   final DateTime date;
   final String status; // pending | confirmed | delivered | cancelled
   final String notes;
+  final DateTime? probablePaymentDate; // expected payment date (like ERP)
+  final double paidAmount;
+  final String paymentType;
+  final double commissionPct; // 3% cash commission when fully paid on delivery date
 
   const OrderModel({
     required this.id,
@@ -55,6 +59,10 @@ class OrderModel {
     required this.date,
     this.status = 'pending',
     this.notes = '',
+    this.probablePaymentDate,
+    this.paidAmount = 0,
+    this.paymentType = 'Cash',
+    this.commissionPct = 0,
   });
 
   static String get statusPending => 'pending';
@@ -82,6 +90,10 @@ class OrderModel {
         'date': date.toIso8601String(),
         'status': status,
         'notes': notes,
+        'probablePaymentDate': probablePaymentDate?.toIso8601String(),
+        'paidAmount': paidAmount,
+        'paymentType': paymentType,
+        'commissionPct': commissionPct,
       };
 
   factory OrderModel.fromMap(Map<String, dynamic> m) => OrderModel(
@@ -97,6 +109,11 @@ class OrderModel {
         date: DateTime.tryParse(m['date'] ?? '') ?? DateTime.now(),
         status: m['status'] ?? 'pending',
         notes: m['notes'] ?? '',
+        probablePaymentDate:
+            DateTime.tryParse(m['probablePaymentDate'] ?? ''),
+        paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+        paymentType: m['paymentType'] ?? 'Cash',
+        commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
       );
 
   OrderModel copyWith({String? status, String? notes}) => OrderModel(
@@ -110,5 +127,9 @@ class OrderModel {
         date: date,
         status: status ?? this.status,
         notes: notes ?? this.notes,
+        probablePaymentDate: probablePaymentDate,
+        paidAmount: paidAmount,
+        paymentType: paymentType,
+        commissionPct: commissionPct,
       );
 }

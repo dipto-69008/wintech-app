@@ -71,6 +71,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               quantity: (d['quantity'] as num?)?.toDouble() ?? 0,
               unit: 'Pcs',
               unitPrice: (d['rate'] as num?)?.toDouble() ?? 0,
+              isBonus: d['isBonus'] == true,
             ))
         .toList();
     // ERP status 'a' (active) → confirmed
@@ -91,6 +92,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
       date: DateTime.tryParse(m['saleDate']?.toString() ?? '') ?? DateTime.now(),
       status: status,
       notes: m['description']?.toString() ?? '',
+      probablePaymentDate:
+          DateTime.tryParse(m['probablePaymentDate']?.toString() ?? ''),
+      paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+      paymentType: m['paymentType']?.toString() ?? 'Cash',
+      commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
     );
   }
 

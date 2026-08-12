@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ValueChanged<bool> onThemeToggle;
@@ -17,6 +19,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   UserModel? _user;
   bool _loading = true;
   bool _isDarkMode = false;
+  bool _erpLive = false;
+  bool _checkingErp = false;
+  int _pendingSync = 0;
+  String _erpUrl = '';
 
   @override
   void initState() {
@@ -28,12 +34,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
     final dark = await LocalStorageService.isDarkMode();
+    final url = await ApiService.getBaseUrl();
+    final pending = await OfflineQueueService.pendingCount;
     if (!mounted) return;
     setState(() {
       _user = user;
       _isDarkMode = dark;
+      _erpUrl = url;
+      _pendingSync = pending;
       _loading = false;
     });
+    _checkErp();
+  }
+
+  Future<void> _checkErp() async {
+    if (_checkingErp) return;
+    setState(() => _checkingErp = true);
+    final live = await ApiService.ping(force: true);
+    var pending = _pendingSync;
+    if (live) {
+      // Live link confirmed — push anything waiting immediately.
+      try {
+        final result = await OfflineQueueService.syncAll();
+        pending = result.remaining;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _erpLive = live;
+      _pendingSync = pending;
+      _checkingErp = false;
+    });
+  }
+
+  Future<void> _editErpUrl() async {
+    final ctrl = TextEditingController(text: _erpUrl);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('ERP Server URL',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+              hintText: 'https://your-erp-domain.com',
+              prefixIcon: Icon(Icons.link_rounded)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel',
+                style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryAccent),
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: Text('Save',
+                style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (saved != null && saved.isNotEmpty) {
+      await ApiService.setBaseUrl(saved);
+      setState(() => _erpUrl = saved.replaceAll(RegExp(r'/+$'), ''));
+      _checkErp();
+    }
   }
 
   Future<void> _logout() async {
@@ -344,6 +413,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Column(
                             children: [
+                              // ERP real-time connection status
+                              ListTile(
+                                leading: Container(
+                                  width: 36, height: 36,
+                                  decoration: BoxDecoration(
+                                    color: (_erpLive
+                                            ? AppTheme.success
+                                            : AppTheme.error)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    _erpLive
+                                        ? Icons.cloud_done_rounded
+                                        : Icons.cloud_off_rounded,
+                                    size: 18,
+                                    color: _erpLive
+                                        ? AppTheme.success
+                                        : AppTheme.error,
+                                  ),
+                                ),
+                                title: Text(
+                                  _checkingErp
+                                      ? 'Checking ERP connection…'
+                                      : (_erpLive
+                                          ? 'ERP Connected (Live)'
+                                          : 'ERP Offline'),
+                                  style: GoogleFonts.hindSiliguri(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? AppTheme.darkText
+                                          : AppTheme.textDark),
+                                ),
+                                subtitle: Text(
+                                  _pendingSync > 0
+                                      ? '$_pendingSync item(s) waiting to sync'
+                                      : (_erpLive
+                                          ? 'All data synced in real-time'
+                                          : 'Data will sync when reconnected'),
+                                  style: GoogleFonts.hindSiliguri(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? AppTheme.darkTextGrey
+                                          : AppTheme.textGrey),
+                                ),
+                                trailing: _checkingErp
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
+                                    : IconButton(
+                                        icon: const Icon(Icons.refresh_rounded,
+                                            size: 20),
+                                        tooltip: 'Reconnect & sync now',
+                                        onPressed: _checkErp,
+                                      ),
+                                onTap: _checkErp,
+                              ),
+                              _divider(),
+                              // ERP server URL
+                              _settingTile(
+                                icon: Icons.dns_rounded,
+                                label: 'ERP Server URL',
+                                isDark: isDark,
+                                trailing: SizedBox(
+                                  width: 130,
+                                  child: Text(
+                                    _erpUrl.replaceFirst(
+                                        RegExp(r'^https?://'), ''),
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.right,
+                                    style: GoogleFonts.hindSiliguri(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? AppTheme.darkTextGrey
+                                            : AppTheme.textGrey),
+                                  ),
+                                ),
+                                onTap: _editErpUrl,
+                              ),
+                              _divider(),
                               // Dark/Light mode
                               ListTile(
                                 leading: Container(

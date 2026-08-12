@@ -24,16 +24,16 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    final email = _emailCtrl.text.trim().toLowerCase();
+    final identifier = _emailCtrl.text.trim();
     final password = _passCtrl.text;
 
     // 1) Try real ERP login — real-time connection to the ERP database.
     try {
-      final erpUser = await ApiService.login(email, password);
+      final erpUser = await ApiService.login(identifier, password);
       final user = UserModel(
         id: erpUser['id']?.toString() ?? '',
-        name: erpUser['name']?.toString() ?? email.split('@').first,
-        email: email,
+        name: erpUser['name']?.toString() ?? identifier,
+        email: erpUser['email']?.toString() ?? identifier,
         role: UserModel.roleTeamMember, // SR / employee
         myReferralCode: erpUser['employeeCode']?.toString() ?? '',
         branch: erpUser['branchName']?.toString() ?? '',
@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     } on ApiException catch (e) {
       // Wrong credentials on ERP — fall through to demo accounts only if it's a demo email
-      if (!LocalStorageService.isDemoAccount(email)) {
+      if (!LocalStorageService.isDemoAccount(identifier)) {
         if (!mounted) return;
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -62,13 +62,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // 2) Demo/offline fallback
-    final demoUser = LocalStorageService.getDemoUser(email);
+    final demoUser = LocalStorageService.getDemoUser(identifier);
     if (demoUser != null) {
       await LocalStorageService.saveCurrentUser(demoUser);
     } else {
       await LocalStorageService.saveUserProfile(
-        name: email.split('@').first,
-        email: email,
+        name: identifier.contains('@') ? identifier.split('@').first : identifier,
+        email: identifier,
       );
     }
 
@@ -140,12 +140,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     BanglaTextField(
                       controller: _emailCtrl,
-                      label: 'Email',
-                      hint: 'example@gmail.com',
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
+                      label: 'Employee ID / Email',
+                      hint: 'e.g. SR-001 or email@wintech.com',
+                      prefixIcon: Icons.badge_outlined,
+                      keyboardType: TextInputType.text,
                       validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Enter email' : null,
+                          (v == null || v.isEmpty) ? 'Employee ID বা Email দিন' : null,
                     ),
                     const SizedBox(height: 16),
                     BanglaTextField(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -33,15 +34,26 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   double _erpCurrentValue = 0;
 
   final _fmt = NumberFormat('#,##0', 'en_US');
+  Timer? _liveTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Real-time: refresh live ERP figures every 30 seconds so changes
+    // made in the ERP appear in the app automatically.
+    _liveTimer = Timer.periodic(
+        const Duration(seconds: 30), (_) => _load(silent: true));
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
 
     // Pull live dashboard stats from ERP when connected
@@ -64,8 +76,11 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           }
         }
       } catch (_) {
-        // ERP unreachable — use local orders below
+        // ERP unreachable right now — show as offline until it responds.
+        _erpConnected = false;
       }
+    } else {
+      _erpConnected = false;
     }
 
     // Always load local orders (for offline display + recent list)

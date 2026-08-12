@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../config/theme.dart';
+import '../../data/wintech_catalog.dart';
 import '../../models/survey_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
@@ -737,14 +738,40 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   String _photo = '';
   bool _pickingPhoto = false;
 
-  static const _productOptions = [
-    'Wintech Grow',
-    'Wintech Gold',
-    'Agro Plus',
-    'Crop Care',
-    'Poultry Care',
-    'Fish Care',
-  ];
+  // Dealer visit: zone-based party selection
+  String _dealerZone = '';
+  List<Map<String, dynamic>> _erpParties = [];
+
+  /// Full Wintech product list from the official catalog (dropdown source)
+  static final List<String> _productOptions = () {
+    final set = <String>{};
+    for (final p in WintechCatalog.products) {
+      set.add(p['name'] as String);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }();
+
+  static List<String> get _zoneOptions => WintechCatalog.zones;
+
+  /// Parties of the selected zone (ERP list merged with local catalog)
+  List<String> get _zoneParties {
+    final names = <String>{};
+    for (final p in _erpParties) {
+      final zone = (p['zone'] ?? p['area'] ?? '').toString();
+      if (_dealerZone.isEmpty || zone == _dealerZone) {
+        names.add((p['name'] ?? '').toString());
+      }
+    }
+    for (final p in WintechCatalog.parties) {
+      if (_dealerZone.isEmpty || p['zone'] == _dealerZone) {
+        names.add(p['name'] as String);
+      }
+    }
+    names.remove('');
+    final list = names.toList()..sort();
+    return list;
+  }
 
   @override
   void initState() {
@@ -771,6 +798,19 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     _products = [...(survey?.wintechProducts ?? [])];
     _photo = survey?.photo ?? '';
     _loadEmployees();
+    _loadParties();
+  }
+
+  /// Fetch live parties from the ERP for zone-wise dealer dropdown.
+  Future<void> _loadParties() async {
+    try {
+      if (await ApiService.isConnected) {
+        final data = await ApiService.parties(allBranches: true);
+        if (mounted) setState(() => _erpParties = data);
+      }
+    } catch (_) {
+      // Offline — the local catalog list still works.
+    }
   }
 
   Future<void> _loadEmployees() async {
@@ -966,38 +1006,98 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 12, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 3,
-                    children: _productOptions.map((product) {
-                      final selected = _products.contains(product);
-                      return FilterChip(
-                        selected: selected,
-                        label: Text(product,
-                            style: GoogleFonts.hindSiliguri(fontSize: 11)),
-                        onSelected: (value) => setState(() {
-                          if (value) {
-                            _products.add(product);
-                          } else {
-                            _products.remove(product);
-                          }
-                        }),
-                      );
-                    }).toList(),
+                  DropdownButtonFormField<String>(
+                    value: null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Select product (পণ্যের তালিকা)',
+                        prefixIcon: Icon(Icons.inventory_2_rounded)),
+                    items: _productOptions
+                        .where((p) => !_products.contains(p))
+                        .map((p) => DropdownMenuItem(
+                            value: p,
+                            child: Text(p,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    GoogleFonts.hindSiliguri(fontSize: 13))))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null && !_products.contains(value)) {
+                        setState(() => _products.add(value));
+                      }
+                    },
                   ),
+                  if (_products.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 3,
+                      children: _products.map((product) {
+                        return Chip(
+                          label: Text(product,
+                              style: GoogleFonts.hindSiliguri(fontSize: 11)),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 14),
+                          onDeleted: () =>
+                              setState(() => _products.remove(product)),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   _field(_prescription, 'Prescription / Recommendation',
                       maxLines: 3, required: false),
                 ] else ...[
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _field(_shopName, 'Shop Name',
-                              required: true)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _field(_dealerName, 'Dealer Name')),
-                    ],
+                  // Zone-wise party dropdown for dealership visits
+                  DropdownButtonFormField<String>(
+                    value: _dealerZone.isEmpty ? null : _dealerZone,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Zone',
+                        prefixIcon: Icon(Icons.map_rounded)),
+                    items: _zoneOptions
+                        .map((z) => DropdownMenuItem(
+                            value: z,
+                            child: Text(z,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    GoogleFonts.hindSiliguri(fontSize: 13))))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _dealerZone = value ?? ''),
                   ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: _zoneParties.contains(_shopName.text)
+                        ? _shopName.text
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Party / Shop Name *',
+                        prefixIcon: Icon(Icons.storefront_rounded)),
+                    hint: Text(
+                        _dealerZone.isEmpty
+                            ? 'Select zone first (জোন সিলেক্ট করুন)'
+                            : 'Select party',
+                        style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                    items: _zoneParties
+                        .map((p) => DropdownMenuItem(
+                            value: p,
+                            child: Text(p,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    GoogleFonts.hindSiliguri(fontSize: 13))))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _shopName.text = value ?? ''),
+                    validator: (_) => _shopName.text.trim().isEmpty
+                        ? 'Required'
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  _field(_shopName, 'Shop Name (manual, if not in list)',
+                      required: false),
+                  const SizedBox(height: 10),
+                  _field(_dealerName, 'Dealer Name'),
                   const SizedBox(height: 10),
                   Row(
                     children: [

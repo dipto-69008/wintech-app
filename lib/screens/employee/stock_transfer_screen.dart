@@ -185,6 +185,12 @@ class _TransferCard extends StatelessWidget {
         ? DateFormat('dd MMM yy, hh:mm a').format(DateTime.tryParse(t['date'].toString()) ?? DateTime.now())
         : '—';
 
+    // Build quantity display: pcs + carton/bucket
+    final qty = (t['quantity'] as num?)?.toDouble() ?? 0;
+    final unitLabel = t['quantityUnit']?.toString() ?? 'Pcs';
+    final carton = t['cartonCount'] != null ? '${t['cartonCount']} Ctn' : null;
+    final bucket = t['bucketCount'] != null ? '${t['bucketCount']} Bkt' : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -220,9 +226,12 @@ class _TransferCard extends StatelessWidget {
                     color: isDark ? AppTheme.darkText : AppTheme.textDark),
                 overflow: TextOverflow.ellipsis),
           ),
-          Text('× ${fmt.format((t['quantity'] as num?)?.toDouble() ?? 0)}',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
+          Text(
+            '× ${fmt.format(qty)} $unitLabel'
+            '${carton != null ? ' ($carton)' : ''}'
+            '${bucket != null ? ' ($bucket)' : ''}',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
         ]),
         const SizedBox(height: 8),
         Row(children: [
@@ -232,6 +241,16 @@ class _TransferCard extends StatelessWidget {
               '${t['fromBranch'] ?? '—'}  →  ${t['toBranch'] ?? '—'}',
               style: GoogleFonts.hindSiliguri(fontSize: 12, color: AppTheme.textGrey))),
         ]),
+        // Weight row
+        if ((t['totalWeight'] ?? '') != '') ...[
+          const SizedBox(height: 4),
+          Row(children: [
+            const Icon(Icons.scale_rounded, size: 12, color: AppTheme.textGrey),
+            const SizedBox(width: 4),
+            Text('${t['totalWeight']} ${t['weightUnit'] ?? 'g'}',
+                style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+          ]),
+        ],
         if ((t['transferredBy'] ?? '').toString().isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(t['transferredBy'].toString(),
@@ -267,7 +286,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   List<Map<String, dynamic>> _products = [];
   Map<String, dynamic>? _selectedProduct;
 
-  // Branches from ERP (fallback: 16 canonical operational branches)
+  // Branches from ERP (fallback: canonical operational branches)
   List<String> _branches = [
     'Bogura-1', 'Bogura-2',
     'Comilla-1', 'Comilla-2', 'Comilla-3', 'Comilla-4',
@@ -279,7 +298,17 @@ class _NewTransferTabState extends State<_NewTransferTab> {
 
   String? _fromBranch;
   String? _toBranch;
+
+  // Quantity
   final _qtyCtrl = TextEditingController();
+  String _qtyUnit = 'Pcs'; // Pcs | Carton | Bucket
+  static const _qtyUnits = ['Pcs', 'Carton', 'Bucket'];
+
+  // Weight
+  final _weightCtrl = TextEditingController();
+  String _weightUnit = 'g'; // g | ml | kg | L
+  static const _weightUnits = ['g', 'ml', 'kg', 'L'];
+
   final _notesCtrl = TextEditingController();
   final _productSearchCtrl = TextEditingController();
 
@@ -323,6 +352,22 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     }
   }
 
+  /// Converts quantity to pieces based on product's pcs-per-carton / pcs-per-bucket.
+  /// Returns (pcs, cartonCount, bucketCount).
+  (double, int?, int?) _resolveQuantity() {
+    final raw = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
+    if (_qtyUnit == 'Carton') {
+      final ppc = (_selectedProduct?['pcsPerCarton'] as num?)?.toInt() ?? 1;
+      final pcs = raw * ppc;
+      return (pcs, raw.toInt(), null);
+    } else if (_qtyUnit == 'Bucket') {
+      final ppb = (_selectedProduct?['pcsPerBucket'] as num?)?.toInt() ?? 1;
+      final pcs = raw * ppb;
+      return (pcs, null, raw.toInt());
+    }
+    return (raw, null, null);
+  }
+
   Future<void> _submit() async {
     final productName = _selectedProduct?['name']?.toString() ??
         _productSearchCtrl.text.trim();
@@ -330,10 +375,13 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source branch', error: true); return; }
     if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination branch', error: true); return; }
     if (_fromBranch == _toBranch) { _snack('Source and destination branch cannot be the same', error: true); return; }
-    final qty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    if (qty <= 0) { _snack('Please enter quantity', error: true); return; }
+    final rawQty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
+    if (rawQty <= 0) { _snack('Please enter quantity', error: true); return; }
 
     setState(() => _saving = true);
+
+    final (pcs, cartons, buckets) = _resolveQuantity();
+    final weight = _weightCtrl.text.trim();
 
     final payload = {
       'productName': productName,
@@ -342,7 +390,12 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         'packSize': _selectedProduct!['packSize'].toString(),
       'fromBranch': _fromBranch!,
       'toBranch': _toBranch!,
-      'quantity': qty,
+      'quantity': pcs,
+      'quantityUnit': _qtyUnit,
+      if (cartons != null) 'cartonCount': cartons,
+      if (buckets != null) 'bucketCount': buckets,
+      if (weight.isNotEmpty) 'totalWeight': weight,
+      if (weight.isNotEmpty) 'weightUnit': _weightUnit,
       'notes': _notesCtrl.text.trim(),
       'transferredBy': '${_user?.name ?? 'Mobile User'} (Mobile)',
     };
@@ -354,15 +407,20 @@ class _NewTransferTabState extends State<_NewTransferTab> {
           productName: productName,
           fromBranch: _fromBranch!,
           toBranch: _toBranch!,
-          quantity: qty,
+          quantity: pcs,
           productId: payload['productId'] as String?,
           packSize: payload['packSize'] as String?,
           notes: payload['notes'] as String? ?? '',
+          extraFields: {
+            'quantityUnit': _qtyUnit,
+            if (cartons != null) 'cartonCount': cartons,
+            if (buckets != null) 'bucketCount': buckets,
+            if (weight.isNotEmpty) 'totalWeight': weight,
+            if (weight.isNotEmpty) 'weightUnit': _weightUnit,
+          },
         );
         sentToErp = true;
-      } catch (_) {
-        // offline — queue it
-      }
+      } catch (_) {}
     }
 
     if (!sentToErp) {
@@ -376,13 +434,15 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         ? '✅ Transfer submitted to ERP!'
         : '📥 Offline — will sync to ERP when connected');
 
-    // Reset form
     setState(() {
       _selectedProduct = null;
       _productSearchCtrl.clear();
       _qtyCtrl.clear();
+      _weightCtrl.clear();
       _notesCtrl.clear();
       _toBranch = null;
+      _qtyUnit = 'Pcs';
+      _weightUnit = 'g';
     });
 
     widget.onCreated();
@@ -442,6 +502,10 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+
+    // Derived: pcs-per-carton / pcs-per-bucket from selected product
+    final ppc = (_selectedProduct?['pcsPerCarton'] as num?)?.toInt();
+    final ppb = (_selectedProduct?['pcsPerBucket'] as num?)?.toInt();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -538,27 +602,131 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                 (v) => setState(() => _toBranch = v)),
         const SizedBox(height: 14),
 
-        // Quantity
+        // ── Quantity with unit selector ───────────────────────────────
         Container(
           decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppTheme.divider)),
-          child: TextField(
-            controller: _qtyCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
-            ],
-            style: GoogleFonts.hindSiliguri(fontSize: 15),
-            decoration: InputDecoration(
-              labelText: 'Quantity *',
-              labelStyle: GoogleFonts.hindSiliguri(
-                  fontSize: 13, color: AppTheme.textGrey),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _qtyCtrl,
+                onChanged: (_) => setState(() {}),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
+                ],
+                style: GoogleFonts.hindSiliguri(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Quantity *',
+                  labelStyle: GoogleFonts.hindSiliguri(
+                      fontSize: 13, color: AppTheme.textGrey),
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+              ),
             ),
+            const SizedBox(width: 8),
+            DropdownButton<String>(
+              value: _qtyUnit,
+              underline: const SizedBox(),
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryAccent),
+              items: _qtyUnits
+                  .map((u) => DropdownMenuItem(
+                      value: u,
+                      child: Text(u,
+                          style: GoogleFonts.hindSiliguri(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) => setState(() => _qtyUnit = v ?? 'Pcs'),
+            ),
+          ]),
+        ),
+
+        // Conversion hint
+        if (_qtyUnit == 'Carton' && ppc != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              '1 Carton = $ppc Pcs  •  '
+              '${(double.tryParse(_qtyCtrl.text) ?? 0) * ppc} total pcs',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11, color: AppTheme.primaryAccent),
+            ),
+          )
+        else if (_qtyUnit == 'Carton' && ppc == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text('Pcs/Carton not yet configured for this product',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.orange)),
           ),
+        if (_qtyUnit == 'Bucket' && ppb != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              '1 Bucket = $ppb Pcs  •  '
+              '${(double.tryParse(_qtyCtrl.text) ?? 0) * ppb} total pcs',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11, color: AppTheme.primaryAccent),
+            ),
+          )
+        else if (_qtyUnit == 'Bucket' && ppb == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text('Pcs/Bucket not yet configured for this product',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, color: Colors.orange)),
+          ),
+
+        const SizedBox(height: 14),
+
+        // ── Total Weight with unit selector ──────────────────────────
+        Container(
+          decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.divider)),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _weightCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
+                ],
+                style: GoogleFonts.hindSiliguri(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Total Weight (optional)',
+                  labelStyle: GoogleFonts.hindSiliguri(
+                      fontSize: 13, color: AppTheme.textGrey),
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            DropdownButton<String>(
+              value: _weightUnit,
+              underline: const SizedBox(),
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryAccent),
+              items: _weightUnits
+                  .map((u) => DropdownMenuItem(
+                      value: u,
+                      child: Text(u,
+                          style: GoogleFonts.hindSiliguri(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) => setState(() => _weightUnit = v ?? 'g'),
+            ),
+          ]),
         ),
         const SizedBox(height: 14),
 
@@ -614,6 +782,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   @override
   void dispose() {
     _qtyCtrl.dispose();
+    _weightCtrl.dispose();
     _notesCtrl.dispose();
     _productSearchCtrl.dispose();
     super.dispose();
@@ -691,6 +860,10 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 final label = [p['name'] ?? '',
                   if ((p['packSize'] ?? '').toString().isNotEmpty) p['packSize'],
                 ].join(' ');
+                // Show carton/bucket info if available
+                final ppc = p['pcsPerCarton'] != null ? '${p['pcsPerCarton']} pcs/ctn' : null;
+                final ppb = p['pcsPerBucket'] != null ? '${p['pcsPerBucket']} pcs/bkt' : null;
+                final convInfo = [ppc, ppb].where((x) => x != null).join(' • ');
                 return ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: AppTheme.lightAccent,
@@ -700,8 +873,13 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                   title: Text(label,
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: Text(p['unit']?.toString() ?? '',
-                      style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                  subtitle: Text(
+                    [
+                      p['unit']?.toString() ?? '',
+                      if (convInfo.isNotEmpty) convInfo,
+                    ].where((s) => s.isNotEmpty).join(' • '),
+                    style: GoogleFonts.hindSiliguri(fontSize: 12),
+                  ),
                   onTap: () {
                     widget.onSelect(p);
                     Navigator.pop(ctx);

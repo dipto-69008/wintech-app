@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
+import '../../data/wintech_catalog.dart';
 import '../../models/expense_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
@@ -27,10 +31,10 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   static const _typeOptions = [
     ('all',                   'All'),
     (ExpenseModel.typeTaBill,     'TA Bill'),
-    (ExpenseModel.typeTaDaSheet,  'TA/DA'),
+    (ExpenseModel.typeDa,         'DA Bill'),
+    (ExpenseModel.typeTaDaSheet,  'Top Sheet'),
     (ExpenseModel.typeOutStation, 'Out Station'),
     (ExpenseModel.typeMotorcycle, 'Motorcycle'),
-    (ExpenseModel.typeOthersBill, 'Others'),
   ];
 
   final _fmt = NumberFormat('#,##0', 'en_US');
@@ -117,6 +121,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
             // Only push brand-new bills to the ERP (edits stay local).
             if (existing == null) {
               var sent = false;
+              var rejected = '';
               if (await ApiService.isConnected) {
                 try {
                   await ApiService.createExpense(e.toMap());
@@ -124,14 +129,25 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                   // The bill now lives in the ERP (with a server id) —
                   // drop the local copy so it doesn't show up twice.
                   await LocalStorageService.deleteExpense(e.id);
+                } on ApiException catch (ex) {
+                  if (ex.statusCode == 400 || ex.statusCode == 403) {
+                    // Business rejection (month lock / missing doc / Friday DA)
+                    rejected = ex.message;
+                    await LocalStorageService.deleteExpense(e.id);
+                  }
                 } catch (_) {}
               }
-              if (!sent) {
-                await OfflineQueueService.enqueueExpense(e.toMap());
+              if (rejected.isNotEmpty) {
+                _snack(rejected.replaceFirst(RegExp(r'^[A-Z_]+: '), ''),
+                    error: true);
+              } else {
+                if (!sent) {
+                  await OfflineQueueService.enqueueExpense(e.toMap());
+                }
+                _snack(sent
+                    ? '✅ Bill submitted to ERP!'
+                    : '📥 Offline — will sync to ERP when connected');
               }
-              _snack(sent
-                  ? '✅ Bill submitted to ERP!'
-                  : '📥 Offline — will sync to ERP when connected');
             }
             await _load();
           },
@@ -140,12 +156,12 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     );
   }
 
-  void _snack(String msg) {
+  void _snack(String msg, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg,
           style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
-      backgroundColor: AppTheme.success,
+      backgroundColor: error ? AppTheme.error : AppTheme.success,
       behavior: SnackBarBehavior.floating,
     ));
   }
@@ -473,11 +489,10 @@ class _TypePickerSheet extends StatelessWidget {
 
   static const _items = [
     (ExpenseModel.typeTaBill,     'TA Bill',        Icons.directions_car_rounded,   AppTheme.primaryAccent),
-    (ExpenseModel.typeTaDaSheet,  'Monthly TA/DA Sheet', Icons.table_rows_rounded, Color(0xFF6A1B9A)),
+    (ExpenseModel.typeDa,         'DA Bill',          Icons.account_balance_wallet_rounded, AppTheme.warning),
     (ExpenseModel.typeOutStation, 'Out Station Bill', Icons.hotel_rounded,          Color(0xFFE65100)),
     (ExpenseModel.typeMotorcycle, 'Motorcycle Log',   Icons.two_wheeler_rounded,    Color(0xFF1565C0)),
-    (ExpenseModel.typeOthersBill, 'TA/DA & Others Bill', Icons.summarize_rounded, Color(0xFF2E7D32)),
-    (ExpenseModel.typeDa,         'DA Bill',          Icons.account_balance_wallet_rounded, AppTheme.warning),
+    (ExpenseModel.typeOthersBill, 'TA/DA Top Sheet', Icons.summarize_rounded, Color(0xFF2E7D32)),
   ];
 
   @override
@@ -528,7 +543,7 @@ class _TypePickerSheet extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  Expense Form Screen  (handles all 6 types)
+//  Expense Form Screen  (handles all bill types)
 // ══════════════════════════════════════════════════════════════════════════
 
 class ExpenseFormScreen extends StatefulWidget {
@@ -553,15 +568,27 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fmt = NumberFormat('#,##0.##', 'en_US');
 
-  late TextEditingController _nameCtrl;
-  late TextEditingController _designationCtrl;
-  late TextEditingController _zoneCtrl;
-  late TextEditingController _monthCtrl;
+  // Dropdown-driven header values
+  String _applicantName = '';
+  String _designation = '';
+  String _zone = '';
+  String _month = '';
+
+  List<String> _employeeNames = [];
+  List<String> _zoneOptions = [];
+  List<String> _monthOptions = [];
+
+  // Motorcycle registration number (entered once, then auto-filled)
+  late TextEditingController _motoRegCtrl;
+  bool _motoRegSaved = false;
 
   // TA Bill rows
   final List<Map<String, TextEditingController>> _taRows = [];
 
-  // TA/DA Sheet rows
+  // Motorcycle Servicing Bill rows (attached to TA bill & motorcycle log)
+  final List<Map<String, TextEditingController>> _servRows = [];
+
+  // TA/DA Top Sheet rows
   final List<Map<String, TextEditingController>> _tadaRows = [];
 
   // Out Station rows
@@ -570,25 +597,36 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   // Motorcycle log rows
   final List<Map<String, TextEditingController>> _motoRows = [];
 
-  // DA Bill
-  late TextEditingController _daAmountCtrl;
-  late TextEditingController _daNoteCtrl;
+  // DA Bill rows (date auto, Friday-blocked, amount from designation)
+  final List<Map<String, TextEditingController>> _daRows = [];
+  final List<bool> _daAdminApproved = [];
 
-  // Others Bill controllers
+  // Top Sheet controllers
   late Map<String, TextEditingController> _othersCtrl;
+  bool _topSheetLoading = false;
 
   bool _saving = false;
+  bool _pickingPhoto = false;
+
+  bool get _isAdmin => widget.user?.isAdmin ?? false;
+
+  static String _today() => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
-    _nameCtrl        = TextEditingController(text: e?.applicantName ?? widget.user?.name ?? '');
-    _designationCtrl = TextEditingController(text: e?.designation ?? widget.user?.designation ?? '');
-    _zoneCtrl        = TextEditingController(text: e?.zone ?? widget.user?.zela ?? '');
-    _monthCtrl       = TextEditingController(text: e?.month ?? _currentMonthBn());
-    _daAmountCtrl    = TextEditingController();
-    _daNoteCtrl      = TextEditingController();
+    _applicantName = e?.applicantName ?? widget.user?.name ?? '';
+    _designation   = e?.designation ?? widget.user?.designation ?? '';
+    _zone          = e?.zone ?? widget.user?.zela ?? '';
+    _month         = e?.month ?? _currentMonth();
+    _motoRegCtrl   = TextEditingController(text: e?.motoRegNumber ?? '');
+
+    _employeeNames = [
+      if (_applicantName.isNotEmpty) _applicantName,
+    ];
+    _zoneOptions = _buildZoneOptions();
+    _monthOptions = _buildMonthOptions();
 
     _othersCtrl = {
       for (final key in _otherKeys) key: TextEditingController(),
@@ -598,16 +636,30 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     if (e != null) {
       switch (widget.type) {
         case ExpenseModel.typeTaBill:
-          for (final r in e.taRows) _addTaRow(init: r);
+          for (final r in e.taRows) {
+            _addTaRow(init: r);
+          }
+          for (final r in e.motoServicingRows) {
+            _addServRow(init: r);
+          }
           break;
         case ExpenseModel.typeTaDaSheet:
-          for (final r in e.tadaRows) _addTadaRow(init: r);
+          for (final r in e.tadaRows) {
+            _addTadaRow(init: r);
+          }
           break;
         case ExpenseModel.typeOutStation:
-          for (final r in e.outStationRows) _addOutRow(init: r);
+          for (final r in e.outStationRows) {
+            _addOutRow(init: r);
+          }
           break;
         case ExpenseModel.typeMotorcycle:
-          for (final r in e.motoRows) _addMotoRow(init: r);
+          for (final r in e.motoRows) {
+            _addMotoRow(init: r);
+          }
+          for (final r in e.motoServicingRows) {
+            _addServRow(init: r);
+          }
           break;
         case ExpenseModel.typeOthersBill:
           for (final key in _otherKeys) {
@@ -616,8 +668,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           }
           break;
         case ExpenseModel.typeDa:
-          _daAmountCtrl.text = (e.othersBill['amount'] ?? '').toString();
-          _daNoteCtrl.text   = (e.othersBill['note'] ?? '').toString();
+          for (final r in e.daRows) {
+            _addDaRow(init: r);
+          }
           break;
       }
     }
@@ -634,6 +687,103 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     if (_motoRows.isEmpty && widget.type == ExpenseModel.typeMotorcycle) {
       _addMotoRow();
     }
+    if (_daRows.isEmpty && widget.type == ExpenseModel.typeDa) {
+      _addDaRow();
+    }
+
+    _loadEmployees();
+    _loadMotoReg();
+    if (widget.type == ExpenseModel.typeOthersBill && e == null) {
+      _loadTopSheet();
+    }
+  }
+
+  List<String> _buildZoneOptions() {
+    final zones = <String>{...WintechCatalog.zones, ...UserModel.zelaList};
+    if (_zone.isNotEmpty) zones.add(_zone);
+    final list = zones.toList()..sort();
+    return list;
+  }
+
+  List<String> _buildMonthOptions() {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final now = DateTime.now();
+    final list = <String>[];
+    for (var i = 0; i < 12; i++) {
+      final d = DateTime(now.year, now.month - i, 1);
+      list.add('${months[d.month - 1]} ${d.year}');
+    }
+    if (_month.isNotEmpty && !list.contains(_month)) list.insert(0, _month);
+    return list;
+  }
+
+  Future<void> _loadEmployees() async {
+    final employees = await LocalStorageService.getAllEmployees();
+    final names = <String>{
+      if ((widget.user?.name ?? '').isNotEmpty) widget.user!.name,
+      ...employees.map((e) => e.name),
+    };
+    if (_applicantName.isNotEmpty) names.add(_applicantName);
+    if (!mounted) return;
+    setState(() => _employeeNames = names.toList());
+  }
+
+  Future<void> _loadMotoReg() async {
+    if (_motoRegCtrl.text.trim().isNotEmpty) return;
+    final saved =
+        await LocalStorageService.getMotoRegNumber(widget.user?.id ?? '');
+    if (saved.isNotEmpty && mounted) {
+      setState(() {
+        _motoRegCtrl.text = saved;
+        _motoRegSaved = true;
+      });
+    }
+  }
+
+  /// Auto-fill Top Sheet from ERP: previous dues, sales target/amount,
+  /// achievement %, recovery amount, bill totals — all automatic.
+  Future<void> _loadTopSheet() async {
+    setState(() => _topSheetLoading = true);
+    try {
+      if (await ApiService.isConnected) {
+        final ts = await ApiService.taDaTopSheet(month: _month);
+        if (ts.isNotEmpty && mounted) {
+          void put(String key, dynamic v) {
+            if (v == null) return;
+            final d = (v as num?)?.toDouble() ?? 0;
+            _othersCtrl[key]?.text = d == 0 ? '' : _stripZeros(d);
+          }
+
+          put('previousDues',       ts['previousDues']);
+          put('salesTarget',        ts['salesTarget']);
+          put('salesAmount',        ts['salesAmount']);
+          put('salesAchievement',   ts['salesAchievement']);
+          put('recoveryAmount',     ts['recoveryAmount']);
+          put('currentDues',        ts['currentDues']);
+          put('tadaAmount',         ts['tadaAmount']);
+          put('outStationBill',     ts['outStationBill']);
+          final sales = (ts['salesAmount'] as num?)?.toDouble() ?? 0;
+          final recovery = (ts['recoveryAmount'] as num?)?.toDouble() ?? 0;
+          if (sales > 0) {
+            _othersCtrl['salesRecoveryPercent']?.text =
+                _stripZeros((recovery / sales) * 100);
+          }
+        }
+      }
+    } catch (_) {
+      // Offline — keep manual entry.
+    }
+    if (mounted) setState(() => _topSheetLoading = false);
+  }
+
+  static String _stripZeros(double v) {
+    final s = v.toStringAsFixed(2);
+    return s.endsWith('.00')
+        ? s.substring(0, s.length - 3)
+        : (s.endsWith('0') ? s.substring(0, s.length - 1) : s);
   }
 
   static const _otherKeys = [
@@ -661,7 +811,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     'othersBill':         'Others Bill',
   };
 
-  String _currentMonthBn() {
+  String _currentMonth() {
     const months = [
       'January', 'February', 'March', 'April',
       'May', 'June', 'July', 'August',
@@ -674,7 +824,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void _addTaRow({Map<String, dynamic>? init}) {
     setState(() {
       _taRows.add({
-        'date':            TextEditingController(text: init?['date'] ?? ''),
+        // Date auto-filled with today for new rows
+        'date':            TextEditingController(text: init?['date'] ?? _today()),
         'from':            TextEditingController(text: init?['from'] ?? ''),
         'to':              TextEditingController(text: init?['to'] ?? ''),
         'modeOfTransport': TextEditingController(text: init?['modeOfTransport'] ?? ''),
@@ -684,10 +835,21 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     });
   }
 
+  void _addServRow({Map<String, dynamic>? init}) {
+    setState(() {
+      _servRows.add({
+        'date':          TextEditingController(text: init?['date'] ?? _today()),
+        'description':   TextEditingController(text: init?['description'] ?? ''),
+        'amount':        TextEditingController(text: (init?['amount'] ?? '').toString()),
+        'supportingDoc': TextEditingController(text: init?['supportingDoc'] ?? ''),
+      });
+    });
+  }
+
   void _addTadaRow({Map<String, dynamic>? init}) {
     setState(() {
       _tadaRows.add({
-        'date':  TextEditingController(text: init?['date'] ?? ''),
+        'date':  TextEditingController(text: init?['date'] ?? _today()),
         'place': TextEditingController(text: init?['place'] ?? ''),
         'ta':    TextEditingController(text: (init?['ta'] ?? '').toString()),
         'da':    TextEditingController(text: (init?['da'] ?? '').toString()),
@@ -698,7 +860,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void _addOutRow({Map<String, dynamic>? init}) {
     setState(() {
       _outRows.add({
-        'date':  TextEditingController(text: init?['date'] ?? ''),
+        'date':  TextEditingController(text: init?['date'] ?? _today()),
         'from':  TextEditingController(text: init?['from'] ?? ''),
         'to':    TextEditingController(text: init?['to'] ?? ''),
         'ta':    TextEditingController(text: (init?['ta'] ?? '').toString()),
@@ -711,45 +873,198 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void _addMotoRow({Map<String, dynamic>? init}) {
     setState(() {
       _motoRows.add({
-        'date':        TextEditingController(text: init?['date'] ?? ''),
-        'destination': TextEditingController(text: init?['destination'] ?? ''),
-        'purposes':    TextEditingController(text: init?['purposes'] ?? ''),
-        'prevReading': TextEditingController(text: (init?['prevReading'] ?? '').toString()),
+        'date':          TextEditingController(text: init?['date'] ?? _today()),
+        'destination':   TextEditingController(text: init?['destination'] ?? ''),
+        'purposes':      TextEditingController(text: init?['purposes'] ?? ''),
+        'prevReading':   TextEditingController(text: (init?['prevReading'] ?? '').toString()),
         'latestReading': TextEditingController(text: (init?['latestReading'] ?? '').toString()),
-        'petrol':      TextEditingController(text: (init?['petrol'] ?? '').toString()),
-        'mobil':       TextEditingController(text: (init?['mobil'] ?? '').toString()),
+        'petrol':        TextEditingController(text: (init?['petrol'] ?? '').toString()),
+        'petrolAmount':  TextEditingController(text: (init?['petrolAmount'] ?? '').toString()),
+        'octane':        TextEditingController(text: (init?['octane'] ?? '').toString()),
+        'octaneAmount':  TextEditingController(text: (init?['octaneAmount'] ?? '').toString()),
+        'mobil':         TextEditingController(text: (init?['mobil'] ?? '').toString()),
+        'mobilAmount':   TextEditingController(text: (init?['mobilAmount'] ?? '').toString()),
+        'othersAmount':  TextEditingController(text: (init?['othersAmount'] ?? '').toString()),
+        'supportingDoc': TextEditingController(text: init?['supportingDoc'] ?? ''),
       });
+    });
+  }
+
+  void _addDaRow({Map<String, dynamic>? init}) {
+    // DA amount comes automatically from the selected designation
+    final autoAmount = ExpenseModel.daByDesignation[_designation];
+    setState(() {
+      _daRows.add({
+        'date':   TextEditingController(text: init?['date'] ?? _today()),
+        'amount': TextEditingController(
+            text: (init?['amount'] ?? (autoAmount ?? '')).toString()),
+        'note':   TextEditingController(text: init?['note'] ?? ''),
+      });
+      _daAdminApproved.add(init?['adminApproved'] as bool? ?? false);
     });
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _designationCtrl.dispose();
-    _zoneCtrl.dispose();
-    _monthCtrl.dispose();
-    _daAmountCtrl.dispose();
-    _daNoteCtrl.dispose();
-    for (final c in _othersCtrl.values) c.dispose();
-    for (final r in _taRows) for (final c in r.values) c.dispose();
-    for (final r in _tadaRows) for (final c in r.values) c.dispose();
-    for (final r in _outRows) for (final c in r.values) c.dispose();
-    for (final r in _motoRows) for (final c in r.values) c.dispose();
+    _motoRegCtrl.dispose();
+    for (final c in _othersCtrl.values) {
+      c.dispose();
+    }
+    for (final rows in [_taRows, _tadaRows, _outRows, _motoRows, _servRows, _daRows]) {
+      for (final r in rows) {
+        for (final c in r.values) {
+          c.dispose();
+        }
+      }
+    }
     super.dispose();
   }
 
   double _dbl(TextEditingController c) =>
       double.tryParse(c.text.trim()) ?? 0;
 
+  bool _isFriday(String date) {
+    final d = DateTime.tryParse(date);
+    return d != null && d.weekday == DateTime.friday;
+  }
+
+  Future<void> _pickRowDate(TextEditingController ctrl,
+      {bool blockFriday = false, int? daIndex}) async {
+    final current = DateTime.tryParse(ctrl.text) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    if (blockFriday && picked.weekday == DateTime.friday && !_isAdmin) {
+      final approved = daIndex != null &&
+          daIndex < _daAdminApproved.length &&
+          _daAdminApproved[daIndex];
+      if (!approved) {
+        _formSnack(
+            'শুক্রবার DA বিল বন্ধ। স্পেশাল কাজের ক্ষেত্রে এডমিনের এপ্রোভাল প্রয়োজন।',
+            error: true);
+        return;
+      }
+    }
+    setState(() => ctrl.text = DateFormat('yyyy-MM-dd').format(picked));
+  }
+
+  Future<void> _captureDoc(TextEditingController docCtrl) async {
+    if (_pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1280,
+        imageQuality: 75,
+      );
+      if (picked != null && mounted) {
+        setState(() => docCtrl.text = picked.path);
+      }
+    } catch (_) {
+      // Camera unavailable — try gallery as fallback
+      try {
+        final picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1280,
+          imageQuality: 75,
+        );
+        if (picked != null && mounted) {
+          setState(() => docCtrl.text = picked.path);
+        }
+      } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
+  }
+
+  void _formSnack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: error ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ── Month lock: bills of a previous month need admin unlock ──────────
+    final locked = ExpenseModel.isMonthLocked(_month);
+    final adminUnlocked = widget.existing?.adminUnlocked ?? false;
+    if (locked && !_isAdmin && !adminUnlocked) {
+      _formSnack(
+          'সিস্টেম লক: $_month-এর বিল জমার সময় শেষ। এডমিন আনলক করলে পুনরায় জমা দিতে পারবেন।',
+          error: true);
+      return;
+    }
+
+    // ── Mandatory supporting docs for fuel & servicing ────────────────────
+    if (widget.type == ExpenseModel.typeMotorcycle) {
+      for (var i = 0; i < _motoRows.length; i++) {
+        final r = _motoRows[i];
+        final hasFuel = _dbl(r['petrol']!) > 0 || _dbl(r['petrolAmount']!) > 0 ||
+            _dbl(r['octane']!) > 0 || _dbl(r['octaneAmount']!) > 0 ||
+            _dbl(r['mobil']!) > 0 || _dbl(r['mobilAmount']!) > 0 ||
+            _dbl(r['othersAmount']!) > 0;
+        if (hasFuel && r['supportingDoc']!.text.trim().isEmpty) {
+          _formSnack(
+              'Row ${i + 1}: পেট্রোল/অকটেন/মবিল বিলের সাপোর্টিং ডকুমেন্টের ছবি বাধ্যতামূলক।',
+              error: true);
+          return;
+        }
+      }
+    }
+    for (var i = 0; i < _servRows.length; i++) {
+      final r = _servRows[i];
+      if (_dbl(r['amount']!) > 0 && r['supportingDoc']!.text.trim().isEmpty) {
+        _formSnack(
+            'Servicing Row ${i + 1}: সাপোর্টিং ডকুমেন্টের ছবি বাধ্যতামূলক।',
+            error: true);
+        return;
+      }
+    }
+
+    // ── Friday DA check ────────────────────────────────────────────────────
+    if (widget.type == ExpenseModel.typeDa) {
+      for (var i = 0; i < _daRows.length; i++) {
+        if (_isFriday(_daRows[i]['date']!.text) &&
+            !(_isAdmin || _daAdminApproved[i])) {
+          _formSnack(
+              'Row ${i + 1}: শুক্রবারের DA বিলের জন্য এডমিনের এপ্রোভাল প্রয়োজন।',
+              error: true);
+          return;
+        }
+      }
+    }
+
     setState(() => _saving = true);
+
+    // Save motorcycle registration number once per employee
+    final motoReg = _motoRegCtrl.text.trim();
+    if (motoReg.isNotEmpty && !_motoRegSaved) {
+      await LocalStorageService.setMotoRegNumber(
+          widget.user?.id ?? '', motoReg);
+    }
 
     List<Map<String, dynamic>> taRows = [];
     List<Map<String, dynamic>> tadaRows = [];
     List<Map<String, dynamic>> outRows = [];
     List<Map<String, dynamic>> motoRows = [];
+    List<Map<String, dynamic>> daRows = [];
     Map<String, dynamic> othersBill = {};
+
+    final servRows = _servRows.map((r) => {
+          'date': r['date']!.text,
+          'description': r['description']!.text,
+          'amount': _dbl(r['amount']!),
+          'supportingDoc': r['supportingDoc']!.text,
+        }).toList();
 
     switch (widget.type) {
       case ExpenseModel.typeTaBill:
@@ -803,7 +1118,13 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             'latestReading': latest,
             'totalKm':       latest - prev,
             'petrol':        _dbl(r['petrol']!),
+            'petrolAmount':  _dbl(r['petrolAmount']!),
+            'octane':        _dbl(r['octane']!),
+            'octaneAmount':  _dbl(r['octaneAmount']!),
             'mobil':         _dbl(r['mobil']!),
+            'mobilAmount':   _dbl(r['mobilAmount']!),
+            'othersAmount':  _dbl(r['othersAmount']!),
+            'supportingDoc': r['supportingDoc']!.text,
           };
         }).toList();
         break;
@@ -817,10 +1138,17 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         ].fold<double>(0.0, (s, k) => s + ((othersBill[k] as double?) ?? 0));
         break;
       case ExpenseModel.typeDa:
-        othersBill = {
-          'amount': _dbl(_daAmountCtrl),
-          'note':   _daNoteCtrl.text.trim(),
-        };
+        daRows = List.generate(_daRows.length, (i) {
+          final r = _daRows[i];
+          final d = DateTime.tryParse(r['date']!.text);
+          return {
+            'date':   r['date']!.text,
+            'amount': _dbl(r['amount']!),
+            'note':   r['note']!.text.trim(),
+            'dayOfWeek': d == null ? '' : DateFormat('EEEE').format(d),
+            'adminApproved': _daAdminApproved[i],
+          };
+        });
         break;
     }
 
@@ -828,17 +1156,22 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       id: widget.existing?.id ??
           'EXP-${DateTime.now().millisecondsSinceEpoch}',
       type: widget.type,
-      month: _monthCtrl.text.trim(),
-      applicantName: _nameCtrl.text.trim(),
-      designation: _designationCtrl.text.trim(),
-      zone: _zoneCtrl.text.trim(),
+      month: _month,
+      applicantName: _applicantName,
+      designation: _designation,
+      zone: _zone,
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       status: widget.existing?.status ?? ExpenseModel.statusPending,
       srId: widget.user?.id ?? '',
+      isLocked: locked,
+      adminUnlocked: adminUnlocked,
       taRows: taRows,
       tadaRows: tadaRows,
       outStationRows: outRows,
       motoRows: motoRows,
+      motoServicingRows: servRows,
+      motoRegNumber: motoReg,
+      daRows: daRows,
       othersBill: othersBill,
     );
 
@@ -852,6 +1185,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     final typeLabel = ExpenseModel(
             id: '', type: widget.type, createdAt: DateTime.now(), srId: '')
         .typeLabel;
+    final locked = ExpenseModel.isMonthLocked(_month) &&
+        !_isAdmin &&
+        !(widget.existing?.adminUnlocked ?? false);
 
     return Scaffold(
       appBar: AppBar(
@@ -883,15 +1219,54 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Common header fields
+            if (locked) _lockBanner(),
+            // Common header fields — all dropdowns
             _sectionCard(isDark, children: [
-              _field('Applicant Name', _nameCtrl),
+              _dropdownField(
+                'Applicant / Employee Name',
+                value: _applicantName.isEmpty ? null : _applicantName,
+                items: _employeeNames,
+                onChanged: (v) => setState(() => _applicantName = v ?? ''),
+              ),
               const SizedBox(height: 12),
-              _field('Designation', _designationCtrl),
+              _dropdownField(
+                'Employee Designation',
+                value: ExpenseModel.designationList.contains(_designation)
+                    ? _designation
+                    : (_designation.isEmpty ? null : _designation),
+                items: [
+                  ...ExpenseModel.designationList,
+                  if (_designation.isNotEmpty &&
+                      !ExpenseModel.designationList.contains(_designation))
+                    _designation,
+                ],
+                onChanged: (v) {
+                  setState(() {
+                    _designation = v ?? '';
+                    // DA amount auto-updates from designation
+                    final auto = ExpenseModel.daByDesignation[_designation];
+                    if (auto != null) {
+                      for (final r in _daRows) {
+                        r['amount']!.text = _stripZeros(auto);
+                      }
+                    }
+                  });
+                },
+              ),
               const SizedBox(height: 12),
-              _field('Zone', _zoneCtrl),
+              _dropdownField(
+                'Zone',
+                value: _zoneOptions.contains(_zone) ? _zone : null,
+                items: _zoneOptions,
+                onChanged: (v) => setState(() => _zone = v ?? ''),
+              ),
               const SizedBox(height: 12),
-              _field('Month', _monthCtrl),
+              _dropdownField(
+                'Month',
+                value: _monthOptions.contains(_month) ? _month : null,
+                items: _monthOptions,
+                onChanged: (v) => setState(() => _month = v ?? ''),
+              ),
             ]),
             const SizedBox(height: 16),
 
@@ -900,9 +1275,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _saving ? null : _submit,
+              onPressed: (_saving || locked) ? null : _submit,
               child: Text(
-                  widget.existing == null ? 'Save' : 'Update',
+                  locked
+                      ? 'Locked — Admin unlock required'
+                      : (widget.existing == null ? 'Save' : 'Update'),
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16, fontWeight: FontWeight.w700)),
             ),
@@ -912,6 +1289,29 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       ),
     );
   }
+
+  Widget _lockBanner() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.error.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.lock_rounded, color: AppTheme.error, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+                '$_month-এর বিল সাবমিট লক হয়ে গেছে। এডমিন আনলক করলে জমা দিতে পারবেন।',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.error)),
+          ),
+        ]),
+      );
 
   List<Widget> _buildTypeFields(bool isDark) {
     switch (widget.type) {
@@ -924,7 +1324,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       case ExpenseModel.typeMotorcycle:
         return _buildMotoFields(isDark);
       case ExpenseModel.typeOthersBill:
-        return _buildOthersBillFields(isDark);
+        return _buildTopSheetFields(isDark);
       case ExpenseModel.typeDa:
         return _buildDaFields(isDark);
       default:
@@ -932,9 +1332,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     }
   }
 
-  // ── TA Bill ──────────────────────────────────────────────────────────
+  // ── TA Bill (with From/To + Motorcycle Servicing Bill) ────────────────
   List<Widget> _buildTaBillFields(bool isDark) {
     return [
+      _motoRegField(isDark),
+      const SizedBox(height: 8),
       Row(children: [
         Text('TA Bill Rows',
             style: GoogleFonts.hindSiliguri(
@@ -965,17 +1367,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               ),
           ]),
           const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _field('Date', r['date']!)),
-            const SizedBox(width: 8),
-            Expanded(child: _field('From', r['from']!)),
-          ]),
+          _dateField('Date', r['date']!),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('To', r['to']!)),
+            Expanded(child: _field('From', r['from']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('Transport', r['modeOfTransport']!)),
+            Expanded(child: _field('To', r['to']!)),
           ]),
+          const SizedBox(height: 8),
+          _field('Transport', r['modeOfTransport']!),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(flex: 2, child: _field('Description', r['description']!)),
@@ -987,6 +1387,72 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       }),
       _totalRow('Total TA',
           _taRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
+      const SizedBox(height: 8),
+      ..._buildServicingSection(isDark),
+    ];
+  }
+
+  // ── Motorcycle Servicing Bill (attached to TA bill & motorcycle log) ──
+  List<Widget> _buildServicingSection(bool isDark) {
+    return [
+      Row(children: [
+        Text('Motorcycle Servicing Bill',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _addServRow,
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: Text('Add', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+        ),
+      ]),
+      if (_servRows.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text('No servicing bill added',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 12, color: AppTheme.textGrey)),
+        ),
+      ..._servRows.asMap().entries.map((entry) {
+        final i = entry.key;
+        final r = entry.value;
+        return _sectionCard(isDark, children: [
+          Row(children: [
+            Text('Servicing ${i + 1}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textGrey)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => setState(() {
+                for (final c in _servRows[i].values) {
+                  c.dispose();
+                }
+                _servRows.removeAt(i);
+              }),
+              child: const Icon(Icons.remove_circle_outline_rounded,
+                  size: 18, color: AppTheme.error),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          _dateField('Date', r['date']!),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(flex: 2, child: _field('Description', r['description']!)),
+            const SizedBox(width: 8),
+            Expanded(child: _field('Amount (৳)', r['amount']!,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}))),
+          ]),
+          const SizedBox(height: 8),
+          _docPicker(r['supportingDoc']!,
+              required: _dbl(r['amount']!) > 0),
+        ]);
+      }),
+      if (_servRows.isNotEmpty)
+        _totalRow('Servicing Total',
+            _servRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
     ];
   }
 
@@ -1025,7 +1491,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('Date', r['date']!)),
+            Expanded(child: _dateField('Date', r['date']!)),
             const SizedBox(width: 8),
             Expanded(flex: 2, child: _field('Place', r['place']!)),
           ]),
@@ -1096,9 +1562,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               ),
           ]),
           const SizedBox(height: 8),
+          _dateField('Date', r['date']!),
+          const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('Date', r['date']!)),
-            const SizedBox(width: 8),
             Expanded(child: _field('From', r['from']!)),
             const SizedBox(width: 8),
             Expanded(child: _field('To', r['to']!)),
@@ -1136,6 +1602,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   // ── Motorcycle Log ───────────────────────────────────────────────────
   List<Widget> _buildMotoFields(bool isDark) {
     return [
+      _motoRegField(isDark),
+      const SizedBox(height: 8),
       Row(children: [
         Text('Motorcycle Log Book',
             style: GoogleFonts.hindSiliguri(
@@ -1151,6 +1619,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final i = entry.key;
         final r = entry.value;
         final km = _dbl(r['latestReading']!) - _dbl(r['prevReading']!);
+        final fuelTotal = _dbl(r['petrolAmount']!) +
+            _dbl(r['octaneAmount']!) +
+            _dbl(r['mobilAmount']!) +
+            _dbl(r['othersAmount']!);
+        final needsDoc = fuelTotal > 0 ||
+            _dbl(r['petrol']!) > 0 ||
+            _dbl(r['octane']!) > 0 ||
+            _dbl(r['mobil']!) > 0;
         return _sectionCard(isDark, children: [
           Row(children: [
             Text('Row ${i + 1}',
@@ -1168,7 +1644,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _field('Date', r['date']!)),
+            Expanded(child: _dateField('Date', r['date']!)),
             const SizedBox(width: 8),
             Expanded(flex: 2, child: _field('Destination/Place', r['destination']!)),
           ]),
@@ -1191,7 +1667,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 Text('Total (KM)',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 10, color: AppTheme.textGrey)),
-                Text('${_fmt.format(km < 0 ? 0 : km)}',
+                Text(_fmt.format(km < 0 ? 0 : km),
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1200,27 +1676,101 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             ),
           ]),
           const SizedBox(height: 8),
+          // Fuel: liter + amount pairs
           Row(children: [
             Expanded(
-                child: _field('Petrol/Octane (L)', r['petrol']!,
-                    keyboardType: TextInputType.number)),
+                child: _field('Petrol (L)', r['petrol']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
             Expanded(
-                child: _field('Mobil (L)', r['mobil']!,
-                    keyboardType: TextInputType.number)),
+                child: _field('Petrol Amount (৳)', r['petrolAmount']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
           ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+                child: _field('Octane (L)', r['octane']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _field('Octane Amount (৳)', r['octaneAmount']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+                child: _field('Mobil (L)', r['mobil']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _field('Mobil Amount (৳)', r['mobilAmount']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+          ]),
+          const SizedBox(height: 8),
+          _field('Others Amount (৳)', r['othersAmount']!,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {})),
+          if (fuelTotal > 0) ...[
+            const SizedBox(height: 6),
+            Text('Fuel Total: ৳ ${_fmt.format(fuelTotal)}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryAccent)),
+          ],
+          const SizedBox(height: 8),
+          _docPicker(r['supportingDoc']!, required: needsDoc),
         ]);
       }),
+      _totalRow(
+          'Total Fuel Bill',
+          _motoRows.fold(
+              0.0,
+              (s, r) =>
+                  s +
+                  _dbl(r['petrolAmount']!) +
+                  _dbl(r['octaneAmount']!) +
+                  _dbl(r['mobilAmount']!) +
+                  _dbl(r['othersAmount']!))),
+      const SizedBox(height: 8),
+      ..._buildServicingSection(isDark),
     ];
   }
 
-  // ── Others Bill ──────────────────────────────────────────────────────
-  List<Widget> _buildOthersBillFields(bool isDark) {
+  // ── TA/DA Top Sheet (auto-generated) ─────────────────────────────────
+  List<Widget> _buildTopSheetFields(bool isDark) {
     return [
-      Text('TA/DA & Others Bill',
-          style: GoogleFonts.hindSiliguri(
-              fontSize: 14, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
+      Row(children: [
+        Text('TA/DA Top Sheet',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        if (_topSheetLoading)
+          const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
+        else
+          TextButton.icon(
+            onPressed: _loadTopSheet,
+            icon: const Icon(Icons.sync_rounded, size: 16),
+            label: Text('Auto-fill',
+                style: GoogleFonts.hindSiliguri(fontSize: 12)),
+          ),
+      ]),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+            'Previous dues, sales target, sales amount, achievement, recovery — সব ERP থেকে স্বয়ংক্রিয়ভাবে চলে আসবে।',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11, color: AppTheme.textGrey)),
+      ),
       _sectionCard(isDark, children: [
         ..._otherKeys.map((key) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -1248,16 +1798,125 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     ];
   }
 
-  // ── DA Bill ──────────────────────────────────────────────────────────
+  // ── DA Bill (auto date, Friday-blocked, amount from designation) ─────
   List<Widget> _buildDaFields(bool isDark) {
+    final autoAmount = ExpenseModel.daByDesignation[_designation];
     return [
-      _sectionCard(isDark, children: [
-        _field('DA Amount (৳)', _daAmountCtrl,
-            keyboardType: TextInputType.number),
-        const SizedBox(height: 12),
-        _field('Note', _daNoteCtrl),
+      Row(children: [
+        Text('DA Bill',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _addDaRow,
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: Text('Add Day', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+        ),
       ]),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+            autoAmount != null
+                ? 'Designation অনুযায়ী DA: ৳ ${_stripZeros(autoAmount)}/দিন। শুক্রবার DA বন্ধ (এডমিন এপ্রোভাল ছাড়া)।'
+                : 'Designation সিলেক্ট করলে DA amount অটোমেটিক চলে আসবে। শুক্রবার DA বন্ধ।',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11, color: AppTheme.textGrey)),
+      ),
+      ..._daRows.asMap().entries.map((entry) {
+        final i = entry.key;
+        final r = entry.value;
+        final friday = _isFriday(r['date']!.text);
+        return _sectionCard(isDark, children: [
+          Row(children: [
+            Text('Day ${i + 1}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textGrey)),
+            if (friday) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text('Friday',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.error)),
+              ),
+            ],
+            const Spacer(),
+            if (_daRows.length > 1)
+              GestureDetector(
+                onTap: () => setState(() {
+                  for (final c in _daRows[i].values) {
+                    c.dispose();
+                  }
+                  _daRows.removeAt(i);
+                  _daAdminApproved.removeAt(i);
+                }),
+                child: const Icon(Icons.remove_circle_outline_rounded,
+                    size: 18, color: AppTheme.error),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+                child: _dateField('Date', r['date']!,
+                    blockFriday: true, daIndex: i)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _field('DA Amount (৳)', r['amount']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+          ]),
+          const SizedBox(height: 8),
+          _field('Note', r['note']!),
+          if (friday && _isAdmin) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              Checkbox(
+                value: _daAdminApproved[i],
+                onChanged: (v) =>
+                    setState(() => _daAdminApproved[i] = v ?? false),
+              ),
+              Expanded(
+                child: Text('Admin approval — শুক্রবারের স্পেশাল কাজ অনুমোদিত',
+                    style: GoogleFonts.hindSiliguri(fontSize: 12)),
+              ),
+            ]),
+          ],
+        ]);
+      }),
+      _totalRow('Total DA',
+          _daRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
     ];
+  }
+
+  // ── Motorcycle registration number ────────────────────────────────────
+  Widget _motoRegField(bool isDark) {
+    return _sectionCard(isDark, children: [
+      Row(children: [
+        const Icon(Icons.two_wheeler_rounded,
+            size: 18, color: Color(0xFF1565C0)),
+        const SizedBox(width: 8),
+        Text('Motorcycle Registration Number',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 13, fontWeight: FontWeight.w700)),
+      ]),
+      const SizedBox(height: 4),
+      Text(
+          _motoRegSaved
+              ? 'সংরক্ষিত নম্বর অটোমেটিক অ্যাড হয়েছে'
+              : 'একবার লিখলেই পরবর্তীতে অটোমেটিক অ্যাড হয়ে যাবে',
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11, color: AppTheme.textGrey)),
+      const SizedBox(height: 8),
+      _field('Registration No. (e.g. DHAKA METRO HA 12-3456)', _motoRegCtrl),
+    ]);
   }
 
   // ── helpers ──────────────────────────────────────────────────────────
@@ -1281,6 +1940,166 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     );
   }
 
+  InputDecoration _inputDecoration() => InputDecoration(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppTheme.divider, width: 1.5)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide:
+                const BorderSide(color: AppTheme.primaryAccent, width: 2)),
+      );
+
+  Widget _dropdownField(String label,
+      {String? value,
+      required List<String> items,
+      required ValueChanged<String?> onChanged}) {
+    final unique = items.toSet().toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textGrey)),
+      const SizedBox(height: 4),
+      DropdownButtonFormField<String>(
+        value: value != null && unique.contains(value) ? value : null,
+        isExpanded: true,
+        decoration: _inputDecoration(),
+        style: GoogleFonts.hindSiliguri(
+            fontSize: 13,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkText
+                : AppTheme.textDark),
+        hint: Text('Select $label',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 12, color: AppTheme.textGrey)),
+        items: unique
+            .map((v) => DropdownMenuItem(
+                value: v,
+                child: Text(v,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.hindSiliguri(fontSize: 13))))
+            .toList(),
+        onChanged: onChanged,
+      ),
+    ]);
+  }
+
+  Widget _dateField(String label, TextEditingController ctrl,
+      {bool blockFriday = false, int? daIndex}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textGrey)),
+      const SizedBox(height: 4),
+      InkWell(
+        onTap: () =>
+            _pickRowDate(ctrl, blockFriday: blockFriday, daIndex: daIndex),
+        borderRadius: BorderRadius.circular(10),
+        child: InputDecorator(
+          decoration: _inputDecoration(),
+          child: Row(children: [
+            const Icon(Icons.calendar_today_rounded,
+                size: 14, color: AppTheme.textGrey),
+            const SizedBox(width: 8),
+            Text(ctrl.text.isEmpty ? 'Select date' : ctrl.text,
+                style: GoogleFonts.hindSiliguri(fontSize: 13)),
+          ]),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _docPicker(TextEditingController docCtrl, {bool required = false}) {
+    final hasDoc = docCtrl.text.trim().isNotEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text('Supporting Document',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textGrey)),
+        if (required) ...[
+          const SizedBox(width: 4),
+          Text('(বাধ্যতামূলক)',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.error)),
+        ],
+      ]),
+      const SizedBox(height: 6),
+      Row(children: [
+        if (hasDoc)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(
+              File(docCtrl.text),
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 56,
+                height: 56,
+                color: AppTheme.divider,
+                child: const Icon(Icons.image_rounded,
+                    size: 22, color: AppTheme.textGrey),
+              ),
+            ),
+          )
+        else
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: (required ? AppTheme.error : AppTheme.divider)
+                  .withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: required
+                      ? AppTheme.error.withValues(alpha: 0.4)
+                      : AppTheme.divider),
+            ),
+            child: Icon(Icons.receipt_long_rounded,
+                size: 22,
+                color: required ? AppTheme.error : AppTheme.textGrey),
+          ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                OutlinedButton.icon(
+                  onPressed:
+                      _pickingPhoto ? null : () => _captureDoc(docCtrl),
+                  icon: _pickingPhoto
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.photo_camera_rounded, size: 17),
+                  label: Text(hasDoc ? 'Retake Photo' : 'Take Photo',
+                      style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                ),
+                if (hasDoc)
+                  TextButton(
+                    onPressed: () => setState(() => docCtrl.clear()),
+                    child: Text('Remove',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 11, color: AppTheme.error)),
+                  ),
+              ]),
+        ),
+      ]),
+    ]);
+  }
+
   Widget _field(String label, TextEditingController ctrl,
       {TextInputType? keyboardType, ValueChanged<String>? onChanged}) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1295,20 +2114,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           keyboardType: keyboardType,
           onChanged: onChanged,
           style: GoogleFonts.hindSiliguri(fontSize: 13),
-          decoration: InputDecoration(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    const BorderSide(color: AppTheme.divider, width: 1.5)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: AppTheme.primaryAccent, width: 2)),
-          ),
+          decoration: _inputDecoration(),
         ),
       ]);
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -8,6 +9,7 @@ import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/secure_screen_service.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final OrderModel order;
@@ -28,12 +30,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _order = widget.order;
+    // Block screenshots/screen-recording until we know the user is admin
+    SecureScreenService.enable();
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    SecureScreenService.disable();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
     final user = await LocalStorageService.getCurrentUser();
-    if (mounted) setState(() => _currentUser = user);
+    if (mounted) {
+      setState(() => _currentUser = user);
+      // Admins may screenshot; officers stay blocked
+      if (user != null && user.isAdmin) {
+        SecureScreenService.disable();
+      }
+    }
   }
 
   bool get _canChangeStatus =>
@@ -41,6 +57,60 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       (_currentUser!.isAdmin ||
           _currentUser!.role == UserModel.roleSuperAdmin ||
           _currentUser!.role == UserModel.roleTeamLeader);
+
+  /// Only admins can download invoices — officers cannot download or screenshot.
+  bool get _canDownloadInvoice => _currentUser != null && _currentUser!.isAdmin;
+
+  /// Merge charged + bonus lines of the SAME product into one display row so
+  /// the invoice never shows a misleading "[2 items]" for one product.
+  /// Bonus quantity is shown as "+N (Bonus)".
+  List<_DisplayItem> get _displayItems {
+    final List<_DisplayItem> out = [];
+    for (final item in _order.items) {
+      final baseName = item.productName.replaceAll('(Bonus)', '').trim();
+      if (item.isBonus || item.unitPrice == 0 && item.productName.contains('(Bonus)')) {
+        // Try to merge into an existing charged row of the same product
+        final idx = out.indexWhere((d) => d.name == baseName && !d.isBonusOnly);
+        if (idx >= 0) {
+          out[idx] = out[idx].withBonus(item.quantity);
+          continue;
+        }
+        out.add(_DisplayItem(
+          name: baseName,
+          quantity: 0,
+          bonusQuantity: item.quantity,
+          unit: item.unit,
+          unitPrice: 0,
+          total: 0,
+        ));
+      } else {
+        // Charged row — absorb any earlier bonus-only row of same product
+        final idx = out.indexWhere((d) => d.name == baseName && d.isBonusOnly);
+        if (idx >= 0) {
+          final bonusQty = out[idx].bonusQuantity;
+          out.removeAt(idx);
+          out.add(_DisplayItem(
+            name: baseName,
+            quantity: item.quantity,
+            bonusQuantity: bonusQty,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+            total: item.total,
+          ));
+        } else {
+          out.add(_DisplayItem(
+            name: baseName,
+            quantity: item.quantity,
+            bonusQuantity: 0,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+            total: item.total,
+          ));
+        }
+      }
+    }
+    return out;
+  }
 
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _updatingStatus = true);
@@ -62,7 +132,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _downloadInvoice() async {
+    if (!_canDownloadInvoice) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Only admin can download invoices',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
     final pdf = pw.Document();
+
+    // Company logo
+    pw.MemoryImage? logoImage;
+    try {
+      final bytes = await rootBundle.load('assets/images/wintech.png');
+      logoImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (_) {}
 
     // Colour palette (PDF colours)
     const brandColor = PdfColor.fromInt(0xFF1B9DD9);
@@ -94,34 +180,88 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(36),
         build: (pw.Context ctx) {
-          return pw.Column(
+          return pw.Stack(children: [
+            // ── Watermark: company name across the page ──────────────
+            pw.Positioned.fill(
+              child: pw.Center(
+                child: pw.Transform.rotate(
+                  angle: 0.5,
+                  child: pw.Opacity(
+                    opacity: 0.07,
+                    child: pw.Text('Wintech Agro Bangladesh',
+                        style: pw.TextStyle(
+                            fontSize: 42,
+                            fontWeight: pw.FontWeight.bold,
+                            color: brandColor)),
+                  ),
+                ),
+              ),
+            ),
+            _invoiceBody(ctx, logoImage, statusColor),
+          ]);
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name:
+          'wintech_invoice_${_order.id.substring(0, 8).toUpperCase()}.pdf',
+    );
+  }
+
+  pw.Widget _invoiceBody(
+      pw.Context ctx, pw.MemoryImage? logoImage, PdfColor statusColor) {
+    const brandColor = PdfColor.fromInt(0xFF1B9DD9);
+    const darkColor = PdfColor.fromInt(0xFF1A2D3D);
+    const greyColor = PdfColor.fromInt(0xFF7A8EA0);
+    const lightBg = PdfColor.fromInt(0xFFF0F8FD);
+    return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               // ── Header ──────────────────────────────────────────────────
               pw.Container(
-                decoration: const pw.BoxDecoration(
+                decoration: pw.BoxDecoration(
                   color: brandColor,
-                  borderRadius: pw.BorderRadius.all(pw.Radius.circular(10)),
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(10)),
                 ),
                 padding: const pw.EdgeInsets.symmetric(
                     horizontal: 24, vertical: 18),
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text('Wintech Agro',
-                            style: pw.TextStyle(
-                                fontSize: 22,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.white)),
-                        pw.SizedBox(height: 2),
-                        pw.Text('Enterprise Resource Management',
-                            style: const pw.TextStyle(
-                                fontSize: 9, color: PdfColors.white)),
+                    pw.Row(children: [
+                      // Company logo
+                      if (logoImage != null) ...[
+                        pw.Container(
+                          width: 44,
+                          height: 44,
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.white,
+                            borderRadius: const pw.BorderRadius.all(
+                                pw.Radius.circular(8)),
+                          ),
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Image(logoImage),
+                        ),
+                        pw.SizedBox(width: 12),
                       ],
-                    ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Wintech Agro Bangladesh',
+                              style: pw.TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.white)),
+                          pw.SizedBox(height: 2),
+                          pw.Text('Fish Import & Distribution',
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.white)),
+                        ],
+                      ),
+                    ]),
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
@@ -204,6 +344,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           pw.SizedBox(height: 6),
                           _pdfDetailRow('Date',
                               DateFormat('dd MMM yyyy').format(_order.date)),
+                          if (_order.probablePaymentDate != null)
+                            _pdfDetailRow(
+                                'Probable Payment',
+                                DateFormat('dd MMM yyyy')
+                                    .format(_order.probablePaymentDate!)),
                           _pdfDetailRow('SR Name', _order.srName),
                           _pdfDetailRow('SR ID', _order.srId),
                           _pdfDetailRow('Status', _order.statusLabel,
@@ -248,21 +393,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _tableHeader('Total'),
                     ],
                   ),
-                  // Item rows
-                  ..._order.items.asMap().entries.map((e) {
+                  // Item rows (bonus lines merged into their product row)
+                  ..._displayItems.asMap().entries.map((e) {
                     final i = e.key;
                     final item = e.value;
                     final rowBg = i.isOdd
                         ? const PdfColor.fromInt(0xFFF0F8FD)
                         : PdfColors.white;
+                    final qtyText = item.isBonusOnly
+                        ? '${_fmt.format(item.bonusQuantity)} (Bonus)'
+                        : item.bonusQuantity > 0
+                            ? '${_fmt.format(item.quantity)} + ${_fmt.format(item.bonusQuantity)} (Bonus)'
+                            : _fmt.format(item.quantity);
                     return pw.TableRow(
                       decoration: pw.BoxDecoration(color: rowBg),
                       children: [
-                        _tableCell(item.productName, align: pw.TextAlign.left),
-                        _tableCell(_fmt.format(item.quantity)),
+                        _tableCell(
+                            item.isBonusOnly
+                                ? '${item.name} (Bonus)'
+                                : item.name,
+                            align: pw.TextAlign.left),
+                        _tableCell(qtyText),
                         _tableCell(item.unit),
-                        _tableCell('৳${_fmt.format(item.unitPrice)}'),
-                        _tableCell('৳${_fmt.format(item.total)}',
+                        _tableCell(item.isBonusOnly
+                            ? 'FREE'
+                            : '৳${_fmt.format(item.unitPrice)}'),
+                        _tableCell(
+                            item.isBonusOnly
+                                ? '৳0'
+                                : '৳${_fmt.format(item.total)}',
                             bold: true),
                       ],
                     );
@@ -280,6 +439,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: pw.Column(
                     children: [
                       _totalRow('Subtotal', _order.total),
+                      if (_order.commissionPct > 0)
+                        _totalRow(
+                            'Cash Commission (${_order.commissionPct.toStringAsFixed(0)}%)',
+                            -(_order.total * _order.commissionPct / 100)),
                       pw.Divider(
                           color: const PdfColor.fromInt(0xFFD6EAF5),
                           height: 8),
@@ -292,7 +455,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   fontSize: 13,
                                   fontWeight: pw.FontWeight.bold,
                                   color: darkColor)),
-                          pw.Text('৳${_fmt.format(_order.total)}',
+                          pw.Text(
+                              '৳${_fmt.format(_order.total - _order.total * _order.commissionPct / 100)}',
                               style: pw.TextStyle(
                                   fontSize: 14,
                                   fontWeight: pw.FontWeight.bold,
@@ -347,22 +511,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       'Generated: ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
                       style: const pw.TextStyle(
                           fontSize: 8, color: greyColor)),
-                  pw.Text('Wintech Agro • wintech-agro.com',
+                  pw.Text('Wintech Agro Bangladesh • wintech-agro.com',
                       style: const pw.TextStyle(
                           fontSize: 8, color: greyColor)),
                 ],
               ),
             ],
           );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name:
-          'wintech_invoice_${_order.id.substring(0, 8).toUpperCase()}.pdf',
-    );
   }
 
   pw.Widget _pdfDetailRow(String label, String value,
@@ -653,7 +808,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w700)),
               const Spacer(),
-              Text('${_order.items.length} item(s)',
+              Text('${_displayItems.length} item(s)',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ]),
@@ -687,10 +842,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     _colHeader('Total', flex: 2, align: TextAlign.right),
                   ]),
                 ),
-                // Rows
-                ...List.generate(_order.items.length, (i) {
-                  final item = _order.items[i];
-                  final isLast = i == _order.items.length - 1;
+                // Rows (bonus merged into the product's row)
+                ...List.generate(_displayItems.length, (i) {
+                  final item = _displayItems[i];
+                  final isLast = i == _displayItems.length - 1;
                   final rowBg = i.isEven
                       ? (isDark ? AppTheme.darkCard : Colors.white)
                       : (isDark
@@ -717,25 +872,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.productName,
+                            Text(
+                                item.isBonusOnly
+                                    ? '${item.name} (Bonus)'
+                                    : item.name,
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                                    fontWeight: FontWeight.w600,
+                                    color: item.isBonusOnly
+                                        ? AppTheme.warning
+                                        : null)),
+                            if (!item.isBonusOnly && item.bonusQuantity > 0)
+                              Text(
+                                  '+ ${_fmt.format(item.bonusQuantity)} ${item.unit} (Bonus)',
+                                  style: GoogleFonts.hindSiliguri(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.warning)),
                           ],
                         ),
                       ),
                       Expanded(
                         flex: 2,
                         child: Text(
-                            '${_fmt.format(item.quantity)} ${item.unit}',
+                            item.isBonusOnly
+                                ? '${_fmt.format(item.bonusQuantity)} ${item.unit}'
+                                : '${_fmt.format(item.quantity)} ${item.unit}',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 11, color: AppTheme.textGrey)),
                       ),
                       Expanded(
                         flex: 2,
-                        child: Text('৳${_fmt.format(item.unitPrice)}',
+                        child: Text(
+                            item.isBonusOnly
+                                ? 'FREE'
+                                : '৳${_fmt.format(item.unitPrice)}',
                             style: GoogleFonts.hindSiliguri(
-                                fontSize: 11, color: AppTheme.textGrey)),
+                                fontSize: 11,
+                                color: item.isBonusOnly
+                                    ? AppTheme.warning
+                                    : AppTheme.textGrey)),
                       ),
                       Expanded(
                         flex: 2,
@@ -786,18 +962,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
       child: Column(children: [
         _totalRow2('Subtotal', _order.total, isDark),
+        if (_order.commissionPct > 0) ...[
+          const SizedBox(height: 6),
+          _totalRow2(
+              'Cash Commission (${_order.commissionPct.toStringAsFixed(0)}%)',
+              -(_order.total * _order.commissionPct / 100),
+              isDark),
+        ],
         const Divider(height: 16),
         Row(children: [
           Text('Grand Total',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, fontWeight: FontWeight.w800)),
           const Spacer(),
-          Text('৳${_fmt.format(_order.total)}',
+          Text(
+              '৳${_fmt.format(_order.total - _order.total * _order.commissionPct / 100)}',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   color: AppTheme.primaryAccent)),
         ]),
+        if (_order.probablePaymentDate != null) ...[
+          const Divider(height: 16),
+          Row(children: [
+            const Icon(Icons.event_rounded,
+                size: 15, color: AppTheme.textGrey),
+            const SizedBox(width: 6),
+            Text('Probable Payment Date',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12.5, color: AppTheme.textGrey)),
+            const Spacer(),
+            Text(
+                DateFormat('dd MMM yyyy')
+                    .format(_order.probablePaymentDate!),
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+          ]),
+        ],
       ]),
     );
   }
@@ -938,6 +1141,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildBottomBar(bool isDark) {
+    // Officers cannot download invoices — hide the button entirely.
+    if (!_canDownloadInvoice) return const SizedBox.shrink();
     return Container(
       padding: EdgeInsets.fromLTRB(
           16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
@@ -995,6 +1200,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return Icons.hourglass_empty_rounded;
     }
   }
+}
+
+/// One display row on the invoice — bonus quantities merged with the
+/// charged quantity of the same product.
+class _DisplayItem {
+  final String name;
+  final double quantity;      // charged quantity
+  final double bonusQuantity; // free quantity
+  final String unit;
+  final double unitPrice;
+  final double total;
+
+  const _DisplayItem({
+    required this.name,
+    required this.quantity,
+    required this.bonusQuantity,
+    required this.unit,
+    required this.unitPrice,
+    required this.total,
+  });
+
+  bool get isBonusOnly => quantity == 0 && bonusQuantity > 0;
+
+  _DisplayItem withBonus(double extraBonus) => _DisplayItem(
+        name: name,
+        quantity: quantity,
+        bonusQuantity: bonusQuantity + extraBonus,
+        unit: unit,
+        unitPrice: unitPrice,
+        total: total,
+      );
 }
 
 class _StatusAction {

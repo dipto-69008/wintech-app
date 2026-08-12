@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'config/theme.dart';
 import 'models/user_model.dart';
+import 'services/api_service.dart';
 import 'services/local_storage_service.dart';
 import 'services/offline_queue_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -45,10 +46,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Auto-sync offline queue: on start, on app-resume, and every 2 minutes.
+  /// Real-time link: on start, on app-resume, and every 30 seconds —
+  /// ping the ERP and push any offline items immediately.
   void _startAutoSync() {
     _runSync();
-    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _runSync());
+    _syncTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _runSync());
   }
 
   @override
@@ -58,6 +61,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   Future<void> _runSync() async {
     try {
+      // Fresh reachability check so screens see the real live status.
+      await ApiService.ping(force: true);
       final result = await OfflineQueueService.syncAll();
       if (result.synced > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
