@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
+import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../widgets/custom_text_field.dart';
 
@@ -21,16 +23,49 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
 
     final email = _emailCtrl.text.trim().toLowerCase();
+    final password = _passCtrl.text;
 
-    // Demo account check
+    // 1) Try real ERP login — real-time connection to the ERP database.
+    try {
+      final erpUser = await ApiService.login(email, password);
+      final user = UserModel(
+        id: erpUser['id']?.toString() ?? '',
+        name: erpUser['name']?.toString() ?? email.split('@').first,
+        email: email,
+        role: UserModel.roleTeamMember, // SR / employee
+        myReferralCode: erpUser['employeeCode']?.toString() ?? '',
+        branch: erpUser['branchName']?.toString() ?? '',
+        zela: erpUser['areaName']?.toString() ?? '',
+      );
+      await LocalStorageService.saveCurrentUser(user);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.pushReplacementNamed(context, '/otp');
+      return;
+    } on ApiException catch (e) {
+      // Wrong credentials on ERP — fall through to demo accounts only if it's a demo email
+      if (!LocalStorageService.isDemoAccount(email)) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.message,
+              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+    } catch (_) {
+      // Network/server unreachable — offline mode, demo accounts still work
+    }
+
+    // 2) Demo/offline fallback
     final demoUser = LocalStorageService.getDemoUser(email);
     if (demoUser != null) {
       await LocalStorageService.saveCurrentUser(demoUser);
     } else {
-      // Regular user — save basic profile
       await LocalStorageService.saveUserProfile(
         name: email.split('@').first,
         email: email,
@@ -95,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: AppTheme.primaryAccent,
                       letterSpacing: 2)),
               const SizedBox(height: 4),
-              Text('Sign in to your account',
+              Text('আপনার অ্যাকাউন্টে লগইন করুন',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, color: AppTheme.textGrey)),
               const SizedBox(height: 32),
@@ -105,17 +140,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     BanglaTextField(
                       controller: _emailCtrl,
-                      label: 'Email',
+                      label: 'ইমেইল',
                       hint: 'example@gmail.com',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Enter your email' : null,
+                          (v == null || v.isEmpty) ? 'ইমেইল দিন' : null,
                     ),
                     const SizedBox(height: 16),
                     BanglaTextField(
                       controller: _passCtrl,
-                      label: 'Password',
+                      label: 'পাসওয়ার্ড',
                       hint: '••••••••',
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: _obscurePass,
@@ -131,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             setState(() => _obscurePass = !_obscurePass),
                       ),
                       validator: (v) =>
-                          (v == null || v.length < 4) ? 'Enter your password' : null,
+                          (v == null || v.length < 4) ? 'পাসওয়ার্ড দিন' : null,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -148,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     valueColor: AlwaysStoppedAnimation(
                                         Colors.white)),
                               )
-                            : Text('Log In',
+                            : Text('লগইন করুন',
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700)),
@@ -172,18 +207,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Icon(Icons.info_outline_rounded,
                                 size: 16, color: AppTheme.primaryAccent),
                             const SizedBox(width: 6),
-                            Text('Demo Account — Wintech Agro',
+                            Text('ডেমো অ্যাকাউন্ট — Wintech Agro',
                                 style: GoogleFonts.hindSiliguri(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primaryAccent)),
                           ]),
                           const SizedBox(height: 8),
-                          _demoRow('Admin', 'admin@gmail.com'),
-                          _demoRow('Officer / Staff', 'sr@wintech.com'),
-                          _demoRow('Customer', 'customer@gmail.com'),
+                          _demoRow('অ্যাডমিন', 'admin@gmail.com'),
+                          _demoRow('এস.আর. / কর্মী', 'sr@wintech.com'),
+                          _demoRow('কাস্টমার', 'customer@gmail.com'),
                           const SizedBox(height: 4),
-                          Text('Password: anything | OTP: 123456',
+                          Text('পাসওয়ার্ড: যেকোনো কিছু | OTP: 123456',
                               style: GoogleFonts.hindSiliguri(
                                   fontSize: 11,
                                   color: AppTheme.textGrey,

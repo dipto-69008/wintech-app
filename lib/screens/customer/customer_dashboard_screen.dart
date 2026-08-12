@@ -74,7 +74,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   SliverToBoxAdapter(child: _buildHeader(isDark)),
                   SliverToBoxAdapter(child: _buildCreditCard(isDark)),
                   SliverToBoxAdapter(child: _buildMonthStats(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('This Month\'s Purchases', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('এই মাসের ক্রয়', isDark)),
                   if (_thisMonthOrders.isEmpty)
                     SliverToBoxAdapter(child: _buildEmpty(isDark))
                   else
@@ -88,7 +88,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   if (_orders.isNotEmpty &&
                       _orders.length > _thisMonthOrders.length) ...[
                     SliverToBoxAdapter(
-                        child: _buildSectionTitle('Previous Orders', isDark)),
+                        child: _buildSectionTitle('পূর্ববর্তী অর্ডার', isDark)),
                     SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (ctx, i) {
@@ -113,10 +113,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   Widget _buildHeader(bool isDark) {
     final hour = DateTime.now().hour;
     final greet = hour < 12
-        ? 'Good Morning'
+        ? 'সুপ্রভাত'
         : hour < 17
-            ? 'Good Afternoon'
-            : 'Good Evening';
+            ? 'শুভ অপরাহ্ন'
+            : 'শুভ সন্ধ্যা';
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.primaryAccent,
@@ -142,7 +142,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$greet, ${_user?.name ?? 'Customer'}! 👋',
+              Text('$greet, ${_user?.name ?? 'কাস্টমার'}! 👋',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -154,7 +154,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                 decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6)),
-                child: Text('Wintech Agro — Customer Portal',
+                child: Text('Wintech Agro — কাস্টমার পোর্টাল',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,
@@ -235,7 +235,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Credit Limit',
+                    Text('ক্রেডিট সীমা',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 12, color: Colors.white70)),
                     Text('৳ ${_fmt.format(_creditLimit)}',
@@ -253,7 +253,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20)),
                 child: Text(
-                    '${(_creditPercent * 100).toStringAsFixed(0)}% used',
+                    '${(_creditPercent * 100).toStringAsFixed(0)}% ব্যবহৃত',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,
@@ -274,10 +274,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             const SizedBox(height: 12),
             Row(children: [
               _creditChip(Icons.check_circle_rounded,
-                  'Available: ৳${_fmt.format(_creditAvailable)}'),
+                  'পাওয়া যাবে: ৳${_fmt.format(_creditAvailable)}'),
               const SizedBox(width: 10),
               _creditChip(Icons.payment_rounded,
-                  'Used: ৳${_fmt.format(_creditUsed)}'),
+                  'ব্যবহৃত: ৳${_fmt.format(_creditUsed)}'),
             ]),
           ],
         ),
@@ -314,17 +314,17 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Row(children: [
         Expanded(
-            child: _statCard(cardBg, 'This Month\'s Orders',
+            child: _statCard(cardBg, 'এই মাসের অর্ডার',
                 '${_thisMonthOrders.length}', Icons.receipt_long_rounded,
                 AppTheme.primaryAccent, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'This Month\'s Purchases',
+            child: _statCard(cardBg, 'এই মাসের ক্রয়',
                 '৳${_fmt.format(_thisMonthTotal)}', Icons.shopping_cart_rounded,
                 AppTheme.success, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'Total Orders',
+            child: _statCard(cardBg, 'মোট অর্ডার',
                 '${_orders.length}', Icons.history_rounded,
                 const Color(0xFF1565C0), isDark)),
       ]),
@@ -397,7 +397,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               size: 60,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 12),
-          Text('No purchases this month',
+          Text('এই মাসে কোনো ক্রয় নেই',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 14, color: AppTheme.textGrey)),
         ]),
@@ -447,11 +447,11 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Order #${order.id.split('-').last}',
+                  Text('অর্ডার #${order.id.split('-').last}',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 14, fontWeight: FontWeight.w700)),
                   Text(
-                      '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} item(s)',
+                      '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} আইটেম',
                       style: GoogleFonts.hindSiliguri(
                           fontSize: 12, color: AppTheme.textGrey)),
                 ],
@@ -504,7 +504,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   ]),
                 )),
             if (order.items.length > 3)
-              Text('+${order.items.length - 3} more item(s)',
+              Text('+${order.items.length - 3} আরো আইটেম',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 11, color: AppTheme.textGrey)),
           ],

@@ -41,14 +41,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Logout',
+        title: Text('লগআউট',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to logout?',
+        content: Text('আপনি কি লগআউট করতে চান?',
             style: GoogleFonts.hindSiliguri()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey)),
+            child: Text('না', style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -56,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10)),
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Yes, Logout',
+            child: Text('হ্যাঁ, লগআউট',
                 style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
           ),
         ],
@@ -123,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               children: [
                                 // Title row
                                 Row(children: [
-                                  Text('Profile',
+                                  Text('প্রোফাইল',
                                       style: GoogleFonts.hindSiliguri(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w800,
@@ -174,7 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 Text(
                                   _user?.name.isNotEmpty == true
                                       ? _user!.name
-                                      : 'User',
+                                      : 'ব্যবহারকারী',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700,
@@ -235,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             color: AppTheme.primaryAccent,
                                             size: 15),
                                         const SizedBox(width: 8),
-                                        Text('Edit Profile',
+                                        Text('প্রোফাইল সম্পাদনা করুন',
                                             style: GoogleFonts.hindSiliguri(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w700,
@@ -260,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sectionLabel('Profile Information', isDark),
+                        _sectionLabel('প্রোফাইল তথ্য', isDark),
                         const SizedBox(height: 12),
                         Container(
                           decoration: BoxDecoration(
@@ -274,43 +274,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Column(
                             children: [
-                              _infoTile(Icons.person_outline_rounded, 'Name',
+                              _infoTile(Icons.person_outline_rounded, 'নাম',
                                   _user?.name.isEmpty == false
                                       ? _user!.name
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.email_outlined, 'Email',
+                              _infoTile(Icons.email_outlined, 'ইমেইল',
                                   _user?.email.isEmpty == false
                                       ? _user!.email
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.phone_outlined, 'Mobile',
+                              _infoTile(Icons.phone_outlined, 'মোবাইল',
                                   _user?.phone.isEmpty == false
                                       ? _user!.phone
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.business_outlined, 'Company',
+                              _infoTile(Icons.business_outlined, 'প্রতিষ্ঠান',
                                   _user?.company.isEmpty == false
                                       ? _user!.company
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.badge_outlined, 'Designation',
+                              _infoTile(Icons.badge_outlined, 'পদবি',
                                   _user?.designation.isEmpty == false
                                       ? _user!.designation
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.location_city_rounded, 'District',
+                              _infoTile(Icons.location_city_rounded, 'জেলা',
                                   _user?.zela.isEmpty == false
                                       ? _user!.zela
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.pin_drop_rounded, 'Thana / Area',
+                              _infoTile(Icons.pin_drop_rounded, 'থানা / এলাকা',
                                   _user?.thana.isEmpty == false
                                       ? _user!.thana
                                       : '—',
@@ -330,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sectionLabel('App Settings', isDark),
+                        _sectionLabel('অ্যাপ সেটিং', isDark),
                         const SizedBox(height: 12),
                         Container(
                           decoration: BoxDecoration(
@@ -366,7 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 ),
                                 title: Text(
-                                  _isDarkMode ? 'Dark Mode On' : 'Light Mode On',
+                                  _isDarkMode ? 'ডার্ক মোড চালু' : 'লাইট মোড চালু',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
@@ -386,7 +386,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _divider(),
                               _settingTile(
                                 icon: Icons.headset_mic_rounded,
-                                label: 'Support & Tickets',
+                                label: 'সাপোর্ট ও টিকেট',
                                 iconColor: AppTheme.primaryAccent,
                                 isDark: isDark,
                                 onTap: () =>
@@ -395,17 +395,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _divider(),
                               _settingTile(
                                 icon: Icons.notifications_outlined,
-                                label: 'Notification Settings',
+                                label: 'নোটিফিকেশন সেটিং',
                                 isDark: isDark,
                                 onTap: () {},
                               ),
                               _divider(),
                               _settingTile(
                                 icon: Icons.info_outline_rounded,
-                                label: 'App Version',
+                                label: 'অ্যাপ সংস্করণ',
                                 isDark: isDark,
                                 trailing: Text(
-                                  'v1.0.0',
+                                  'v১.০.০',
                                   style: GoogleFonts.hindSiliguri(
                                       fontSize: 13, color: AppTheme.textGrey),
                                 ),
@@ -413,14 +413,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _divider(),
                               _settingTile(
                                 icon: Icons.privacy_tip_outlined,
-                                label: 'Privacy Policy',
+                                label: 'গোপনীয়তা নীতি',
                                 isDark: isDark,
                                 onTap: () {},
                               ),
                               _divider(),
                               _settingTile(
                                 icon: Icons.star_outline_rounded,
-                                label: 'Rate the App',
+                                label: 'অ্যাপ রেটিং দিন',
                                 iconColor: const Color(0xFFF57F17),
                                 isDark: isDark,
                                 onTap: () {},
@@ -449,7 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         onPressed: _logout,
                         icon: const Icon(Icons.logout_rounded, color: AppTheme.error),
-                        label: Text('Logout',
+                        label: Text('লগআউট করুন',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -479,7 +479,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '© 2026 Wintech Agro\nAll rights reserved',
+                            '© ২০২৬ Wintech Agro\nসর্বস্বত্ব সংরক্ষিত',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12,

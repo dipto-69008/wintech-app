@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -19,6 +20,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<UserModel> _employees = [];
   bool _loading = true;
 
+  // Live ERP figures
+  bool _erpConnected = false;
+  double _erpMonthSales = 0;
+  int _erpMonthOrders = 0;
+  double _erpTodaySales = 0;
+  int _erpTodayOrders = 0;
+
   final _fmt = NumberFormat('#,##0', 'en_US');
 
   @override
@@ -30,6 +38,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
+
+    // Pull live dashboard stats from ERP when connected
+    if (await ApiService.isConnected) {
+      try {
+        final dash = await ApiService.dashboard();
+        final today = dash['today'] as Map<String, dynamic>? ?? {};
+        final thisMonth = dash['thisMonth'] as Map<String, dynamic>? ?? {};
+        if (mounted) {
+          _erpConnected = true;
+          _erpTodaySales = (today['salesAmount'] as num?)?.toDouble() ?? 0;
+          _erpTodayOrders = (today['orders'] as num?)?.toInt() ?? 0;
+          _erpMonthSales = (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
+          _erpMonthOrders = (thisMonth['orders'] as num?)?.toInt() ?? 0;
+        }
+      } catch (_) {
+        // ERP unreachable — use local data
+      }
+    }
+
     final orders = await LocalStorageService.getOrders();
     final employees = await LocalStorageService.getAllEmployees();
     if (!mounted) return;
@@ -52,7 +79,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   double get _thisMonthRevenue =>
-      _thisMonthOrders.fold(0.0, (s, o) => s + o.total);
+      _erpConnected ? _erpMonthSales : _thisMonthOrders.fold(0.0, (s, o) => s + o.total);
+
+  int get _thisMonthOrderCount =>
+      _erpConnected ? _erpMonthOrders : _thisMonthOrders.length;
 
   double get _totalOutstanding {
     return _employees
@@ -85,9 +115,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 slivers: [
                   SliverToBoxAdapter(child: _buildHeader(isDark)),
                   SliverToBoxAdapter(child: _buildSummaryRow(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('Officer Performance', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('এস.আর. পারফরম্যান্স', isDark)),
                   SliverToBoxAdapter(child: _buildSRPerformance(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('Recent Orders', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('সাম্প্রতিক অর্ডার', isDark)),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => _buildOrderTile(_orders[i], isDark),
@@ -103,7 +133,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildHeader(bool isDark) {
     final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    final greet = hour < 12 ? 'সুপ্রভাত' : hour < 17 ? 'শুভ অপরাহ্ন' : 'শুভ সন্ধ্যা';
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.primaryAccent,
@@ -130,7 +160,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$greet, ${_user?.name ?? 'Admin'}! 👋',
+                Text('$greet, ${_user?.name ?? 'অ্যাডমিন'}! 👋',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -143,11 +173,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6)),
-                    child: Text('Wintech Agro — Admin',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 11,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text('Wintech Agro — অ্যাডমিন',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
+                      if (_erpConnected) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.cloud_done_rounded,
+                            size: 11, color: Colors.white70),
+                      ],
+                    ]),
                   ),
                 ]),
               ],
@@ -198,7 +235,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('This Month\'s Total Sales',
+                Text('এই মাসের মোট বিক্রয়',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 13, color: Colors.white70)),
                 const SizedBox(height: 6),
@@ -210,14 +247,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 Row(children: [
                   _headerChip(Icons.receipt_long_rounded,
-                      '${_thisMonthOrders.length} Orders'),
+                      '$_thisMonthOrderCount অর্ডার'),
                   const SizedBox(width: 10),
                   _headerChip(Icons.people_rounded,
-                      '${stats.length} Officers'),
+                      '${stats.length} এস.আর.'),
                   const SizedBox(width: 10),
                   _headerChip(Icons.account_balance_wallet_rounded,
-                      '৳ ${_fmt.format(_totalOutstanding)} Due'),
+                      '৳ ${_fmt.format(_totalOutstanding)} বকেয়া'),
                 ]),
+                if (_erpConnected) ...[
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    const Icon(Icons.cloud_done_rounded,
+                        size: 12, color: Colors.white54),
+                    const SizedBox(width: 4),
+                    Text('ERP live — আজ: ৳${_fmt.format(_erpTodaySales)} (${_erpTodayOrders} অর্ডার)',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 11, color: Colors.white54)),
+                  ]),
+                ],
               ],
             ),
           ),
@@ -226,17 +274,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(children: [
             Expanded(
                 child: _statCard(
-                    cardBg, 'Total Orders', '${_orders.length}',
+                    cardBg, 'মোট অর্ডার', '${_erpConnected ? _erpMonthOrders : _orders.length}',
                     Icons.receipt_rounded, AppTheme.primaryAccent, isDark)),
             const SizedBox(width: 10),
             Expanded(
                 child: _statCard(
-                    cardBg, 'Officers', '${_employees.where((e) => e.isEmployee).length}',
+                    cardBg, 'এস.আর. সংখ্যা', '${_employees.where((e) => e.isEmployee).length}',
                     Icons.badge_rounded, const Color(0xFF1565C0), isDark)),
             const SizedBox(width: 10),
             Expanded(
                 child: _statCard(
-                    cardBg, 'Customers', '${_employees.where((e) => e.isCustomer).length}',
+                    cardBg, 'কাস্টমার', '${_employees.where((e) => e.isCustomer).length}',
                     Icons.storefront_rounded, AppTheme.success, isDark)),
           ]),
         ],
@@ -331,7 +379,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           decoration: BoxDecoration(
               color: cardBg, borderRadius: BorderRadius.circular(14)),
           child: Center(
-            child: Text('No orders this month',
+            child: Text('এই মাসে কোনো অর্ডার নেই',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: AppTheme.textGrey)),
           ),
@@ -378,7 +426,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600)),
-                        Text('${e.value.orders} orders',
+                        Text('${e.value.orders} টি অর্ডার',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 12,
                                 color: AppTheme.textGrey)),
@@ -440,7 +488,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               Text(
-                  'Officer: ${order.srName} · ${order.items.length} items',
+                  'SR: ${order.srName} · ${order.items.length} আইটেম',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

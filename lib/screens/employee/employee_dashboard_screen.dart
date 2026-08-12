@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 
 class EmployeeDashboardScreen extends StatefulWidget {
@@ -22,6 +23,15 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   List<OrderModel> _orders = [];
   bool _loading = true;
 
+  // Live ERP figures
+  bool _erpConnected = false;
+  double _erpTodaySales = 0;
+  double _erpMonthSales = 0;
+  int _erpTodayOrders = 0;
+  int _erpMonthOrders = 0;
+  double _erpTargetValue = 0;
+  double _erpCurrentValue = 0;
+
   final _fmt = NumberFormat('#,##0', 'en_US');
 
   @override
@@ -33,11 +43,36 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
+
+    // Pull live dashboard stats from ERP when connected
+    if (await ApiService.isConnected) {
+      try {
+        final dash = await ApiService.dashboard();
+        final today = dash['today'] as Map<String, dynamic>? ?? {};
+        final thisMonth = dash['thisMonth'] as Map<String, dynamic>? ?? {};
+        final targets = (dash['targets'] as List? ?? []);
+        if (mounted) {
+          _erpConnected = true;
+          _erpTodaySales = (today['salesAmount'] as num?)?.toDouble() ?? 0;
+          _erpTodayOrders = (today['orders'] as num?)?.toInt() ?? 0;
+          _erpMonthSales = (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
+          _erpMonthOrders = (thisMonth['orders'] as num?)?.toInt() ?? 0;
+          if (targets.isNotEmpty) {
+            final t = targets.first as Map<String, dynamic>;
+            _erpTargetValue = (t['targetValue'] as num?)?.toDouble() ?? 0;
+            _erpCurrentValue = (t['currentValue'] as num?)?.toDouble() ?? 0;
+          }
+        }
+      } catch (_) {
+        // ERP unreachable — use local orders below
+      }
+    }
+
+    // Always load local orders (for offline display + recent list)
     final orders = await LocalStorageService.getOrders();
     if (!mounted) return;
     setState(() {
       _user = user;
-      // SR only sees their own orders
       _orders = orders
           .where((o) => o.srId == (user?.id ?? ''))
           .toList();
@@ -67,9 +102,17 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   }
 
   double get _todayRevenue =>
-      _todayOrders.fold(0.0, (s, o) => s + o.total);
+      _erpConnected ? _erpTodaySales : _todayOrders.fold(0.0, (s, o) => s + o.total);
   double get _monthRevenue =>
-      _monthOrders.fold(0.0, (s, o) => s + o.total);
+      _erpConnected ? _erpMonthSales : _monthOrders.fold(0.0, (s, o) => s + o.total);
+  int get _todayOrderCount =>
+      _erpConnected ? _erpTodayOrders : _todayOrders.length;
+  int get _monthOrderCount =>
+      _erpConnected ? _erpMonthOrders : _monthOrders.length;
+  double get _targetValue =>
+      _erpConnected && _erpTargetValue > 0 ? _erpTargetValue : (_user?.targetAmount ?? 0);
+  double get _achievedValue =>
+      _erpConnected && _erpCurrentValue > 0 ? _erpCurrentValue : _monthRevenue;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +131,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                   SliverToBoxAdapter(child: _buildTargetCard(isDark)),
                   SliverToBoxAdapter(child: _buildTodayStats(isDark)),
                   SliverToBoxAdapter(child: _buildQuickActions(isDark)),
-                  SliverToBoxAdapter(child: _buildSectionTitle('Recent Orders', isDark)),
+                  SliverToBoxAdapter(child: _buildSectionTitle('সাম্প্রতিক অর্ডার', isDark)),
                   if (_orders.isEmpty)
                     SliverToBoxAdapter(child: _buildEmpty(isDark))
                   else
@@ -108,10 +151,10 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   Widget _buildHeader(bool isDark) {
     final hour = DateTime.now().hour;
     final greet = hour < 12
-        ? 'Good Morning'
+        ? 'সুপ্রভাত'
         : hour < 17
-            ? 'Good Afternoon'
-            : 'Good Evening';
+            ? 'শুভ অপরাহ্ন'
+            : 'শুভ সন্ধ্যা';
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.primaryAccent,
@@ -137,7 +180,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$greet, ${_user?.name ?? 'Officer'}! 👋',
+              Text('$greet, ${_user?.name ?? 'এস.আর.'}! 👋',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -150,7 +193,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6)),
                 child: Text(
-                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'Sales Officer'}',
+                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'সেলস রিপ্রেজেন্টেটিভ'}',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11,
                         color: Colors.white,
@@ -189,9 +232,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   }
 
   Widget _buildTargetCard(bool isDark) {
-    final user = _user;
-    final target = user?.targetAmount ?? 0;
-    final achieved = _monthRevenue;
+    final target = _targetValue;
+    final achieved = _achievedValue;
     final progress = target > 0
         ? (achieved / target).clamp(0.0, 1.0)
         : 0.0;
@@ -221,7 +263,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
             Row(children: [
               const Icon(Icons.flag_rounded, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
-              Text('Monthly Target Progress',
+              Text('মাসিক টার্গেট প্রগ্রেস',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: Colors.white70)),
               const Spacer(),
@@ -245,12 +287,23 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
             Row(children: [
               _targetChip(
                   Icons.check_circle_rounded,
-                  'Achieved: ৳${_fmt.format(achieved)}'),
+                  'অর্জিত: ৳${_fmt.format(achieved)}'),
               const SizedBox(width: 10),
               _targetChip(
                   Icons.schedule_rounded,
-                  target > 0 ? 'Remaining: ৳${_fmt.format(remaining)}' : 'Set a target'),
+                  target > 0 ? 'বাকি: ৳${_fmt.format(remaining)}' : 'টার্গেট সেট করুন'),
             ]),
+            if (_erpConnected) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                const Icon(Icons.cloud_done_rounded,
+                    color: Colors.white54, size: 13),
+                const SizedBox(width: 4),
+                Text('ERP live data',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: Colors.white54)),
+              ]),
+            ],
           ],
         ),
       ),
@@ -281,17 +334,17 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(children: [
         Expanded(
-            child: _statCard(cardBg, 'Today\'s Orders',
-                '${_todayOrders.length}', Icons.receipt_long_rounded,
+            child: _statCard(cardBg, 'আজকের অর্ডার',
+                '$_todayOrderCount', Icons.receipt_long_rounded,
                 AppTheme.primaryAccent, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'Today\'s Sales',
+            child: _statCard(cardBg, 'আজকের বিক্রয়',
                 '৳${_fmt.format(_todayRevenue)}',
                 Icons.payments_rounded, AppTheme.success, isDark)),
         const SizedBox(width: 10),
         Expanded(
-            child: _statCard(cardBg, 'Monthly Total',
+            child: _statCard(cardBg, 'মাসিক মোট',
                 '৳${_fmt.format(_monthRevenue)}',
                 Icons.bar_chart_rounded,
                 const Color(0xFF1565C0), isDark)),
@@ -357,7 +410,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                 const Icon(Icons.point_of_sale_rounded,
                     color: Colors.white, size: 22),
                 const SizedBox(width: 8),
-                Text('New Order (POS)',
+                Text('নতুন অর্ডার (POS)',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -381,7 +434,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               const Icon(Icons.flag_rounded,
                   color: AppTheme.primaryAccent, size: 24),
               const SizedBox(height: 4),
-              Text('Target',
+              Text('টার্গেট',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -409,6 +462,25 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+        const Spacer(),
+        if (_erpConnected)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.cloud_done_rounded,
+                  size: 11, color: AppTheme.success),
+              const SizedBox(width: 3),
+              Text('ERP live',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 10,
+                      color: AppTheme.success,
+                      fontWeight: FontWeight.w600)),
+            ]),
+          ),
       ]),
     );
   }
@@ -422,11 +494,11 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               size: 60,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 12),
-          Text('No orders yet',
+          Text('কোনো অর্ডার নেই',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 14, color: AppTheme.textGrey)),
           const SizedBox(height: 8),
-          Text('Add a new order from POS',
+          Text('POS থেকে নতুন অর্ডার যোগ করুন',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -472,7 +544,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               Text(order.customerName,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
-              Text('${order.items.length} items',
+              Text('${order.items.length} আইটেম',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

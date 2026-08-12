@@ -1,19 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'config/theme.dart';
 import 'models/user_model.dart';
 import 'services/local_storage_service.dart';
+import 'services/offline_queue_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/employee/employee_dashboard_screen.dart';
 import 'screens/employee/target_achievement_screen.dart';
+import 'screens/employee/stock_transfer_screen.dart';
 import 'screens/customer/customer_dashboard_screen.dart';
 import 'screens/customer/customer_settings_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/employee/order_list_screen.dart';
 import 'screens/notifications/notification_screen.dart';
-import 'screens/survey/survey_screen.dart';
-import 'screens/employee/more_screen.dart';
 
 class HomeShell extends StatefulWidget {
   final ValueChanged<bool> onThemeToggle;
@@ -23,15 +24,53 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   UserModel? _user;
   bool _loadingUser = true;
+  Timer? _syncTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUser();
+    _startAutoSync();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _syncTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Auto-sync offline queue: on start, on app-resume, and every 2 minutes.
+  void _startAutoSync() {
+    _runSync();
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _runSync());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _runSync();
+  }
+
+  Future<void> _runSync() async {
+    try {
+      final result = await OfflineQueueService.syncAll();
+      if (result.synced > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              '🔄 ${result.synced}টি অফলাইন আইটেম ERP-তে sync হয়েছে',
+              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUser() async {
@@ -45,39 +84,37 @@ class _HomeShellState extends State<HomeShell> {
 
   void _switchTab(int index) => setState(() => _currentIndex = index);
 
-  // ── Admin (4 tabs) ────────────────────────────────────────────────────
+  // ── Admin (3 tabs) ────────────────────────────────────────────────────
   List<Widget> get _adminPages => [
         const AdminDashboardScreen(),
         const AllEmployeesScreen(),
-        const SurveyScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
   static const _adminNavItems = [
-    _NavDef(Icons.analytics_rounded, 'Reports'),
-    _NavDef(Icons.badge_rounded, 'Officers'),
-    _NavDef(Icons.assignment_rounded, 'Survey'),
-    _NavDef(Icons.settings_rounded, 'Settings'),
+    _NavDef(Icons.analytics_rounded, 'রিপোর্টিং'),
+    _NavDef(Icons.badge_rounded, 'এস.আর. তালিকা'),
+    _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 
   // ── Employee / SR (5 tabs) ────────────────────────────────────────────
   List<Widget> get _srPages => [
         EmployeeDashboardScreen(
           onGoToOrders: () => _switchTab(1),
-          onGoToTargets: () => _switchTab(2),
+          onGoToTargets: () => _switchTab(3),
         ),
         const OrderListScreen(),
+        const StockTransferScreen(),
         const TargetAchievementScreen(),
-        const MoreScreen(),
         SettingsScreen(onThemeToggle: widget.onThemeToggle),
       ];
 
   static const _srNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
-    _NavDef(Icons.receipt_long_rounded, 'Orders'),
-    _NavDef(Icons.flag_rounded, 'Targets'),
-    _NavDef(Icons.grid_view_rounded, 'More'),
-    _NavDef(Icons.settings_rounded, 'Settings'),
+    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
+    _NavDef(Icons.receipt_long_rounded, 'অর্ডার'),
+    _NavDef(Icons.swap_horiz_rounded, 'ট্রান্সফার'),
+    _NavDef(Icons.flag_rounded, 'টার্গেট'),
+    _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 
   // ── Customer (3 tabs) ─────────────────────────────────────────────────
@@ -88,9 +125,9 @@ class _HomeShellState extends State<HomeShell> {
       ];
 
   static const _customerNavItems = [
-    _NavDef(Icons.dashboard_rounded, 'Dashboard'),
-    _NavDef(Icons.campaign_rounded, 'Announcements'),
-    _NavDef(Icons.settings_rounded, 'Settings'),
+    _NavDef(Icons.dashboard_rounded, 'ড্যাশবোর্ড'),
+    _NavDef(Icons.campaign_rounded, 'ঘোষণা'),
+    _NavDef(Icons.settings_rounded, 'সেটিং'),
   ];
 
   bool get _isAdmin => _user?.isAdmin ?? false;

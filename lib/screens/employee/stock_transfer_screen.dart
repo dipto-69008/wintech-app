@@ -1,24 +1,83 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
-import '../../models/stock_transfer_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/offline_queue_service.dart';
 
+/// Native stock-transfer screen.
+/// — CREATE: submits directly to ERP via API; if offline, queues locally.
+/// — LIST  : loads live ERP data; falls back to local queue preview.
 class StockTransferScreen extends StatefulWidget {
   const StockTransferScreen({super.key});
-
   @override
   State<StockTransferScreen> createState() => _StockTransferScreenState();
 }
 
-class _StockTransferScreenState extends State<StockTransferScreen> {
-  UserModel? _user;
-  List<StockTransferModel> _transfers = [];
+class _StockTransferScreenState extends State<StockTransferScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+  @override
+  void dispose() { _tab.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('স্টক ট্রান্সফার',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+        backgroundColor: AppTheme.primaryAccent,
+        foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tab,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          labelStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700, fontSize: 13),
+          unselectedLabelStyle: GoogleFonts.hindSiliguri(fontSize: 13),
+          tabs: const [Tab(text: 'তালিকা'), Tab(text: 'নতুন ট্রান্সফার')],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tab,
+        children: [
+          _TransferListTab(),
+          _NewTransferTab(onCreated: () {
+            _tab.animateTo(0);
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Transfer List Tab ─────────────────────────────────────────────────────────
+
+class _TransferListTab extends StatefulWidget {
+  @override
+  State<_TransferListTab> createState() => _TransferListTabState();
+}
+
+class _TransferListTabState extends State<_TransferListTab>
+    with AutomaticKeepAliveClientMixin {
   bool _loading = true;
-  String _filter = 'all';
+  bool _erpConnected = false;
+  List<Map<String, dynamic>> _transfers = [];
+  List<QueueItem> _queued = [];
   final _fmt = NumberFormat('#,##0.##', 'en_US');
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -28,550 +87,631 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final user = await LocalStorageService.getCurrentUser();
-    final all = await LocalStorageService.getStockTransfers();
+    final queuedItems = await OfflineQueueService.getQueue();
+    final pendingTransfers = queuedItems.where((q) => q.type == QueueItemType.stockTransfer).toList();
+
+    if (await ApiService.isConnected) {
+      try {
+        final data = await ApiService.stockTransfers(mineOnly: true);
+        if (!mounted) return;
+        setState(() {
+          _erpConnected = true;
+          _transfers = data;
+          _queued = pendingTransfers;
+          _loading = false;
+        });
+        return;
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
-      _user = user;
-      _transfers = (user?.isAdmin ?? false)
-          ? all
-          : all.where((t) => t.srId == (user?.id ?? '')).toList();
+      _erpConnected = false;
+      _transfers = [];
+      _queued = pendingTransfers;
       _loading = false;
     });
   }
 
-  List<StockTransferModel> get _filtered {
-    final now = DateTime.now();
-    return _transfers.where((t) {
-      if (_filter == 'today') {
-        return t.date.year == now.year &&
-            t.date.month == now.month &&
-            t.date.day == now.day;
-      } else if (_filter == 'month') {
-        return t.date.year == now.year && t.date.month == now.month;
-      }
-      return true;
-    }).toList();
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryAccent));
+    }
+
+    final all = [
+      ..._queued.map((q) => {'_queued': true, ...q.payload,
+        'date': q.createdAt.toIso8601String(),
+        'transferredBy': 'অপেক্ষমাণ (অফলাইন)',
+      }),
+      ..._transfers,
+    ];
+
+    if (all.isEmpty) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.swap_horiz_rounded, size: 64,
+              color: AppTheme.textGrey.withValues(alpha: 0.4)),
+          const SizedBox(height: 12),
+          Text('কোনো ট্রান্সফার নেই',
+              style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey, fontSize: 15)),
+          const SizedBox(height: 8),
+          TextButton(onPressed: _load,
+              child: Text('রিফ্রেশ', style: GoogleFonts.hindSiliguri())),
+        ]),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppTheme.primaryAccent,
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          if (!_erpConnected)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('অফলাইন মোড — ERP-তে সংযোগ নেই',
+                    style: GoogleFonts.hindSiliguri(fontSize: 12, color: Colors.orange))),
+              ]),
+            ),
+          ...all.map((t) => _TransferCard(t: t, fmt: _fmt, isDark: isDark)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransferCard extends StatelessWidget {
+  final Map<String, dynamic> t;
+  final NumberFormat fmt;
+  final bool isDark;
+  const _TransferCard({required this.t, required this.fmt, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final queued = t['_queued'] == true;
+    final date = t['date'] != null
+        ? DateFormat('dd MMM yy, hh:mm a').format(DateTime.tryParse(t['date'].toString()) ?? DateTime.now())
+        : '—';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: queued ? Colors.orange.withValues(alpha: 0.6) : AppTheme.divider,
+          width: queued ? 1.5 : 1,
+        ),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: queued
+                  ? Colors.orange.withValues(alpha: 0.12)
+                  : AppTheme.primaryAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(queued ? 'অফলাইন' : 'ERP ✓',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: queued ? Colors.orange : AppTheme.primaryAccent)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(t['productName']?.toString() ?? '—',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 14, fontWeight: FontWeight.w700,
+                    color: isDark ? AppTheme.darkText : AppTheme.textDark),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text('× ${fmt.format((t['quantity'] as num?)?.toDouble() ?? 0)}',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.textGrey),
+          const SizedBox(width: 4),
+          Expanded(child: Text(
+              '${t['fromBranch'] ?? '—'}  →  ${t['toBranch'] ?? '—'}',
+              style: GoogleFonts.hindSiliguri(fontSize: 12, color: AppTheme.textGrey))),
+        ]),
+        if ((t['transferredBy'] ?? '').toString().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(t['transferredBy'].toString(),
+              style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+        ],
+        const SizedBox(height: 4),
+        Text(date, style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+        if ((t['notes'] ?? '').toString().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text('📝 ${t['notes']}',
+              style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+        ],
+      ]),
+    );
+  }
+}
+
+// ── New Transfer Tab ──────────────────────────────────────────────────────────
+
+class _NewTransferTab extends StatefulWidget {
+  final VoidCallback onCreated;
+  const _NewTransferTab({required this.onCreated});
+  @override
+  State<_NewTransferTab> createState() => _NewTransferTabState();
+}
+
+class _NewTransferTabState extends State<_NewTransferTab> {
+  UserModel? _user;
+  bool _saving = false;
+  bool _erpConnected = false;
+
+  // Products from ERP
+  List<Map<String, dynamic>> _products = [];
+  Map<String, dynamic>? _selectedProduct;
+
+  // Branches from ERP (fallback: 16 canonical operational branches)
+  List<String> _branches = [
+    'Bogura-1', 'Bogura-2',
+    'Comilla-1', 'Comilla-2', 'Comilla-3', 'Comilla-4',
+    'Feni-1', 'Feni-2',
+    'Fulbaria', 'Fulpur', 'Gouripur',
+    'Jessore-1', 'Jessore-2 [Bakra]',
+    'Muktagasa', 'Netrokona', 'Tarakanda',
+  ];
+
+  String? _fromBranch;
+  String? _toBranch;
+  final _qtyCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _productSearchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
   }
 
-  void _openDialog({StockTransferModel? edit}) {
+  Future<void> _loadData() async {
+    final user = await LocalStorageService.getCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      _user = user;
+      if (user?.branch != null && user!.branch.isNotEmpty) {
+        _fromBranch = user.branch;
+      }
+    });
+
+    if (!await ApiService.isConnected) return;
+    try {
+      final results = await Future.wait([
+        ApiService.products(),
+        ApiService.branches(),
+      ]);
+      if (!mounted) return;
+      final prods = results[0];
+      final branches = results[1];
+      setState(() {
+        _erpConnected = true;
+        if (prods.isNotEmpty) _products = prods;
+        if (branches.isNotEmpty) {
+          _branches = branches
+              .map((b) => b['name']?.toString() ?? '')
+              .where((n) => n.isNotEmpty)
+              .toList();
+        }
+      });
+    } catch (_) {
+      setState(() => _erpConnected = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    final productName = _selectedProduct?['name']?.toString() ??
+        _productSearchCtrl.text.trim();
+    if (productName.isEmpty) { _snack('পণ্য বেছে নিন', error: true); return; }
+    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('উৎস শাখা বেছে নিন', error: true); return; }
+    if (_toBranch == null || _toBranch!.isEmpty) { _snack('গন্তব্য শাখা বেছে নিন', error: true); return; }
+    if (_fromBranch == _toBranch) { _snack('উৎস ও গন্তব্য শাখা একই হতে পারবে না', error: true); return; }
+    final qty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
+    if (qty <= 0) { _snack('পরিমাণ দিন', error: true); return; }
+
+    setState(() => _saving = true);
+
+    final payload = {
+      'productName': productName,
+      if (_selectedProduct?['_id'] != null) 'productId': _selectedProduct!['_id'].toString(),
+      if ((_selectedProduct?['packSize'] ?? '').toString().isNotEmpty)
+        'packSize': _selectedProduct!['packSize'].toString(),
+      'fromBranch': _fromBranch!,
+      'toBranch': _toBranch!,
+      'quantity': qty,
+      'notes': _notesCtrl.text.trim(),
+      'transferredBy': '${_user?.name ?? 'Mobile User'} (Mobile)',
+    };
+
+    bool sentToErp = false;
+    if (_erpConnected || await ApiService.isConnected) {
+      try {
+        await ApiService.createStockTransfer(
+          productName: productName,
+          fromBranch: _fromBranch!,
+          toBranch: _toBranch!,
+          quantity: qty,
+          productId: payload['productId'] as String?,
+          packSize: payload['packSize'] as String?,
+          notes: payload['notes'] as String? ?? '',
+        );
+        sentToErp = true;
+      } catch (_) {
+        // offline — queue it
+      }
+    }
+
+    if (!sentToErp) {
+      await OfflineQueueService.enqueueStockTransfer(payload);
+    }
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    _snack(sentToErp
+        ? '✅ ট্রান্সফার ERP-তে জমা হয়েছে!'
+        : '📥 অফলাইন — sync হলে ERP-তে যাবে');
+
+    // Reset form
+    setState(() {
+      _selectedProduct = null;
+      _productSearchCtrl.clear();
+      _qtyCtrl.clear();
+      _notesCtrl.clear();
+      _toBranch = null;
+    });
+
+    widget.onCreated();
+  }
+
+  void _snack(String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: error ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  void _pickProduct() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _TransferDialog(
-        user: _user,
-        existing: edit,
-        onSave: (t) async {
-          await LocalStorageService.saveStockTransfer(t);
-          await _load();
+      builder: (_) => _ProductPickerSheet(
+        products: _products,
+        onSelect: (p) {
+          setState(() {
+            _selectedProduct = p;
+            _productSearchCtrl.text = [
+              p['name'] ?? '',
+              if ((p['packSize'] ?? '').toString().isNotEmpty) p['packSize'],
+            ].join(' ');
+          });
         },
       ),
     );
   }
 
-  Future<void> _delete(StockTransferModel t) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Delete?',
-            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
-        content: Text('This transfer will be deleted.',
-            style: GoogleFonts.hindSiliguri()),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('No', style: GoogleFonts.hindSiliguri())),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.error,
-                  minimumSize: const Size(80, 40)),
-              child: Text('Yes', style: GoogleFonts.hindSiliguri())),
-        ],
+  Widget _branchDropdown(String label, String? value, ValueChanged<String?> onChanged) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return DropdownButtonFormField<String>(
+      value: value,
+      isExpanded: true,
+      style: GoogleFonts.hindSiliguri(
+          fontSize: 14, color: isDark ? AppTheme.darkText : AppTheme.textDark),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.hindSiliguri(fontSize: 13, color: AppTheme.textGrey),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
+      items: _branches.map((b) => DropdownMenuItem(value: b,
+          child: Text(b, style: GoogleFonts.hindSiliguri(fontSize: 14),
+              overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: onChanged,
     );
-    if (ok == true) {
-      await LocalStorageService.deleteStockTransfer(t.id);
-      _load();
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryAccent))
-          : RefreshIndicator(
-              color: AppTheme.primaryAccent,
-              onRefresh: _load,
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(child: _buildHeader(isDark)),
-                  SliverToBoxAdapter(child: _buildFilters(isDark)),
-                  SliverToBoxAdapter(child: _buildSummary(isDark)),
-                  if (_filtered.isEmpty)
-                    SliverToBoxAdapter(child: _buildEmpty(isDark))
-                  else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => _buildTile(_filtered[i], isDark),
-                        childCount: _filtered.length,
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              ),
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openDialog(),
-        backgroundColor: AppTheme.primaryAccent,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('New Transfer',
-            style: GoogleFonts.hindSiliguri(
-                color: Colors.white, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isDark) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.primaryAccent,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(
-          20, MediaQuery.of(context).padding.top + 14, 20, 20),
-      child: Row(children: [
-        GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: const Icon(Icons.arrow_back_rounded,
-              color: Colors.white, size: 24),
-        ),
-        const SizedBox(width: 12),
-        const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 24),
-        const SizedBox(width: 10),
-        Text('Stock Transfer',
-            style: GoogleFonts.hindSiliguri(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.white)),
-        const Spacer(),
-        Text('Total: ${_transfers.length}',
-            style: GoogleFonts.hindSiliguri(
-                fontSize: 13, color: Colors.white70)),
-      ]),
-    );
-  }
-
-  Widget _buildFilters(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(children: [
-        _chip('all', 'All', isDark),
-        const SizedBox(width: 8),
-        _chip('today', 'Today', isDark),
-        const SizedBox(width: 8),
-        _chip('month', 'This Month', isDark),
-      ]),
-    );
-  }
-
-  Widget _chip(String val, String label, bool isDark) {
-    final sel = _filter == val;
-    return GestureDetector(
-      onTap: () => setState(() => _filter = val),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: sel
-              ? AppTheme.primaryAccent
-              : (isDark ? AppTheme.darkCard : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: sel ? AppTheme.primaryAccent : AppTheme.divider),
-        ),
-        child: Text(label,
-            style: GoogleFonts.hindSiliguri(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: sel
-                    ? Colors.white
-                    : (isDark ? AppTheme.darkText : AppTheme.textDark))),
-      ),
-    );
-  }
-
-  Widget _buildSummary(bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: AppTheme.primaryAccent.withValues(alpha: 0.2)),
-        ),
-        child: Row(children: [
-          const Icon(Icons.swap_horiz_rounded,
-              color: AppTheme.primaryAccent, size: 18),
-          const SizedBox(width: 8),
-          Text('${_filtered.length} transfers',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 13, color: AppTheme.textGrey)),
-        ]),
-      ),
-    );
-  }
 
-  Widget _buildEmpty(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Center(
-        child: Column(children: [
-          Icon(Icons.swap_horiz_rounded,
-              size: 64,
-              color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
-          const SizedBox(height: 14),
-          Text('No transfers',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 15, color: AppTheme.textGrey)),
-          const SizedBox(height: 6),
-          Text('Tap + to add a new transfer',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 12, color: AppTheme.textGrey)),
-        ]),
-      ),
-    );
-  }
-
-  Widget _buildTile(StockTransferModel t, bool isDark) {
-    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    final statusColor = t.status == StockTransferModel.statusApproved
-        ? AppTheme.success
-        : t.status == StockTransferModel.statusRejected
-            ? AppTheme.error
-            : AppTheme.warning;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-              blurRadius: 4)
-        ],
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12)),
-          child:
-              Icon(Icons.swap_horiz_rounded, color: statusColor, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t.productName,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text('${t.fromWarehouse} → ${t.toWarehouse}',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12, color: AppTheme.textGrey)),
-            Text(
-                '${t.date.day}/${t.date.month}/${t.date.year} · ${_fmt.format(t.quantity)} ${t.unit}',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12, color: AppTheme.textGrey)),
-            if (t.notes.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(t.notes,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.hindSiliguri(
-                      fontSize: 11,
-                      color: isDark ? AppTheme.darkTextGrey : AppTheme.textGrey)),
-            ],
-          ]),
-        ),
-        Column(children: [
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Connection badge
+        Row(children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20)),
-            child: Text(t.statusLabel,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor)),
+              color: (_erpConnected
+                  ? AppTheme.success
+                  : Colors.orange).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(_erpConnected ? Icons.cloud_done_rounded : Icons.wifi_off_rounded,
+                  size: 14, color: _erpConnected ? AppTheme.success : Colors.orange),
+              const SizedBox(width: 5),
+              Text(_erpConnected ? 'ERP সংযুক্ত' : 'অফলাইন মোড',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: _erpConnected ? AppTheme.success : Colors.orange)),
+            ]),
           ),
-          const SizedBox(height: 6),
-          Row(children: [
-            GestureDetector(
-              onTap: () => _openDialog(edit: t),
-              child: const Icon(Icons.edit_rounded,
-                  size: 18, color: AppTheme.primaryAccent),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _delete(t),
-              child: const Icon(Icons.delete_outline_rounded,
-                  size: 18, color: AppTheme.error),
-            ),
-          ]),
         ]),
-      ]),
+        const SizedBox(height: 16),
+
+        // Product field
+        GestureDetector(
+          onTap: _products.isEmpty ? null : _pickProduct,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: _selectedProduct != null
+                      ? AppTheme.primaryAccent
+                      : AppTheme.divider,
+                  width: _selectedProduct != null ? 2 : 1),
+            ),
+            child: Row(children: [
+              const Icon(Icons.inventory_2_rounded,
+                  color: AppTheme.primaryAccent, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: _products.isEmpty
+                  ? TextField(
+                controller: _productSearchCtrl,
+                style: GoogleFonts.hindSiliguri(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'পণ্যের নাম লিখুন',
+                  hintStyle: GoogleFonts.hindSiliguri(
+                      fontSize: 13, color: AppTheme.textGrey),
+                  border: InputBorder.none, isDense: true,
+                ),
+              )
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('পণ্য *',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey)),
+                const SizedBox(height: 2),
+                Text(
+                  _selectedProduct == null
+                      ? 'পণ্য বেছে নিন'
+                      : [_selectedProduct!['name'],
+                    if ((_selectedProduct!['packSize'] ?? '').toString().isNotEmpty)
+                      _selectedProduct!['packSize'],
+                  ].join(' '),
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 14,
+                      fontWeight: _selectedProduct == null
+                          ? FontWeight.w400
+                          : FontWeight.w700,
+                      color: _selectedProduct == null
+                          ? AppTheme.textGrey
+                          : (isDark ? AppTheme.darkText : AppTheme.textDark)),
+                ),
+              ])),
+              if (_products.isNotEmpty)
+                const Icon(Icons.arrow_drop_down_rounded,
+                    color: AppTheme.primaryAccent),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // From branch
+        _branchDropdown('উৎস শাখা (From) *', _fromBranch,
+                (v) => setState(() => _fromBranch = v)),
+        const SizedBox(height: 14),
+
+        // To branch
+        _branchDropdown('গন্তব্য শাখা (To) *', _toBranch,
+                (v) => setState(() => _toBranch = v)),
+        const SizedBox(height: 14),
+
+        // Quantity
+        Container(
+          decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.divider)),
+          child: TextField(
+            controller: _qtyCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
+            ],
+            style: GoogleFonts.hindSiliguri(fontSize: 15),
+            decoration: InputDecoration(
+              labelText: 'পরিমাণ *',
+              labelStyle: GoogleFonts.hindSiliguri(
+                  fontSize: 13, color: AppTheme.textGrey),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Notes
+        Container(
+          decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.divider)),
+          child: TextField(
+            controller: _notesCtrl,
+            maxLines: 2,
+            style: GoogleFonts.hindSiliguri(fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'নোট (ঐচ্ছিক)',
+              labelStyle: GoogleFonts.hindSiliguri(
+                  fontSize: 13, color: AppTheme.textGrey),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: _saving ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryAccent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: _saving
+                ? const SizedBox(width: 20, height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation(Colors.white)))
+                : const Icon(Icons.swap_horiz_rounded,
+                size: 20, color: Colors.white),
+            label: Text(
+                _saving ? 'জমা হচ্ছে...' : 'ট্রান্সফার জমা দিন',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 16, fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+        ),
+      ],
     );
-  }
-}
-
-// ── Add/Edit Dialog ───────────────────────────────────────────────────────
-
-class _TransferDialog extends StatefulWidget {
-  final UserModel? user;
-  final StockTransferModel? existing;
-  final Future<void> Function(StockTransferModel) onSave;
-
-  const _TransferDialog(
-      {required this.user, required this.existing, required this.onSave});
-
-  @override
-  State<_TransferDialog> createState() => _TransferDialogState();
-}
-
-class _TransferDialogState extends State<_TransferDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _fromCtrl;
-  late TextEditingController _toCtrl;
-  late TextEditingController _productCtrl;
-  late TextEditingController _qtyCtrl;
-  late TextEditingController _notesCtrl;
-  String _unit = 'KG';
-  DateTime _date = DateTime.now();
-  bool _saving = false;
-
-  static const _units = ['KG', 'Liter', 'Piece', 'Box', 'Carton', 'Sack', 'Dozen'];
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    _fromCtrl    = TextEditingController(text: e?.fromWarehouse ?? '');
-    _toCtrl      = TextEditingController(text: e?.toWarehouse ?? '');
-    _productCtrl = TextEditingController(text: e?.productName ?? '');
-    _qtyCtrl     = TextEditingController(
-        text: e != null ? e.quantity.toString() : '');
-    _notesCtrl   = TextEditingController(text: e?.notes ?? '');
-    _unit = e?.unit ?? 'KG';
-    _date = e?.date ?? DateTime.now();
   }
 
   @override
   void dispose() {
-    _fromCtrl.dispose();
-    _toCtrl.dispose();
-    _productCtrl.dispose();
     _qtyCtrl.dispose();
     _notesCtrl.dispose();
+    _productSearchCtrl.dispose();
     super.dispose();
   }
+}
 
-  Future<void> _pickDate() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (d != null) setState(() => _date = d);
-  }
+// ── Product picker bottom sheet ───────────────────────────────────────────────
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-    final model = StockTransferModel(
-      id: widget.existing?.id ??
-          'ST-${DateTime.now().millisecondsSinceEpoch}',
-      fromWarehouse: _fromCtrl.text.trim(),
-      toWarehouse: _toCtrl.text.trim(),
-      productName: _productCtrl.text.trim(),
-      quantity: double.tryParse(_qtyCtrl.text.trim()) ?? 0,
-      unit: _unit,
-      date: _date,
-      notes: _notesCtrl.text.trim(),
-      status: widget.existing?.status ?? StockTransferModel.statusPending,
-      srId: widget.user?.id ?? '',
-      srName: widget.user?.name ?? '',
-    );
-    await widget.onSave(model);
-    if (mounted) Navigator.pop(context);
-  }
+class _ProductPickerSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> products;
+  final ValueChanged<Map<String, dynamic>> onSelect;
+  const _ProductPickerSheet({required this.products, required this.onSelect});
+  @override
+  State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
+}
+
+class _ProductPickerSheetState extends State<_ProductPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _q = '';
+
+  @override
+  void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppTheme.darkCard : Colors.white;
-    return Container(
-      decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(
-              child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: AppTheme.divider,
-                      borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: 16),
-            Text(
-                widget.existing == null
-                    ? 'New Stock Transfer'
-                    : 'Edit Transfer',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-            _label('From (Warehouse)'),
-            TextFormField(
-              controller: _fromCtrl,
-              decoration: const InputDecoration(hintText: 'Sender warehouse'),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            _label('To (Warehouse)'),
-            TextFormField(
-              controller: _toCtrl,
-              decoration: const InputDecoration(hintText: 'Receiver warehouse'),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            _label('Product Name'),
-            TextFormField(
-              controller: _productCtrl,
-              decoration: const InputDecoration(hintText: 'Enter product name'),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _label('Quantity'),
-                      TextFormField(
-                        controller: _qtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration:
-                            const InputDecoration(hintText: '0'),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Required';
-                          if (double.tryParse(v.trim()) == null) {
-                            return 'Enter a number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ]),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _label('Unit'),
-                      DropdownButtonFormField<String>(
-                        value: _unit,
-                        items: _units
-                            .map((u) => DropdownMenuItem(
-                                value: u,
-                                child: Text(u,
-                                    style: GoogleFonts.hindSiliguri())))
-                            .toList(),
-                        onChanged: (v) => setState(() => _unit = v!),
-                        decoration: const InputDecoration(),
-                      ),
-                    ]),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            _label('Date'),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkCard2 : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.divider, width: 1.5),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.calendar_today_rounded,
-                      size: 16, color: AppTheme.primaryAccent),
-                  const SizedBox(width: 8),
-                  Text(
-                      '${_date.day}/${_date.month}/${_date.year}',
-                      style: GoogleFonts.hindSiliguri(fontSize: 14)),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _label('Notes (optional)'),
-            TextFormField(
-              controller: _notesCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(hintText: 'Additional info...'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saving ? null : _submit,
-              child: _saving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : Text(
-                      widget.existing == null ? 'Save' : 'Update',
-                      style: GoogleFonts.hindSiliguri(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-          ]),
+    final filtered = widget.products.where((p) {
+      final name = [p['name'] ?? '', p['packSize'] ?? ''].join(' ').toLowerCase();
+      return name.contains(_q.toLowerCase());
+    }).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75, maxChildSize: 0.95, minChildSize: 0.4,
+      expand: false,
+      builder: (ctx, sc) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
+        child: Column(children: [
+          Container(width: 40, height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                  color: AppTheme.divider,
+                  borderRadius: BorderRadius.circular(4))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _q = v),
+              style: GoogleFonts.hindSiliguri(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'পণ্য খুঁজুন...',
+                hintStyle: GoogleFonts.hindSiliguri(
+                    fontSize: 13, color: AppTheme.textGrey),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: AppTheme.primaryAccent),
+                filled: true,
+                fillColor: isDark
+                    ? AppTheme.darkBg
+                    : AppTheme.primaryAccent.withValues(alpha: 0.05),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              controller: sc,
+              itemCount: filtered.length,
+              itemBuilder: (_, i) {
+                final p = filtered[i];
+                final label = [p['name'] ?? '',
+                  if ((p['packSize'] ?? '').toString().isNotEmpty) p['packSize'],
+                ].join(' ');
+                return ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppTheme.lightAccent,
+                    child: Icon(Icons.inventory_2_rounded,
+                        color: AppTheme.primaryAccent, size: 18),
+                  ),
+                  title: Text(label,
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: Text(p['unit']?.toString() ?? '',
+                      style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                  onTap: () {
+                    widget.onSelect(p);
+                    Navigator.pop(ctx);
+                  },
+                );
+              },
+            ),
+          ),
+        ]),
       ),
     );
   }
-
-  Widget _label(String t) => Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(t,
-          style: GoogleFonts.hindSiliguri(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGrey)));
 }

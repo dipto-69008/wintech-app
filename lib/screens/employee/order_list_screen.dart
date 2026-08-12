@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
+import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import 'order_detail_screen.dart';
 
@@ -31,6 +32,25 @@ class _OrderListScreenState extends State<OrderListScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
+
+    // 1) Try live ERP orders first (real-time from ERP database).
+    if (await ApiService.isConnected) {
+      try {
+        final erpOrders =
+            await ApiService.orders(mineOnly: !(user?.isAdmin ?? false));
+        if (!mounted) return;
+        setState(() {
+          _user = user;
+          _orders = erpOrders.map(_erpToOrderModel).toList();
+          _loading = false;
+        });
+        return;
+      } catch (_) {
+        // ERP unreachable — fall back to local orders below
+      }
+    }
+
+    // 2) Offline / demo fallback
     final orders = await LocalStorageService.getOrders();
     if (!mounted) return;
     setState(() {
@@ -41,6 +61,37 @@ class _OrderListScreenState extends State<OrderListScreen> {
           : orders.where((o) => o.srId == (user?.id ?? '')).toList();
       _loading = false;
     });
+  }
+
+  /// Map an ERP SaleMaster (+items) document to the local OrderModel.
+  OrderModel _erpToOrderModel(Map<String, dynamic> m) {
+    final items = (m['items'] as List? ?? [])
+        .map((d) => OrderItem(
+              productName: d['productName']?.toString() ?? '',
+              quantity: (d['quantity'] as num?)?.toDouble() ?? 0,
+              unit: 'পিস',
+              unitPrice: (d['rate'] as num?)?.toDouble() ?? 0,
+            ))
+        .toList();
+    // ERP status 'a' (active) → confirmed
+    final erpStatus = m['status']?.toString() ?? 'a';
+    final status = erpStatus == 'a'
+        ? OrderModel.statusConfirmed
+        : (erpStatus == 'cancelled'
+            ? OrderModel.statusCancelled
+            : erpStatus);
+    return OrderModel(
+      id: m['invoiceNo']?.toString() ?? m['_id']?.toString() ?? '',
+      srId: _user?.id ?? '',
+      srName: m['addBy']?.toString() ?? '',
+      customerId: m['partyId']?.toString() ?? '',
+      customerName: m['partyName']?.toString() ?? '',
+      items: items,
+      total: (m['totalAmount'] as num?)?.toDouble() ?? 0,
+      date: DateTime.tryParse(m['saleDate']?.toString() ?? '') ?? DateTime.now(),
+      status: status,
+      notes: m['description']?.toString() ?? '',
+    );
   }
 
   List<OrderModel> get _filtered {
@@ -95,7 +146,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             Navigator.pushNamed(context, '/pos-order').then((_) => _load()),
         backgroundColor: AppTheme.primaryAccent,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('New Order',
+        label: Text('নতুন অর্ডার',
             style: GoogleFonts.hindSiliguri(
                 color: Colors.white, fontWeight: FontWeight.w700)),
       ),
@@ -117,13 +168,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
         const Icon(Icons.receipt_long_rounded,
             color: Colors.white, size: 24),
         const SizedBox(width: 10),
-        Text('Order List',
+        Text('অর্ডার তালিকা',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const Spacer(),
-        Text('Total: ${_orders.length}',
+        Text('মোট: ${_orders.length}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 13, color: Colors.white70)),
       ]),
@@ -134,11 +185,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
-        _filterChip('all', 'All', isDark),
+        _filterChip('all', 'সব', isDark),
         const SizedBox(width: 8),
-        _filterChip('today', 'Today', isDark),
+        _filterChip('today', 'আজকের', isDark),
         const SizedBox(width: 8),
-        _filterChip('month', 'This Month', isDark),
+        _filterChip('month', 'এই মাস', isDark),
       ]),
     );
   }
@@ -186,7 +237,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           const Icon(Icons.payments_rounded,
               color: AppTheme.primaryAccent, size: 18),
           const SizedBox(width: 8),
-          Text('${_filtered.length} orders · ',
+          Text('${_filtered.length} অর্ডার · ',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13, color: AppTheme.textGrey)),
           Text('৳ ${_fmt.format(_filteredTotal)}',
@@ -208,11 +259,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
               size: 64,
               color: isDark ? AppTheme.darkTextGrey : AppTheme.divider),
           const SizedBox(height: 14),
-          Text('No orders found',
+          Text('কোনো অর্ডার নেই',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('Tap + to place a new order',
+          Text('নতুন অর্ডার দিতে + বোতাম চাপুন',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -275,7 +326,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               Text(
-                  '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} items',
+                  '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} আইটেম',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

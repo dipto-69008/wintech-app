@@ -53,7 +53,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Status updated: ${updated.statusLabel}',
+          content: Text('স্ট্যাটাস আপডেট হয়েছে: ${updated.statusLabel}',
               style: GoogleFonts.hindSiliguri()),
           backgroundColor: AppTheme.success,
         ),
@@ -131,8 +131,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 fontWeight: pw.FontWeight.bold,
                                 color: PdfColors.white)),
                         pw.SizedBox(height: 2),
-                         pw.Text(
-                             '#${(_order.invoiceNo.isNotEmpty ? _order.invoiceNo : _order.id.substring(0, 8).toUpperCase())}',
+                        pw.Text('#${_order.id.substring(0, 8).toUpperCase()}',
                             style: const pw.TextStyle(
                                 fontSize: 10, color: PdfColors.white)),
                       ],
@@ -205,19 +204,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           pw.SizedBox(height: 6),
                           _pdfDetailRow('Date',
                               DateFormat('dd MMM yyyy').format(_order.date)),
-                           if (_order.invoiceNo.isNotEmpty)
-                             _pdfDetailRow('Invoice', _order.invoiceNo),
-                          _pdfDetailRow('Officer Name', _order.srName),
-                          _pdfDetailRow('Officer ID', _order.srId),
-                           if (_order.branch.isNotEmpty)
-                             _pdfDetailRow('Branch', _order.branch),
-                           _pdfDetailRow('Payment', _order.paymentType),
-                           _pdfDetailRow('Paid', '৳${_fmt.format(_order.paidAmount)}'),
-                           _pdfDetailRow('Due', '৳${_fmt.format(_order.dueAmount)}'),
-                           if (_order.probablePaymentDate.isNotEmpty)
-                             _pdfDetailRow(
-                                 'Probable payment',
-                                 _order.probablePaymentDate),
+                          _pdfDetailRow('SR Name', _order.srName),
+                          _pdfDetailRow('SR ID', _order.srId),
                           _pdfDetailRow('Status', _order.statusLabel,
                               valueColor: statusColor),
                         ],
@@ -270,26 +258,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     return pw.TableRow(
                       decoration: pw.BoxDecoration(color: rowBg),
                       children: [
-                         _tableCell(
-                             item.isBonus
-                                 ? 'BONUS - ${item.productName}'
-                                 : item.productName,
-                             align: pw.TextAlign.left,
-                             color: item.isBonus
-                                 ? const PdfColor.fromInt(0xFFF57F17)
-                                 : null),
+                        _tableCell(item.productName, align: pw.TextAlign.left),
                         _tableCell(_fmt.format(item.quantity)),
                         _tableCell(item.unit),
-                         _tableCell(item.isBonus
-                             ? 'FREE'
-                             : '৳${_fmt.format(item.unitPrice)}'),
-                         _tableCell(item.isBonus
-                             ? 'FREE'
-                             : '৳${_fmt.format(item.total)}',
-                             bold: true,
-                             color: item.isBonus
-                                 ? const PdfColor.fromInt(0xFFF57F17)
-                                 : null),
+                        _tableCell('৳${_fmt.format(item.unitPrice)}'),
+                        _tableCell('৳${_fmt.format(item.total)}',
+                            bold: true),
                       ],
                     );
                   }),
@@ -305,7 +279,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   width: 220,
                   child: pw.Column(
                     children: [
-                       _totalRow('Subtotal', _order.total),
+                      _totalRow('Subtotal', _order.total),
                       pw.Divider(
                           color: const PdfColor.fromInt(0xFFD6EAF5),
                           height: 8),
@@ -325,9 +299,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   color: brandColor)),
                         ],
                       ),
-                      pw.SizedBox(height: 8),
-                      _totalRow('Paid', _order.paidAmount),
-                      _totalRow('Due', _order.dueAmount),
                     ],
                   ),
                 ),
@@ -428,9 +399,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   pw.Widget _tableCell(String text,
-      {bool bold = false,
-      pw.TextAlign align = pw.TextAlign.center,
-      PdfColor? color}) {
+      {bool bold = false, pw.TextAlign align = pw.TextAlign.center}) {
     return pw.Padding(
       padding:
           const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -439,7 +408,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               fontSize: 9,
               fontWeight:
                   bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-               color: color ?? const PdfColor.fromInt(0xFF2C2C2C)),
+              color: const PdfColor.fromInt(0xFF2C2C2C)),
           textAlign: align),
     );
   }
@@ -530,7 +499,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Order #${_order.id.substring(0, 8).toUpperCase()}',
+                'অর্ডার #${_order.id.substring(0, 8).toUpperCase()}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12, color: Colors.white70),
               ),
@@ -542,7 +511,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         IconButton(
           onPressed: _downloadInvoice,
           icon: const Icon(Icons.download_rounded, color: Colors.white),
-          tooltip: 'Download Invoice',
+          tooltip: 'ইনভয়েস ডাউনলোড',
         ),
       ],
     );
@@ -589,64 +558,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildInfoCards(bool isDark) {
-    return Column(
-      children: [
-        Row(children: [
-          Expanded(
-            child: _infoCard(
-              isDark: isDark,
-              icon: Icons.person_rounded,
-              label: 'Customer',
-              value: _order.customerName,
-              sub: 'ID: ${_order.customerId}',
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _infoCard(
-              isDark: isDark,
-              icon: Icons.badge_rounded,
-              label: 'Officer',
-              value: _order.srName,
-              sub: 'ID: ${_order.srId}',
-            ),
-          ),
-        ]),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: _infoCard(
-              isDark: isDark,
-              icon: Icons.receipt_long_rounded,
-              label: 'Invoice',
-              value: _order.invoiceNo.isEmpty ? '—' : _order.invoiceNo,
-              sub: _order.branch.isEmpty ? 'No branch specified' : _order.branch,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _infoCard(
-              isDark: isDark,
-              icon: Icons.payments_rounded,
-              label: 'Payment',
-              value: _order.paymentType,
-              sub:
-                  'Paid ৳${_fmt.format(_order.paidAmount)} · Due ৳${_fmt.format(_order.dueAmount)}',
-            ),
-          ),
-        ]),
-        if (_order.probablePaymentDate.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _infoCard(
-            isDark: isDark,
-            icon: Icons.event_available_rounded,
-            label: 'Probable Payment Date',
-            value: _order.probablePaymentDate,
-            sub: 'Payment reminder date',
-          ),
-        ],
-      ],
-    );
+    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    return Row(children: [
+      Expanded(
+        child: _infoCard(
+          isDark: isDark,
+          icon: Icons.person_rounded,
+          label: 'গ্রাহক',
+          value: _order.customerName,
+          sub: 'ID: ${_order.customerId}',
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _infoCard(
+          isDark: isDark,
+          icon: Icons.badge_rounded,
+          label: 'SR',
+          value: _order.srName,
+          sub: 'ID: ${_order.srId}',
+        ),
+      ),
+    ]);
   }
 
   Widget _infoCard(
@@ -684,9 +617,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 fontWeight: FontWeight.w700,
                 color: isDark ? AppTheme.darkText : AppTheme.textDark)),
         const SizedBox(height: 2),
-         Text(sub,
-             maxLines: 2,
-             overflow: TextOverflow.ellipsis,
+        Text(sub,
             style: GoogleFonts.hindSiliguri(
                 fontSize: 10, color: AppTheme.textGrey)),
       ]),
@@ -718,11 +649,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const Icon(Icons.inventory_2_rounded,
                   color: AppTheme.primaryAccent, size: 18),
               const SizedBox(width: 8),
-              Text('Product List',
+              Text('পণ্যের তালিকা',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w700)),
               const Spacer(),
-              Text('${_order.items.length} items',
+              Text('${_order.items.length}টি আইটেম',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ]),
@@ -746,14 +677,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: Row(children: [
                     Expanded(
                         flex: 4,
-                        child: Text('Product',
+                        child: Text('পণ্য',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: AppTheme.textGrey))),
-                    _colHeader('Qty', flex: 2),
-                    _colHeader('Price', flex: 2),
-                    _colHeader('Total', flex: 2, align: TextAlign.right),
+                    _colHeader('পরিমাণ', flex: 2),
+                    _colHeader('দাম', flex: 2),
+                    _colHeader('মোট', flex: 2, align: TextAlign.right),
                   ]),
                 ),
                 // Rows
@@ -786,36 +717,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                             Row(
-                               children: [
-                                 if (item.isBonus)
-                                   Container(
-                                     margin: const EdgeInsets.only(right: 5),
-                                     padding: const EdgeInsets.symmetric(
-                                         horizontal: 5, vertical: 2),
-                                     decoration: BoxDecoration(
-                                       color: AppTheme.warning,
-                                       borderRadius: BorderRadius.circular(4),
-                                     ),
-                                     child: Text('BONUS',
-                                         style: GoogleFonts.hindSiliguri(
-                                             fontSize: 8,
-                                             color: Colors.white,
-                                             fontWeight: FontWeight.w800)),
-                                   ),
-                                 Expanded(
-                                   child: Text(item.productName,
-                                       maxLines: 2,
-                                       overflow: TextOverflow.ellipsis,
-                                       style: GoogleFonts.hindSiliguri(
-                                           fontSize: 13,
-                                           fontWeight: FontWeight.w600,
-                                           color: item.isBonus
-                                               ? AppTheme.warning
-                                               : null)),
-                                 ),
-                               ],
-                             ),
+                            Text(item.productName,
+                                style: GoogleFonts.hindSiliguri(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -828,27 +733,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       Expanded(
                         flex: 2,
-                         child: Text(item.isBonus
-                             ? 'FREE'
-                             : '৳${_fmt.format(item.unitPrice)}',
+                        child: Text('৳${_fmt.format(item.unitPrice)}',
                             style: GoogleFonts.hindSiliguri(
-                                 fontSize: 11,
-                                 color: item.isBonus
-                                     ? AppTheme.warning
-                                     : AppTheme.textGrey)),
+                                fontSize: 11, color: AppTheme.textGrey)),
                       ),
                       Expanded(
                         flex: 2,
-                         child: Text(item.isBonus
-                             ? 'FREE'
-                             : '৳${_fmt.format(item.total)}',
+                        child: Text('৳${_fmt.format(item.total)}',
                             textAlign: TextAlign.right,
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                 color: item.isBonus
-                                     ? AppTheme.warning
-                                     : AppTheme.primaryAccent)),
+                                color: AppTheme.primaryAccent)),
                       ),
                     ]),
                   );
@@ -889,12 +785,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
       child: Column(children: [
-        _totalRow2('Subtotal', _order.total, isDark),
-        _totalRow2('Paid', _order.paidAmount, isDark),
-        _totalRow2('Due', _order.dueAmount, isDark),
+        _totalRow2('উপ-মোট', _order.total, isDark),
         const Divider(height: 16),
         Row(children: [
-          Text('Total Amount',
+          Text('মোট পরিমাণ',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, fontWeight: FontWeight.w800)),
           const Spacer(),
@@ -940,7 +834,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Notes',
+                Text('নোট',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -966,23 +860,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (_order.status == OrderModel.statusPending) {
       actions.add(_StatusAction(
-          label: 'Confirm',
+          label: 'নিশ্চিত করুন',
           status: OrderModel.statusConfirmed,
           icon: Icons.check_circle_rounded,
           color: const Color(0xFF1565C0)));
       actions.add(_StatusAction(
-          label: 'Cancel',
+          label: 'বাতিল করুন',
           status: OrderModel.statusCancelled,
           icon: Icons.cancel_rounded,
           color: AppTheme.error));
     } else if (_order.status == OrderModel.statusConfirmed) {
       actions.add(_StatusAction(
-          label: 'Deliver',
+          label: 'ডেলিভারি দিন',
           status: OrderModel.statusDelivered,
           icon: Icons.local_shipping_rounded,
           color: AppTheme.success));
       actions.add(_StatusAction(
-          label: 'Cancel',
+          label: 'বাতিল করুন',
           status: OrderModel.statusCancelled,
           icon: Icons.cancel_rounded,
           color: AppTheme.error));
@@ -1004,7 +898,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Change Status',
+          Text('স্ট্যাটাস পরিবর্তন করুন',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -1068,7 +962,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 borderRadius: BorderRadius.circular(14)),
           ),
           icon: const Icon(Icons.download_rounded, size: 20),
-          label: Text('Download Invoice',
+          label: Text('ইনভয়েস ডাউনলোড করুন',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, fontWeight: FontWeight.w700)),
         ),

@@ -7,8 +7,11 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/otp_screen.dart';
+import 'screens/onboarding/employee_type_screen.dart';
 import 'screens/notifications/notification_screen.dart';
+import 'screens/support/support_screen.dart';
 import 'screens/settings/edit_profile_screen.dart';
+import 'screens/settings/digital_id_card_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/target/target_screen.dart';
 import 'screens/commission/commission_screen.dart';
@@ -82,14 +85,20 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
             return _slide(const SignupScreen(), settings);
           case '/otp':
             return _slide(const OtpScreen(), settings);
+          case '/employee-type':
+            return _slide(const EmployeeTypeScreen(), settings);
           case '/home':
             return _slide(HomeShell(onThemeToggle: _onThemeToggle), settings);
           case '/pos-order':
             return _slide(const PosOrderScreen(), settings);
           case '/notifications':
             return _slide(const NotificationScreen(), settings);
+          case '/support':
+            return _slide(const SupportScreen(), settings);
           case '/edit-profile':
             return _slide(const EditProfileScreen(), settings);
+          case '/digital-id':
+            return _slide(const DigitalIdCardScreen(), settings);
           case '/all-employees':
             return _slide(const AllEmployeesScreen(), settings);
           case '/target':

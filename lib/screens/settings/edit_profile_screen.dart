@@ -19,7 +19,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _companyCtrl = TextEditingController();
   final _designationCtrl = TextEditingController();
   final _thanaCtrl = TextEditingController();
-  String _selectedZela = 'Dhaka';
+  String _selectedZela = 'ঢাকা';
   bool _loading = true;
   bool _saving = false;
   UserModel? _user;
@@ -40,7 +40,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _companyCtrl.text = user?.company ?? '';
       _designationCtrl.text = user?.designation ?? '';
       _thanaCtrl.text = user?.thana ?? '';
-      _selectedZela = (user?.zela.isNotEmpty == true) ? user!.zela : 'Dhaka';
+      _selectedZela = (user?.zela.isNotEmpty == true) ? user!.zela : 'ঢাকা';
       _loading = false;
     });
   }
@@ -71,7 +71,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Profile updated!',
+      content: Text('প্রোফাইল আপডেট হয়েছে!',
           style: GoogleFonts.hindSiliguri()),
       behavior: SnackBarBehavior.floating,
       backgroundColor: AppTheme.success,
@@ -93,7 +93,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Edit Profile',
+        title: Text('প্রোফাইল সম্পাদনা',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryAccent,
         foregroundColor: Colors.white,
@@ -154,20 +154,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 28),
 
-                    _sectionLabel('Personal Information'),
+                    _sectionLabel('ব্যক্তিগত তথ্য'),
                     const SizedBox(height: 12),
                     BanglaTextField(
                       controller: _nameCtrl,
-                      label: 'Full Name *',
-                      hint: 'Your name',
+                      label: 'পূর্ণ নাম *',
+                      hint: 'আপনার নাম',
                       prefixIcon: Icons.person_outline_rounded,
                       validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
+                          (v == null || v.trim().isEmpty) ? 'নাম দিন' : null,
                     ),
                     const SizedBox(height: 12),
                     BanglaTextField(
                       controller: _phoneCtrl,
-                      label: 'Mobile Number',
+                      label: 'মোবাইল নম্বর',
                       hint: '01XXXXXXXXX',
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
@@ -175,20 +175,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(height: 12),
                     BanglaTextField(
                       controller: _companyCtrl,
-                      label: 'Company',
-                      hint: 'Company name',
+                      label: 'প্রতিষ্ঠান',
+                      hint: 'কোম্পানির নাম',
                       prefixIcon: Icons.business_outlined,
                     ),
                     const SizedBox(height: 12),
                     BanglaTextField(
                       controller: _designationCtrl,
-                      label: 'Designation',
-                      hint: 'Your designation',
+                      label: 'পদবি',
+                      hint: 'আপনার পদবি',
                       prefixIcon: Icons.badge_outlined,
                     ),
                     const SizedBox(height: 20),
 
-                    _sectionLabel('District'),
+                    _sectionLabel('জেলা'),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: _selectedZela,
@@ -223,12 +223,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    _sectionLabel('Thana / Area (Assigned Area)'),
+                    _sectionLabel('থানা / এলাকা (নির্ধারিত এলাকা)'),
                     const SizedBox(height: 12),
                     BanglaTextField(
                       controller: _thanaCtrl,
-                      label: 'Thana',
-                      hint: 'e.g. Dhanmondi, Mirpur',
+                      label: 'থানা',
+                      hint: 'যেমনঃ ধানমন্ডি, মিরপুর',
                       prefixIcon: Icons.pin_drop_rounded,
                     ),
                     const SizedBox(height: 32),
@@ -246,7 +246,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     valueColor: AlwaysStoppedAnimation(
                                         Colors.white)))
                             : const Icon(Icons.save_rounded, color: Colors.white),
-                        label: Text('Save Changes',
+                        label: Text('পরিবর্তন সংরক্ষণ করুন',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 15, fontWeight: FontWeight.w700)),
                       ),

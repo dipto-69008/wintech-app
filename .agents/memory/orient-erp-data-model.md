@@ -25,11 +25,6 @@ Demo OTP: `123456` | Demo password: any value
 - Current user key: `currentUser`
 - Demo data seeded on first launch via `seedDemoData()`
 
-## Order Promotions
-- Promotional/free units are stored as separate zero-price `OrderItem` entries with `isBonus: true`; the parent order total remains billable-only.
-**Why:** This preserves backward compatibility with existing orders while letting order details and invoices distinguish charged products from free bonus products.
-**How to apply:** When adding promotions, append bonus lines rather than changing the paid line quantity or order total; old item maps default to `isBonus: false`.
-
 ## SR Branch
 - `UserModel.branch` (String, default `''`) — set in `_demoAccounts` map in local_storage_service
 - Displayed in employee dashboard header: "Wintech Agro — [branch]"

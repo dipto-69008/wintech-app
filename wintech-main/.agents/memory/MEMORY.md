@@ -1,1 +1,0 @@
-- [Next.js build workflow](nextjs-build-workflow.md) — stop the dev workflow before running a production build because both processes share `.next`.
