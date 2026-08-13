@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../models/payment_collection_model.dart';
@@ -98,17 +101,32 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
           // Only push brand-new collections to the ERP (edits stay local).
           if (edit == null) {
             var sent = false;
+            var submission = p;
+            if (p.proofImage.isNotEmpty && !p.proofImage.startsWith('http')) {
+              try {
+                submission = p.copyWith(
+                    proofImage: await ApiService.uploadPhoto(p.proofImage,
+                        folder: 'collections'));
+              } catch (_) {
+                // Keep the local image only in the offline queue. It must
+                // never be posted to the ERP as a device-specific file path.
+              }
+            }
             if (await ApiService.isConnected) {
               try {
-                await ApiService.createPaymentCollection(p.toMap());
-                sent = true;
-                // The collection now lives in the ERP (with a server id) —
-                // drop the local copy so it doesn't show up twice.
-                await LocalStorageService.deletePaymentCollection(p.id);
+                final imageReady = submission.proofImage.isEmpty ||
+                    submission.proofImage.startsWith('https://');
+                if (imageReady) {
+                  await ApiService.createPaymentCollection(submission.toMap());
+                  sent = true;
+                  // The collection now lives in the ERP (with a server id) —
+                  // drop the local copy so it doesn't show up twice.
+                  await LocalStorageService.deletePaymentCollection(p.id);
+                }
               } catch (_) {}
             }
             if (!sent) {
-              await OfflineQueueService.enqueuePaymentCollection(p.toMap());
+              await OfflineQueueService.enqueuePaymentCollection(submission.toMap());
             }
             _snack(sent
                 ? '✅ Collection submitted to ERP!'
@@ -473,7 +491,10 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   late TextEditingController _notesCtrl;
   late TextEditingController _chequeCtrl;
   String _method = 'cash';
-  DateTime _date = DateTime.now();
+  DateTime _date = _dhakaNow();
+  String _proofImage = '';
+  bool _pickingImage = false;
+  double _customerDue = 0;
   bool _saving = false;
 
   // Searchable ERP customer selection
@@ -498,8 +519,9 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _notesCtrl    = TextEditingController(text: e?.notes ?? '');
     _chequeCtrl   = TextEditingController(text: e?.chequeNumber ?? '');
     _method = e?.paymentMethod ?? 'cash';
-    _date   = e?.date ?? DateTime.now();
+    _date   = e?.date ?? _dhakaNow();
     _customerId = e?.customerId ?? '';
+    _proofImage = e?.proofImage ?? '';
     _loadParties();
   }
 
@@ -526,6 +548,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
           setState(() {
             _customerCtrl.text = (p['name'] ?? '').toString();
             _customerId = (p['_id'] ?? '').toString();
+            _customerDue = _number(p['currentDue']) + _number(p['previousDue']);
           });
         },
       ),
@@ -541,18 +564,31 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-    if (d != null) setState(() => _date = d);
+  static DateTime _dhakaNow() =>
+      DateTime.now().toUtc().add(const Duration(hours: 6));
+
+  static double _number(dynamic value) =>
+      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+
+  Future<void> _pickProofImage() async {
+    if (_pickingImage) return;
+    setState(() => _pickingImage = true);
+    try {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 75,
+        maxWidth: 1280,
+      );
+      if (image != null && mounted) setState(() => _proofImage = image.path);
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    // The collection timestamp is always captured at submit time in Dhaka.
+    _date = _dhakaNow();
     setState(() => _saving = true);
     final model = PaymentCollectionModel(
       id: widget.existing?.id ??
@@ -563,6 +599,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
       paymentMethod: _method,
       notes: _notesCtrl.text.trim(),
       chequeNumber: _chequeCtrl.text.trim(),
+      proofImage: _proofImage,
       date: _date,
       status: widget.existing?.status ?? PaymentCollectionModel.statusPending,
       srId: widget.user?.id ?? '',
@@ -620,6 +657,24 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                   v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 12),
+            if (_customerId.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Customer due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_customerDue)}',
+                  style: GoogleFonts.hindSiliguri(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+              ),
+            if (_customerId.isNotEmpty) const SizedBox(height: 12),
             _label('Amount (Taka)'),
             TextFormField(
               controller: _amountCtrl,
@@ -654,10 +709,8 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               ),
             ],
             const SizedBox(height: 12),
-            _label('Date'),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
+            _label('Collection Date & Time (Asia/Dhaka)'),
+            Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
@@ -666,14 +719,41 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                   border: Border.all(color: AppTheme.divider, width: 1.5),
                 ),
                 child: Row(children: [
-                  const Icon(Icons.calendar_today_rounded,
+                  const Icon(Icons.access_time_rounded,
                       size: 16, color: AppTheme.primaryAccent),
                   const SizedBox(width: 8),
-                  Text('${_date.day}/${_date.month}/${_date.year}',
+                  Text(DateFormat('dd MMM yyyy · hh:mm a').format(_date),
                       style: GoogleFonts.hindSiliguri(fontSize: 14)),
                 ]),
               ),
-            ),
+            const SizedBox(height: 12),
+            _label('Collection Image (optional)'),
+            Row(children: [
+              OutlinedButton.icon(
+                onPressed: _pickingImage ? null : _pickProofImage,
+                icon: _pickingImage
+                    ? const SizedBox(width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.photo_camera_rounded, size: 17),
+                label: Text(_proofImage.isEmpty ? 'Take Photo' : 'Change Photo',
+                    style: GoogleFonts.hindSiliguri(fontSize: 12)),
+              ),
+              if (_proofImage.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _proofImage.startsWith('http')
+                      ? Image.network(_proofImage, width: 42, height: 42,
+                          fit: BoxFit.cover)
+                      : Image.file(File(_proofImage), width: 42, height: 42,
+                          fit: BoxFit.cover),
+                ),
+                IconButton(
+                    tooltip: 'Remove image',
+                    onPressed: () => setState(() => _proofImage = ''),
+                    icon: const Icon(Icons.close_rounded, size: 18)),
+              ],
+            ]),
             const SizedBox(height: 12),
             _label('Notes (optional)'),
             TextFormField(
@@ -797,6 +877,7 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
                       (p['mobile'] ?? '').toString(),
                       (p['area'] ?? '').toString(),
                     ].where((s) => s.isNotEmpty).join(' • ');
+                      final due = _number(p['currentDue']) + _number(p['previousDue']);
                     return ListTile(
                       dense: true,
                       leading: const Icon(Icons.storefront_rounded,
@@ -804,9 +885,11 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
                       title: Text((p['name'] ?? '').toString(),
                           style: GoogleFonts.hindSiliguri(
                               fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: sub.isEmpty
-                          ? null
-                          : Text(sub,
+                      subtitle: Text(
+                          [
+                            if (sub.isNotEmpty) sub,
+                            'Due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(due)}',
+                          ].join(' • '),
                               style: GoogleFonts.hindSiliguri(fontSize: 11)),
                       onTap: () {
                         widget.onSelect(p);

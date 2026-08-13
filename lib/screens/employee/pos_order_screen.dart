@@ -51,6 +51,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   // Payment
   String _paymentType = 'Cash';
   DateTime? _probablePaymentDate; // expected payment date (like ERP)
+  bool _requestCashCommission = false;
   final _paidCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   static const _paymentTypes = [
@@ -133,10 +134,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   double get _subTotal => _chargedLines.fold(0.0, (s, l) => s + l.total);
   double get _paid => double.tryParse(_paidCtrl.text) ?? 0;
 
-  /// 3% cash commission — ONLY when payment type is Cash and the full
-  /// amount is paid today (the delivery/order date). Confirmed by server too.
+  /// The employee can request a full-cash commission manually. The ERP still
+  /// validates full payment and an admin must approve the request.
+  bool get _isFullCashPayment =>
+      _paymentType == 'Cash' && _subTotal > 0 && _paid >= _subTotal;
   double get _cashCommissionPct =>
-      _paymentType == 'Cash' && _subTotal > 0 && _paid >= _subTotal ? 3 : 0;
+      _isFullCashPayment && _requestCashCommission ? 3 : 0;
   double get _commissionAmount => _subTotal * _cashCommissionPct / 100;
   double get _grandTotal => _subTotal - _commissionAmount;
   double get _due => (_grandTotal - _paid).clamp(0, double.infinity);
@@ -301,6 +304,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       'paymentType': _paymentType,
       'paidAmount': _paid,
       'notes': _notesCtrl.text.trim(),
+      'requestCommission': _requestCashCommission && _isFullCashPayment,
       if (_probablePaymentDate != null)
         'probablePaymentDate': _probablePaymentDate!.toIso8601String(),
     };
@@ -319,6 +323,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           paidAmount: _paid,
           notes: _notesCtrl.text.trim(),
           probablePaymentDate: _probablePaymentDate,
+          requestCommission: _requestCashCommission && _isFullCashPayment,
         );
         sentToErp = true;
       } on ApiException catch (e) {
@@ -959,7 +964,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                    'Cash Commission 3% (full payment today): −৳${_fmt2.format(_commissionAmount)}',
+                    'Cash Commission 3% requested: ৳${_fmt2.format(_commissionAmount)} (ERP admin approval required)',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -967,6 +972,28 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               ),
             ]),
           ),
+        ],
+        if (_isFullCashPayment) ...[
+          const SizedBox(height: 8),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            value: _requestCashCommission,
+            activeColor: AppTheme.primaryAccent,
+            onChanged: (value) =>
+                setState(() => _requestCashCommission = value),
+            title: Text('Request 3% cash commission',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 13, fontWeight: FontWeight.w700)),
+            subtitle: Text(
+                'Full payment received — turn this on or off before saving.',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11.5, color: AppTheme.textGrey)),
+          ),
+        ] else if (_requestCashCommission) ...[
+          const SizedBox(height: 8),
+          Text('Commission request is off until the full cash amount is entered.',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11.5, color: AppTheme.textGrey)),
         ],
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [

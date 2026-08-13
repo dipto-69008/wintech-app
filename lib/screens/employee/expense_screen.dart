@@ -134,13 +134,9 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                       if (row is! Map) continue;
                       final doc = (row['supportingDoc'] ?? '').toString();
                       if (doc.isNotEmpty && !doc.startsWith('http')) {
-                        try {
-                          row['supportingDoc'] = await ApiService.uploadPhoto(
-                              doc,
-                              folder: 'expenses');
-                        } catch (_) {
-                          // Keep local path — server still sees a non-empty doc.
-                        }
+                        row['supportingDoc'] = await ApiService.uploadPhoto(
+                            doc,
+                            folder: 'expenses');
                       }
                     }
                   }

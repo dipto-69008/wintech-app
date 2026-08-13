@@ -29,7 +29,7 @@ class _LeaveScreenState extends State<LeaveScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
     _load();
   }
 
@@ -70,9 +70,12 @@ class _LeaveScreenState extends State<LeaveScreen>
     setState(() {
       _user = user;
       _erpConnected = erp;
-      _leaves = (user?.isAdmin ?? false)
-          ? all
-          : all.where((l) => l.srId == (user?.id ?? '')).toList();
+       // The mobile endpoint already returns only this employee's live
+       // applications. Keeping them unfiltered avoids hiding records when
+       // legacy employee identifiers differ from the current local session.
+       _leaves = erp || (user?.isAdmin ?? false)
+           ? all
+           : all.where((l) => l.srId == (user?.id ?? '')).toList();
       _loading = false;
     });
   }
@@ -148,7 +151,9 @@ class _LeaveScreenState extends State<LeaveScreen>
   List<LeaveModel> get _pendingLeaves =>
       _leaves.where((l) => l.status == LeaveModel.statusPending).toList();
   List<LeaveModel> get _historyLeaves =>
-      _leaves.where((l) => l.status != LeaveModel.statusPending).toList();
+       _leaves;
+  List<LeaveModel> get _approvedLeaves =>
+       _leaves.where((l) => l.status == LeaveModel.statusApproved).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +181,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                       indicatorColor: AppTheme.primaryAccent,
                       tabs: const [
                         Tab(text: 'Pending'),
+                        Tab(text: 'Approved'),
                         Tab(text: 'History'),
                       ],
                     ),
@@ -187,6 +193,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                 controller: _tabCtrl,
                 children: [
                   _buildList(_pendingLeaves, isDark),
+                  _buildList(_approvedLeaves, isDark),
                   _buildList(_historyLeaves, isDark),
                 ],
               ),
@@ -506,9 +513,9 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_type == LeaveModel.typeMedical && _attachments.isEmpty) {
+    if (_attachments.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Medical leave requires a supporting document photo',
+        content: Text('Image is required. Please take a supporting document photo.',
             style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
         backgroundColor: AppTheme.error,
         behavior: SnackBarBehavior.floating,
@@ -702,9 +709,7 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
               ),
             ],
             const SizedBox(height: 12),
-            _label(_type == LeaveModel.typeMedical
-                ? 'Supporting Document (Required)'
-                : 'Supporting Document (Optional)'),
+            _label('Supporting Document (Required)'),
             _attachmentPicker(),
             const SizedBox(height: 12),
             _label('Reason'),

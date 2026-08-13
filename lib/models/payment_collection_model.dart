@@ -10,6 +10,7 @@ class PaymentCollectionModel {
   final String srId;
   final String srName;
   final String chequeNumber;
+  final String proofImage;
 
   const PaymentCollectionModel({
     required this.id,
@@ -23,6 +24,7 @@ class PaymentCollectionModel {
     required this.srId,
     required this.srName,
     this.chequeNumber = '',
+    this.proofImage = '',
   });
 
   static const String statusPending   = 'pending';
@@ -59,6 +61,7 @@ class PaymentCollectionModel {
         'srId': srId,
         'srName': srName,
         'chequeNumber': chequeNumber,
+        'proofImage': proofImage,
       };
 
   factory PaymentCollectionModel.fromMap(Map<String, dynamic> m) =>
@@ -75,9 +78,10 @@ class PaymentCollectionModel {
         srId: m['srId'] ?? '',
         srName: m['srName'] ?? '',
         chequeNumber: m['chequeNumber'] ?? '',
+        proofImage: m['proofImage'] ?? '',
       );
 
-  PaymentCollectionModel copyWith({String? status}) =>
+  PaymentCollectionModel copyWith({String? status, String? proofImage}) =>
       PaymentCollectionModel(
         id: id,
         customerName: customerName,
@@ -90,5 +94,6 @@ class PaymentCollectionModel {
         srId: srId,
         srName: srName,
         chequeNumber: chequeNumber,
+        proofImage: proofImage ?? this.proofImage,
       );
 }

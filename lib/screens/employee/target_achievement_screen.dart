@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
@@ -20,8 +19,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   UserModel? _user;
   List<OrderModel> _myOrders = [];
   bool _loading = true;
-  bool _editingTarget = false;
-  final _targetCtrl = TextEditingController();
 
   // Live ERP figures (when connected)
   bool _erpConnected = false;
@@ -73,13 +70,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
       _user = user;
       _myOrders = myOrders;
       _loading = false;
-      if (_erpConnected && _erpTargetValue > 0) {
-        _targetCtrl.text = _erpTargetValue.toStringAsFixed(0);
-      } else if (user != null) {
-        _targetCtrl.text = user.targetAmount > 0
-            ? user.targetAmount.toStringAsFixed(0)
-            : '';
-      }
     });
   }
 
@@ -102,34 +92,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   double get _progress =>
       _target > 0 ? (_monthRevenue / _target).clamp(0.0, 1.0) : 0;
   double get _remaining => (_target - _monthRevenue).clamp(0, double.infinity);
-
-  Future<void> _saveTarget() async {
-    final val = double.tryParse(_targetCtrl.text.replaceAll(',', ''));
-    if (val == null || val <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please enter a valid target amount',
-            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-      return;
-    }
-    final updated = _user!.copyWith(targetAmount: val);
-    await LocalStorageService.saveCurrentUser(updated);
-    if (!mounted) return;
-    setState(() {
-      _user = updated;
-      _editingTarget = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ Target updated successfully!',
-          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
-      backgroundColor: AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
 
   String get _achievementBadge {
     if (_progress >= 1.0) return '🏆 Target Achieved!';
@@ -162,7 +124,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                   SliverToBoxAdapter(child: _buildHeader(isDark)),
                   SliverToBoxAdapter(child: _buildTargetCard(isDark)),
                   SliverToBoxAdapter(child: _buildStatsRow(isDark)),
-                  SliverToBoxAdapter(child: _buildTargetEditor(isDark)),
                   SliverToBoxAdapter(child: _buildMonthlyHistory(isDark)),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -323,110 +284,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
     );
   }
 
-  Widget _buildTargetEditor(bool isDark) {
-    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: AppTheme.primaryAccent.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const Icon(Icons.edit_rounded,
-                  color: AppTheme.primaryAccent, size: 18),
-              const SizedBox(width: 8),
-              Text('Set Monthly Target',
-                  style: GoogleFonts.hindSiliguri(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
-              const Spacer(),
-              if (!_editingTarget)
-                TextButton(
-                  onPressed: () =>
-                      setState(() => _editingTarget = true),
-                  child: Text('Change',
-                      style: GoogleFonts.hindSiliguri(
-                          fontSize: 13,
-                          color: AppTheme.primaryAccent,
-                          fontWeight: FontWeight.w600)),
-                ),
-            ]),
-            if (_editingTarget) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _targetCtrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly
-                ],
-                style: GoogleFonts.hindSiliguri(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Target Amount (৳)',
-                  labelStyle: GoogleFonts.hindSiliguri(fontSize: 13),
-                  prefixText: '৳ ',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        setState(() => _editingTarget = false),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primaryAccent),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text('Cancel',
-                        style: GoogleFonts.hindSiliguri(
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primaryAccent)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _saveTarget,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryAccent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text('Save',
-                        style: GoogleFonts.hindSiliguri(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
-                  ),
-                ),
-              ]),
-            ] else ...[
-              const SizedBox(height: 8),
-              Text(
-                  _target > 0
-                      ? 'Current Target: ৳ ${_fmt.format(_target)}'
-                      : 'Set your target',
-                  style: GoogleFonts.hindSiliguri(
-                      fontSize: 13,
-                      color: _target > 0
-                          ? AppTheme.primaryAccent
-                          : AppTheme.textGrey)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMonthlyHistory(bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
     final now = DateTime.now();
@@ -529,9 +386,4 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
     return names[m.clamp(1, 12)];
   }
 
-  @override
-  void dispose() {
-    _targetCtrl.dispose();
-    super.dispose();
-  }
 }

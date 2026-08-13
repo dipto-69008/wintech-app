@@ -209,15 +209,27 @@ class OfflineQueueService {
           }
           ok = true;
         } else if (item.type == QueueItemType.expense) {
+          await _uploadExpenseDocuments(item.payload);
           await ApiService.createExpense(item.payload);
           ok = true;
         } else if (item.type == QueueItemType.leave) {
+          final attachments = List<String>.from(item.payload['attachments'] ?? const []);
+          item.payload['attachments'] =
+              await ApiService.uploadPhotos(attachments, folder: 'leaves');
           await ApiService.createLeave(item.payload);
           ok = true;
         } else if (item.type == QueueItemType.paymentCollection) {
+          final proofImage = (item.payload['proofImage'] ?? '').toString();
+          if (proofImage.isNotEmpty && !proofImage.startsWith('http')) {
+            item.payload['proofImage'] =
+                await ApiService.uploadPhoto(proofImage, folder: 'collections');
+          }
           await ApiService.createPaymentCollection(item.payload);
           ok = true;
         } else if (item.type == QueueItemType.survey) {
+          final photos = List<String>.from(item.payload['photos'] ?? const []);
+          item.payload['photos'] =
+              await ApiService.uploadPhotos(photos, folder: 'surveys');
           await ApiService.createSurvey(item.payload);
           ok = true;
         }
@@ -254,6 +266,32 @@ class OfflineQueueService {
 
     await _saveQueue(keep);
     return SyncResult(synced: synced, failed: failed, remaining: keep.length);
+  }
+
+  static Future<void> _uploadExpenseDocuments(Map<String, dynamic> payload) async {
+    Future<void> uploadRows(String key) async {
+      final rows = payload[key];
+      if (rows is! List) return;
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final data = Map<String, dynamic>.from(row);
+        final single = (data['supportingDoc'] ?? '').toString();
+        if (single.isNotEmpty && !single.startsWith('http')) {
+          data['supportingDoc'] =
+              await ApiService.uploadPhoto(single, folder: 'expenses');
+        }
+        final many = List<String>.from(data['supportingDocs'] ?? const []);
+        if (many.isNotEmpty) {
+          data['supportingDocs'] =
+              await ApiService.uploadPhotos(many, folder: 'expenses');
+        }
+        final index = rows.indexOf(row);
+        rows[index] = data;
+      }
+    }
+
+    await uploadRows('motoRows');
+    await uploadRows('motoServicingRows');
   }
 
   /// Errors worth retrying: missing route, auth hiccup, throttling, 5xx.

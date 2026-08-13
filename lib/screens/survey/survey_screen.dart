@@ -699,7 +699,9 @@ class _SurveyCard extends StatelessWidget {
 
   static String _formatDate(String raw) {
     final date = DateTime.tryParse(raw);
-    return date == null ? raw : DateFormat('dd MMM yyyy').format(date);
+    return date == null
+        ? raw
+        : DateFormat('dd MMM yyyy · hh:mm a').format(date);
   }
 }
 
@@ -780,7 +782,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     super.initState();
     final survey = widget.existing;
     _type = survey?.type ?? widget.type;
-    _visitDate = survey?.visitDate ?? _dateOnly(DateTime.now());
+    _visitDate = survey?.visitDate ?? _dhakaNow().toIso8601String();
     _worker.text = survey?.workerName ?? '';
     _posting.text = survey?.postingId ?? '';
     _farmName.text = survey?.farmName ?? '';
@@ -851,18 +853,26 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     super.dispose();
   }
 
-  static String _dateOnly(DateTime value) =>
-      DateFormat('yyyy-MM-dd').format(value);
+  static DateTime _dhakaNow() =>
+      DateTime.now().toUtc().add(const Duration(hours: 6));
+
+  static String _dateAndTime(DateTime value) =>
+      DateFormat('dd MMM yyyy · hh:mm a').format(value);
 
   Future<void> _pickDate() async {
-    final current = DateTime.tryParse(_visitDate) ?? DateTime.now();
+    final current = DateTime.tryParse(_visitDate) ?? _dhakaNow();
     final date = await showDatePicker(
       context: context,
       initialDate: current,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (date != null) setState(() => _visitDate = _dateOnly(date));
+    if (date != null) {
+      final now = _dhakaNow();
+      setState(() => _visitDate = DateTime(
+          date.year, date.month, date.day, now.hour, now.minute, now.second)
+          .toIso8601String());
+    }
   }
 
   Future<void> _save() async {
@@ -909,6 +919,8 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       _message('Please take at least one real-time photo with the camera');
       return;
     }
+    // New visit records always capture the live Asia/Dhaka timestamp.
+    if (widget.existing == null) _visitDate = _dhakaNow().toIso8601String();
     setState(() => _saving = true);
     final existing = widget.existing;
     final amount = double.tryParse(_collection.text.trim());
@@ -944,14 +956,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
         try {
           // Upload real-time photos first so the ERP stores durable URLs.
           final payload = survey.toMap();
-          try {
-            payload['photos'] = await ApiService.uploadPhotos(
-                survey.allPhotos,
-                folder: 'surveys');
-          } catch (_) {
-            // Upload failed — still submit; server accepts legacy photo field.
-            payload['photos'] = survey.allPhotos;
-          }
+          payload['photos'] = await ApiService.uploadPhotos(
+              survey.allPhotos,
+              folder: 'surveys');
           await ApiService.createSurvey(payload);
           sent = true;
           // The survey now lives in the ERP (with a server id) —
@@ -1026,9 +1033,10 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   borderRadius: BorderRadius.circular(12),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                        labelText: 'Visit Date',
+                        labelText: 'Visit Date & Time (Asia/Dhaka)',
                         prefixIcon: Icon(Icons.calendar_today_rounded)),
-                    child: Text(_visitDate),
+                    child: Text(_dateAndTime(
+                        DateTime.tryParse(_visitDate) ?? _dhakaNow())),
                   ),
                 ),
                 const SizedBox(height: 16),

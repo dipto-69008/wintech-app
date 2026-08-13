@@ -285,6 +285,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   // Products from ERP
   List<Map<String, dynamic>> _products = [];
   Map<String, dynamic>? _selectedProduct;
+  double? _availableQuantity;
+  bool _availabilityLoading = false;
 
   // Branches from ERP (fallback: canonical operational branches)
   List<String> _branches = [
@@ -356,6 +358,36 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     }
   }
 
+  Future<void> _loadAvailability() async {
+    final product = _selectedProduct;
+    final branch = _fromBranch;
+    if (product == null || branch == null || branch.isEmpty || !_erpConnected) {
+      if (mounted) setState(() => _availableQuantity = null);
+      return;
+    }
+    setState(() => _availabilityLoading = true);
+    try {
+      final data = await ApiService.stockAvailability(
+        branch: branch,
+        productId: product['_id']?.toString(),
+        productName: product['name']?.toString(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _availableQuantity =
+            (data['availableQuantity'] as num?)?.toDouble() ?? 0;
+        _availabilityLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _availableQuantity = null;
+          _availabilityLoading = false;
+        });
+      }
+    }
+  }
+
   /// Converts quantity to pieces based on product's pcs-per-carton / pcs-per-bucket.
   /// Returns (pcs, cartonCount, bucketCount).
   (double, int?, int?) _resolveQuantity() {
@@ -417,6 +449,12 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   void _addItem() {
     final item = _currentEntryAsItem();
     if (item == null) return;
+    final requested = (item['quantity'] as num?)?.toDouble() ?? 0;
+    if (_availableQuantity != null && requested > _availableQuantity!) {
+      _snack('Only ${_availableQuantity!.toStringAsFixed(0)} pcs are available in $_fromBranch',
+          error: true);
+      return;
+    }
     setState(() => _items.add(item));
     _clearEntryFields();
     _snack('Product added — ${_items.length} in this transfer');
@@ -442,6 +480,32 @@ class _NewTransferTabState extends State<_NewTransferTab> {
       }
     }
     if (items.isEmpty) { _snack('Please add at least one product', error: true); return; }
+
+    // Validate all submitted products against the ERP movement ledger,
+    // including lines added before the user selected another product.
+    if (_erpConnected) {
+      for (final item in items) {
+        try {
+          final stock = await ApiService.stockAvailability(
+            branch: _fromBranch!,
+            productId: item['productId']?.toString(),
+            productName: item['productName']?.toString(),
+          );
+          final available =
+              (stock['availableQuantity'] as num?)?.toDouble() ?? 0;
+          final requested = (item['quantity'] as num?)?.toDouble() ?? 0;
+          if (requested > available) {
+            _snack(
+                '${item['productName']}: only ${available.toStringAsFixed(0)} pcs can be transferred from $_fromBranch',
+                error: true);
+            return;
+          }
+        } catch (_) {
+          _snack('Could not verify ERP stock. Please try again.', error: true);
+          return;
+        }
+      }
+    }
 
     setState(() => _saving = true);
 
@@ -517,11 +581,13 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         onSelect: (p) {
           setState(() {
             _selectedProduct = p;
+            _availableQuantity = null;
             _productSearchCtrl.text = [
               p['name'] ?? '',
               if ((p['packSize'] ?? '').toString().isNotEmpty) p['packSize'],
             ].join(' ');
           });
+          _loadAvailability();
         },
       ),
     );
@@ -643,8 +709,46 @@ class _NewTransferTabState extends State<_NewTransferTab> {
 
         // From branch
         _branchDropdown('Source Branch (From) *', _fromBranch,
-                (v) => setState(() => _fromBranch = v)),
+                (v) {
+              setState(() => _fromBranch = v);
+              _loadAvailability();
+            }),
         const SizedBox(height: 14),
+
+        if (_selectedProduct != null && _fromBranch != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppTheme.primaryAccent.withValues(alpha: 0.18)),
+            ),
+            child: _availabilityLoading
+                ? Row(children: [
+                    const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 8),
+                    Text('Checking ERP stock…',
+                        style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                  ])
+                : Text(
+                    _availableQuantity == null
+                        ? 'ERP stock is unavailable for this product/branch.'
+                        : 'Available in $_fromBranch: ${_availableQuantity!.toStringAsFixed(0)} pcs  •  You can transfer up to this amount.',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _availableQuantity == null
+                            ? AppTheme.textGrey
+                            : AppTheme.primaryAccent),
+                  ),
+          ),
+          const SizedBox(height: 14),
+        ],
 
         // To branch
         _branchDropdown('Destination Branch (To) *', _toBranch,

@@ -180,6 +180,7 @@ class ApiService {
     double paidAmount = 0,
     String notes = '',
     DateTime? probablePaymentDate,
+    bool requestCommission = false,
   }) {
     return _post('/api/mobile/orders', {
       if (partyId != null) 'partyId': partyId,
@@ -188,6 +189,7 @@ class ApiService {
       'paymentType': paymentType,
       'paidAmount': paidAmount,
       'notes': notes,
+      'requestCommission': requestCommission,
       if (probablePaymentDate != null)
         'probablePaymentDate': probablePaymentDate.toIso8601String(),
     });
@@ -245,6 +247,22 @@ class ApiService {
     final body = await _get(
         '/api/mobile/stock-transfers', {if (mineOnly) 'mine': '1'});
     return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// ERP transfer-ledger stock available for a product at a branch.
+  static Future<Map<String, dynamic>> stockAvailability({
+    required String branch,
+    String? productId,
+    String? productName,
+  }) async {
+    final body = await _get('/api/mobile/stock-transfers', {
+      'availability': '1',
+      'branch': branch,
+      if (productId != null && productId.isNotEmpty) 'productId': productId,
+      if (productName != null && productName.isNotEmpty)
+        'productName': productName,
+    });
+    return Map<String, dynamic>.from(body['data'] as Map? ?? {});
   }
 
   /// Record a stock transfer — appears instantly in ERP Inventory → Stock Transfer.
