@@ -175,24 +175,38 @@ class OfflineQueueService {
           ok = true;
         } else if (item.type == QueueItemType.stockTransfer) {
           final p = item.payload;
-          await ApiService.createStockTransfer(
-            productName: p['productName'] as String,
-            fromBranch: p['fromBranch'] as String,
-            toBranch: p['toBranch'] as String,
-            quantity: (p['quantity'] as num).toDouble(),
-            productId: p['productId'] as String?,
-            packSize: p['packSize'] as String?,
-            notes: p['notes'] as String? ?? '',
-            extraFields: {
-              if (p['quantityUnit'] != null) 'quantityUnit': p['quantityUnit'],
-              if (p['cartonCount'] != null) 'cartonCount': p['cartonCount'],
-              if (p['bucketCount'] != null) 'bucketCount': p['bucketCount'],
-              if (p['totalWeight'] != null) 'totalWeight': p['totalWeight'],
-              if (p['weightUnit'] != null) 'weightUnit': p['weightUnit'],
-              if (p['transferredBy'] != null)
-                'transferredBy': p['transferredBy'],
-            },
-          );
+          if (p['items'] is List) {
+            // New multi-product payload
+            await ApiService.createMultiStockTransfer(
+              fromBranch: p['fromBranch'] as String,
+              toBranch: p['toBranch'] as String,
+              items: List<Map<String, dynamic>>.from(
+                  (p['items'] as List).map((e) => Map<String, dynamic>.from(e as Map))),
+              transferredBy: p['transferredBy'] as String? ?? '',
+              receivedBy: p['receivedBy'] as String? ?? '',
+              notes: p['notes'] as String? ?? '',
+            );
+          } else {
+            // Legacy single-product payload
+            await ApiService.createStockTransfer(
+              productName: p['productName'] as String,
+              fromBranch: p['fromBranch'] as String,
+              toBranch: p['toBranch'] as String,
+              quantity: (p['quantity'] as num).toDouble(),
+              productId: p['productId'] as String?,
+              packSize: p['packSize'] as String?,
+              notes: p['notes'] as String? ?? '',
+              extraFields: {
+                if (p['quantityUnit'] != null) 'quantityUnit': p['quantityUnit'],
+                if (p['cartonCount'] != null) 'cartonCount': p['cartonCount'],
+                if (p['bucketCount'] != null) 'bucketCount': p['bucketCount'],
+                if (p['totalWeight'] != null) 'totalWeight': p['totalWeight'],
+                if (p['weightUnit'] != null) 'weightUnit': p['weightUnit'],
+                if (p['transferredBy'] != null)
+                  'transferredBy': p['transferredBy'],
+              },
+            );
+          }
           ok = true;
         } else if (item.type == QueueItemType.expense) {
           await ApiService.createExpense(item.payload);

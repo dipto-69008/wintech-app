@@ -31,7 +31,8 @@ class SurveyModel {
   final String remarks;
 
   // ── Common ─────────────────────────────────────────────────────────────
-  final String photo;
+  final String photo;          // legacy single photo (kept for old records)
+  final List<String> photos;   // real-time camera photos (paths locally, URLs after upload)
   final String createdAt; // ISO datetime string
 
   const SurveyModel({
@@ -58,8 +59,15 @@ class SurveyModel {
     this.remarks = '',
     // common
     this.photo = '',
+    this.photos = const [],
     required this.createdAt,
   });
+
+  /// All photos (legacy single + new list) without duplicates.
+  List<String> get allPhotos => [
+        if (photo.trim().isNotEmpty && !photos.contains(photo)) photo,
+        ...photos,
+      ];
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -82,6 +90,7 @@ class SurveyModel {
         'collectionAmount': collectionAmount,
         'remarks': remarks,
         'photo': photo,
+        'photos': photos,
         'createdAt': createdAt,
       };
 
@@ -109,6 +118,10 @@ class SurveyModel {
         collectionAmount: (m['collectionAmount'] as num?)?.toDouble(),
         remarks: m['remarks'] as String? ?? '',
         photo: m['photo'] as String? ?? '',
+        photos: (m['photos'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
         createdAt: m['createdAt'] as String? ?? '',
       );
 
@@ -134,6 +147,7 @@ class SurveyModel {
     bool clearCollection = false,
     String? remarks,
     String? photo,
+    List<String>? photos,
     String? createdAt,
   }) =>
       SurveyModel(
@@ -158,6 +172,7 @@ class SurveyModel {
             clearCollection ? null : (collectionAmount ?? this.collectionAmount),
         remarks: remarks ?? this.remarks,
         photo: photo ?? this.photo,
+        photos: photos ?? this.photos,
         createdAt: createdAt ?? this.createdAt,
       );
 }

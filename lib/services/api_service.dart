@@ -270,6 +270,132 @@ class ApiService {
     });
   }
 
+  /// Record a MULTI-product stock transfer.
+  /// Each item: {productName, quantity, productId?, packSize?, quantityUnit?,
+  /// cartonCount?, bucketCount?, pcsCount?, totalWeight?, weightUnit?}
+  static Future<Map<String, dynamic>> createMultiStockTransfer({
+    required String fromBranch,
+    required String toBranch,
+    required List<Map<String, dynamic>> items,
+    String transferredBy = '',
+    String receivedBy = '',
+    String notes = '',
+  }) {
+    return _post('/api/mobile/stock-transfers', {
+      'fromBranch': fromBranch,
+      'toBranch': toBranch,
+      'items': items,
+      if (transferredBy.isNotEmpty) 'transferredBy': transferredBy,
+      if (receivedBy.isNotEmpty) 'receivedBy': receivedBy,
+      'notes': notes,
+    });
+  }
+
+  /// Upload a photo (real-time camera capture) to the ERP.
+  /// Returns the durable URL to store in payloads instead of device paths.
+  /// [folder]: surveys | expenses | leaves | parties
+  static Future<String> uploadPhoto(String filePath,
+      {String folder = 'misc'}) async {
+    final base = await getBaseUrl();
+    final token = await getToken();
+    final req = http.MultipartRequest(
+        'POST', Uri.parse('$base/api/mobile/upload'))
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['folder'] = folder
+      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+    final streamed = await req.send().timeout(const Duration(seconds: 60));
+    final res = await http.Response.fromStream(streamed);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) {
+      throw ApiException(
+          body['error']?.toString() ?? 'Upload failed', res.statusCode);
+    }
+    _markOnline();
+    return body['url'] as String;
+  }
+
+  /// Upload multiple photos, returning the list of URLs.
+  /// Photos that fail to upload throw — caller decides to retry or queue.
+  static Future<List<String>> uploadPhotos(List<String> filePaths,
+      {String folder = 'misc'}) async {
+    final urls = <String>[];
+    for (final p in filePaths) {
+      if (p.trim().isEmpty) continue;
+      // Already a remote URL (re-submission) — keep as is.
+      if (p.startsWith('http://') || p.startsWith('https://')) {
+        urls.add(p);
+        continue;
+      }
+      urls.add(await uploadPhoto(p, folder: folder));
+    }
+    return urls;
+  }
+
+  /// Officer requests the 3% cash commission on a fully-cash-paid order.
+  /// Admin must approve it afterwards before it is applied.
+  static Future<Map<String, dynamic>> requestCashCommission(String orderId) =>
+      _post('/api/mobile/orders/$orderId/commission', {'action': 'request'});
+
+  /// Update a party's trade license from the field (number, expiry, photo URL).
+  static Future<Map<String, dynamic>> updatePartyTradeLicense({
+    required String partyId,
+    String? tradeLicenseNo,
+    DateTime? tradeLicenseExpiry,
+    String? tradeLicensePhoto,
+  }) async {
+    final base = await getBaseUrl();
+    final res = await http
+        .patch(Uri.parse('$base/api/mobile/parties'),
+            headers: await _headers(),
+            body: jsonEncode({
+              'partyId': partyId,
+              if (tradeLicenseNo != null) 'tradeLicenseNo': tradeLicenseNo,
+              if (tradeLicenseExpiry != null)
+                'tradeLicenseExpiry': tradeLicenseExpiry.toIso8601String(),
+              if (tradeLicensePhoto != null)
+                'tradeLicensePhoto': tradeLicensePhoto,
+            }))
+        .timeout(const Duration(seconds: 20));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) {
+      throw ApiException(
+          body['error']?.toString() ?? 'Server error', res.statusCode);
+    }
+    _markOnline();
+    return body;
+  }
+
+  /// List product return invoices submitted by this officer.
+  static Future<List<Map<String, dynamic>>> salesReturns() async {
+    final body = await _get('/api/mobile/sales-returns');
+    return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Create a product return invoice.
+  /// items: [{productName, quantity, rate}]
+  static Future<Map<String, dynamic>> createSalesReturn({
+    required String partyName,
+    required List<Map<String, dynamic>> items,
+    String invoiceNo = '',
+    String reason = '',
+    String notes = '',
+    DateTime? returnDate,
+  }) =>
+      _post('/api/mobile/sales-returns', {
+        'partyName': partyName,
+        'items': items,
+        if (invoiceNo.isNotEmpty) 'invoiceNo': invoiceNo,
+        'reason': reason,
+        'notes': notes,
+        if (returnDate != null) 'returnDate': returnDate.toIso8601String(),
+      });
+
+  /// ADMIN ONLY — approve or reject a pending cash-commission request.
+  static Future<Map<String, dynamic>> decideCashCommission(
+          String orderId, bool approve) =>
+      _post('/api/mobile/orders/$orderId/commission',
+          {'action': approve ? 'approve' : 'reject'});
+
   static Future<List<Map<String, dynamic>>> expenses() async {
     final body = await _get('/api/mobile/expenses');
     return List<Map<String, dynamic>>.from(body['data'] as List);

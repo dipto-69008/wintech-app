@@ -476,6 +476,10 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   DateTime _date = DateTime.now();
   bool _saving = false;
 
+  // Searchable ERP customer selection
+  List<Map<String, dynamic>> _erpParties = [];
+  String _customerId = '';
+
   static const _methods = [
     ('cash',   'Cash'),
     ('cheque', 'Cheque'),
@@ -495,6 +499,37 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _chequeCtrl   = TextEditingController(text: e?.chequeNumber ?? '');
     _method = e?.paymentMethod ?? 'cash';
     _date   = e?.date ?? DateTime.now();
+    _customerId = e?.customerId ?? '';
+    _loadParties();
+  }
+
+  Future<void> _loadParties() async {
+    try {
+      if (await ApiService.isConnected) {
+        final data = await ApiService.parties(allBranches: true);
+        if (mounted) setState(() => _erpParties = data);
+      }
+    } catch (_) {
+      // Offline — free-text customer entry still works.
+    }
+  }
+
+  void _openCustomerPicker() {
+    if (_erpParties.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CustomerPickerSheet(
+        parties: _erpParties,
+        onSelect: (p) {
+          setState(() {
+            _customerCtrl.text = (p['name'] ?? '').toString();
+            _customerId = (p['_id'] ?? '').toString();
+          });
+        },
+      ),
+    );
   }
 
   @override
@@ -523,6 +558,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
       id: widget.existing?.id ??
           'PC-${DateTime.now().millisecondsSinceEpoch}',
       customerName: _customerCtrl.text.trim(),
+      customerId: _customerId,
       amount: double.tryParse(_amountCtrl.text.trim()) ?? 0,
       paymentMethod: _method,
       notes: _notesCtrl.text.trim(),
@@ -566,10 +602,20 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            _label('Customer Name'),
+            _label('Customer'),
             TextFormField(
               controller: _customerCtrl,
-              decoration: const InputDecoration(hintText: 'Customer Name'),
+              readOnly: _erpParties.isNotEmpty,
+              onTap: _erpParties.isNotEmpty ? _openCustomerPicker : null,
+              decoration: InputDecoration(
+                hintText: _erpParties.isNotEmpty
+                    ? 'Tap to search ERP customer'
+                    : 'Customer Name',
+                suffixIcon: _erpParties.isNotEmpty
+                    ? const Icon(Icons.search_rounded,
+                        color: AppTheme.primaryAccent)
+                    : null,
+              ),
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
             ),
@@ -665,4 +711,112 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppTheme.textGrey)));
+}
+
+// ── Searchable ERP Customer Picker ────────────────────────────────────────
+
+class _CustomerPickerSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> parties;
+  final void Function(Map<String, dynamic>) onSelect;
+  const _CustomerPickerSheet({required this.parties, required this.onSelect});
+
+  @override
+  State<_CustomerPickerSheet> createState() => _CustomerPickerSheetState();
+}
+
+class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_query.trim().isEmpty) return widget.parties;
+    final q = _query.toLowerCase();
+    return widget.parties.where((p) {
+      final name = (p['name'] ?? '').toString().toLowerCase();
+      final code = (p['code'] ?? '').toString().toLowerCase();
+      final mobile = (p['mobile'] ?? '').toString().toLowerCase();
+      final area = (p['area'] ?? '').toString().toLowerCase();
+      return name.contains(q) ||
+          code.contains(q) ||
+          mobile.contains(q) ||
+          area.contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppTheme.darkCard : Colors.white;
+    final results = _filtered;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(children: [
+        Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: AppTheme.divider,
+                borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 14),
+        Text('Select Customer',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _searchCtrl,
+          autofocus: true,
+          onChanged: (v) => setState(() => _query = v),
+          decoration: const InputDecoration(
+            hintText: 'Search by name, code, mobile or area...',
+            prefixIcon: Icon(Icons.search_rounded),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: results.isEmpty
+              ? Center(
+                  child: Text('No customer found',
+                      style: GoogleFonts.hindSiliguri(
+                          color: AppTheme.textGrey)))
+              : ListView.builder(
+                  itemCount: results.length,
+                  itemBuilder: (_, i) {
+                    final p = results[i];
+                    final sub = [
+                      (p['code'] ?? '').toString(),
+                      (p['mobile'] ?? '').toString(),
+                      (p['area'] ?? '').toString(),
+                    ].where((s) => s.isNotEmpty).join(' • ');
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.storefront_rounded,
+                          color: AppTheme.primaryAccent, size: 20),
+                      title: Text((p['name'] ?? '').toString(),
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: sub.isEmpty
+                          ? null
+                          : Text(sub,
+                              style: GoogleFonts.hindSiliguri(fontSize: 11)),
+                      onTap: () {
+                        widget.onSelect(p);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ]),
+    );
+  }
 }

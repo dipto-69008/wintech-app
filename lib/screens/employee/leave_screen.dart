@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../config/theme.dart';
 import '../../models/leave_model.dart';
@@ -415,12 +418,19 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
   String _type = LeaveModel.typeCasual;
   DateTime _from = DateTime.now();
   DateTime _to   = DateTime.now();
+  DateTime? _joining;
   final _reasonCtrl = TextEditingController();
+  final _encashDaysCtrl = TextEditingController();
+  List<String> _attachments = [];
+  bool _pickingPhoto = false;
   bool _saving = false;
+
+  bool get _isEncashment => _type == LeaveModel.typeEncashment;
 
   @override
   void dispose() {
     _reasonCtrl.dispose();
+    _encashDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -434,7 +444,10 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
     if (d != null) {
       setState(() {
         _from = d;
+        // One-day leave by default: keep both dates equal until the user
+        // explicitly picks a later end date.
         if (_to.isBefore(_from)) _to = _from;
+        if (_joining != null && !_joining!.isAfter(_to)) _joining = null;
       });
     }
   }
@@ -446,22 +459,99 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
       firstDate: _from,
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (d != null) setState(() => _to = d);
+    if (d != null) {
+      setState(() {
+        _to = d;
+        if (_joining != null && !_joining!.isAfter(_to)) _joining = null;
+      });
+    }
+  }
+
+  Future<void> _pickJoining() async {
+    final min = _to.add(const Duration(days: 1));
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _joining != null && _joining!.isAfter(_to) ? _joining! : min,
+      firstDate: min,
+      lastDate: _to.add(const Duration(days: 400)),
+    );
+    if (d != null) setState(() => _joining = d);
+  }
+
+  Future<void> _captureAttachment() async {
+    if (_pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 75,
+        maxWidth: 1280,
+      );
+      if (picked != null && mounted) {
+        setState(() => _attachments = [..._attachments, picked.path]);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Camera unavailable',
+              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_type == LeaveModel.typeMedical && _attachments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Medical leave requires a supporting document photo',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final encashDays = int.tryParse(_encashDaysCtrl.text.trim()) ?? 0;
+    if (_isEncashment && encashDays <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Enter the number of days to encash',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
     setState(() => _saving = true);
+    // Upload attachments to the ERP first so the payload carries URLs.
+    var attachmentUrls = _attachments;
+    if (_attachments.isNotEmpty) {
+      try {
+        attachmentUrls =
+            await ApiService.uploadPhotos(_attachments, folder: 'leaves');
+      } catch (_) {
+        // Offline — keep local paths; queue sync will retry later.
+      }
+    }
     final l = LeaveModel(
       id: 'LV-${DateTime.now().millisecondsSinceEpoch}',
       leaveType: _type,
       fromDate: _from,
-      toDate: _to,
+      toDate: _isEncashment ? _from : _to,
       reason: _reasonCtrl.text.trim(),
       status: LeaveModel.statusPending,
       srId: widget.user?.id ?? '',
       srName: widget.user?.name ?? '',
       appliedAt: DateTime.now(),
+      attachments: attachmentUrls,
+      joiningDate: _isEncashment
+          ? null
+          : (_joining ?? _to.add(const Duration(days: 1))),
+      isEncashment: _isEncashment,
+      encashmentDays: _isEncashment ? encashDays : 0,
     );
     await widget.onSave(l);
     if (mounted) Navigator.pop(context);
@@ -518,53 +608,104 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
               decoration: const InputDecoration(),
             ),
             const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _label('Start Date'),
-                      GestureDetector(
-                        onTap: _pickFrom,
-                        child: _dateField(
-                            '${_from.day}/${_from.month}/${_from.year}',
-                            isDark),
-                      ),
-                    ]),
+            if (_isEncashment) ...[
+              _label('Days to Encash'),
+              TextFormField(
+                controller: _encashDaysCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    hintText: 'Number of earned-leave days to encash'),
+                validator: (v) {
+                  if (!_isEncashment) return null;
+                  final n = int.tryParse((v ?? '').trim()) ?? 0;
+                  return n <= 0 ? 'Enter a positive number of days' : null;
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _label('End Date'),
-                      GestureDetector(
-                        onTap: _pickTo,
-                        child: _dateField(
-                            '${_to.day}/${_to.month}/${_to.year}',
-                            isDark),
-                      ),
-                    ]),
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                    color: AppTheme.primaryAccent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 14, color: AppTheme.primaryAccent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                        'Encashment amount is calculated from your salary by HR after approval.',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryAccent)),
+                  ),
+                ]),
               ),
-            ]),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                  color:
-                      AppTheme.primaryAccent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [
-                const Icon(Icons.info_outline_rounded,
-                    size: 14, color: AppTheme.primaryAccent),
-                const SizedBox(width: 6),
-                Text('Total $_days days of leave',
-                    style: GoogleFonts.hindSiliguri(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryAccent)),
+            ] else ...[
+              Row(children: [
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('Start Date'),
+                        GestureDetector(
+                          onTap: _pickFrom,
+                          child: _dateField(
+                              '${_from.day}/${_from.month}/${_from.year}',
+                              isDark),
+                        ),
+                      ]),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('End Date'),
+                        GestureDetector(
+                          onTap: _pickTo,
+                          child: _dateField(
+                              '${_to.day}/${_to.month}/${_to.year}',
+                              isDark),
+                        ),
+                      ]),
+                ),
               ]),
-            ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                    color:
+                        AppTheme.primaryAccent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 14, color: AppTheme.primaryAccent),
+                  const SizedBox(width: 6),
+                  Text('Total $_days days of leave',
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryAccent)),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              _label('Joining Date (after leave)'),
+              GestureDetector(
+                onTap: _pickJoining,
+                child: _dateField(
+                    _joining == null
+                        ? 'Auto: day after end date'
+                        : '${_joining!.day}/${_joining!.month}/${_joining!.year}',
+                    isDark),
+              ),
+            ],
+            const SizedBox(height: 12),
+            _label(_type == LeaveModel.typeMedical
+                ? 'Supporting Document (Required)'
+                : 'Supporting Document (Optional)'),
+            _attachmentPicker(),
             const SizedBox(height: 12),
             _label('Reason'),
             TextFormField(
@@ -608,6 +749,69 @@ class _LeaveApplySheetState extends State<_LeaveApplySheet> {
           Text(text, style: GoogleFonts.hindSiliguri(fontSize: 13)),
         ]),
       );
+
+  Widget _attachmentPicker() {
+    Widget thumb(String path) => Stack(children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.divider),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: path.startsWith('http')
+                ? Image.network(path,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image_outlined,
+                        size: 22, color: AppTheme.textGrey))
+                : Image.file(File(path),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image_outlined,
+                        size: 22, color: AppTheme.textGrey)),
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: () =>
+                  setState(() => _attachments.remove(path)),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                    color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded,
+                    size: 12, color: Colors.white),
+              ),
+            ),
+          ),
+        ]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (_attachments.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _attachments.map(thumb).toList()),
+        ),
+      OutlinedButton.icon(
+        onPressed:
+            (_pickingPhoto || _attachments.length >= 5) ? null : _captureAttachment,
+        icon: _pickingPhoto
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.photo_camera_rounded, size: 17),
+        label: Text(
+            _attachments.isEmpty ? 'Take Photo' : 'Add Photo (${_attachments.length}/5)',
+            style: GoogleFonts.hindSiliguri(fontSize: 12)),
+      ),
+    ]);
+  }
 
   Widget _label(String t) => Padding(
       padding: const EdgeInsets.only(bottom: 6),

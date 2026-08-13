@@ -311,6 +311,10 @@ class _NewTransferTabState extends State<_NewTransferTab> {
 
   final _notesCtrl = TextEditingController();
   final _productSearchCtrl = TextEditingController();
+  final _receivedByCtrl = TextEditingController();
+
+  // Multi-product transfer: lines added so far
+  final List<Map<String, dynamic>> _items = [];
 
   @override
   void initState() {
@@ -368,56 +372,99 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     return (raw, null, null);
   }
 
-  Future<void> _submit() async {
+  /// Builds an item map from the currently-filled product/quantity fields.
+  Map<String, dynamic>? _currentEntryAsItem({bool showErrors = true}) {
     final productName = _selectedProduct?['name']?.toString() ??
         _productSearchCtrl.text.trim();
-    if (productName.isEmpty) { _snack('Please select a product', error: true); return; }
-    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source branch', error: true); return; }
-    if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination branch', error: true); return; }
-    if (_fromBranch == _toBranch) { _snack('Source and destination branch cannot be the same', error: true); return; }
+    if (productName.isEmpty) {
+      if (showErrors) _snack('Please select a product', error: true);
+      return null;
+    }
     final rawQty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    if (rawQty <= 0) { _snack('Please enter quantity', error: true); return; }
-
-    setState(() => _saving = true);
-
+    if (rawQty <= 0) {
+      if (showErrors) _snack('Please enter quantity', error: true);
+      return null;
+    }
     final (pcs, cartons, buckets) = _resolveQuantity();
     final weight = _weightCtrl.text.trim();
-
-    final payload = {
+    return {
       'productName': productName,
-      if (_selectedProduct?['_id'] != null) 'productId': _selectedProduct!['_id'].toString(),
+      if (_selectedProduct?['_id'] != null)
+        'productId': _selectedProduct!['_id'].toString(),
       if ((_selectedProduct?['packSize'] ?? '').toString().isNotEmpty)
         'packSize': _selectedProduct!['packSize'].toString(),
-      'fromBranch': _fromBranch!,
-      'toBranch': _toBranch!,
       'quantity': pcs,
       'quantityUnit': _qtyUnit,
       if (cartons != null) 'cartonCount': cartons,
       if (buckets != null) 'bucketCount': buckets,
       if (weight.isNotEmpty) 'totalWeight': weight,
       if (weight.isNotEmpty) 'weightUnit': _weightUnit,
+    };
+  }
+
+  void _clearEntryFields() {
+    setState(() {
+      _selectedProduct = null;
+      _productSearchCtrl.clear();
+      _qtyCtrl.clear();
+      _weightCtrl.clear();
+      _qtyUnit = 'Pcs';
+      _weightUnit = 'g';
+    });
+  }
+
+  /// Adds the currently-entered product to the multi-product list.
+  void _addItem() {
+    final item = _currentEntryAsItem();
+    if (item == null) return;
+    setState(() => _items.add(item));
+    _clearEntryFields();
+    _snack('Product added — ${_items.length} in this transfer');
+  }
+
+  Future<void> _submit() async {
+    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source branch', error: true); return; }
+    if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination branch', error: true); return; }
+    if (_fromBranch == _toBranch) { _snack('Source and destination branch cannot be the same', error: true); return; }
+
+    // Collect items: everything in the list + whatever is still in the
+    // entry fields (so single-product flow works exactly as before).
+    final items = [..._items];
+    final hasEntry = _productSearchCtrl.text.trim().isNotEmpty ||
+        _selectedProduct != null ||
+        _qtyCtrl.text.trim().isNotEmpty;
+    if (hasEntry) {
+      final current = _currentEntryAsItem(showErrors: items.isEmpty);
+      if (current != null) {
+        items.add(current);
+      } else if (items.isEmpty) {
+        return; // entry invalid and nothing else added
+      }
+    }
+    if (items.isEmpty) { _snack('Please add at least one product', error: true); return; }
+
+    setState(() => _saving = true);
+
+    final payload = {
+      'fromBranch': _fromBranch!,
+      'toBranch': _toBranch!,
+      'items': items,
       'notes': _notesCtrl.text.trim(),
       'transferredBy': '${_user?.name ?? 'Mobile User'} (Mobile)',
+      if (_receivedByCtrl.text.trim().isNotEmpty)
+        'receivedBy': _receivedByCtrl.text.trim(),
     };
 
     bool sentToErp = false;
     if (_erpConnected || await ApiService.isConnected) {
       try {
-        await ApiService.createStockTransfer(
-          productName: productName,
+        await ApiService.createMultiStockTransfer(
           fromBranch: _fromBranch!,
           toBranch: _toBranch!,
-          quantity: pcs,
-          productId: payload['productId'] as String?,
-          packSize: payload['packSize'] as String?,
-          notes: payload['notes'] as String? ?? '',
-          extraFields: {
-            'quantityUnit': _qtyUnit,
-            if (cartons != null) 'cartonCount': cartons,
-            if (buckets != null) 'bucketCount': buckets,
-            if (weight.isNotEmpty) 'totalWeight': weight,
-            if (weight.isNotEmpty) 'weightUnit': _weightUnit,
-          },
+          items: items,
+          transferredBy: '${_user?.name ?? 'Mobile User'} (Mobile)',
+          receivedBy: _receivedByCtrl.text.trim(),
+          notes: _notesCtrl.text.trim(),
         );
         sentToErp = true;
       } catch (_) {}
@@ -435,11 +482,13 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         : '📥 Offline — will sync to ERP when connected');
 
     setState(() {
+      _items.clear();
       _selectedProduct = null;
       _productSearchCtrl.clear();
       _qtyCtrl.clear();
       _weightCtrl.clear();
       _notesCtrl.clear();
+      _receivedByCtrl.clear();
       _toBranch = null;
       _qtyUnit = 'Pcs';
       _weightUnit = 'g';
@@ -730,6 +779,95 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         ),
         const SizedBox(height: 14),
 
+        // ── Add another product to this transfer ─────────────────────
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _saving ? null : _addItem,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text('Add Another Product',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 13, fontWeight: FontWeight.w700)),
+          ),
+        ),
+
+        // Added products list
+        if (_items.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.divider)),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Products in this transfer (${_items.length})',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primaryAccent)),
+                const SizedBox(height: 6),
+                ..._items.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final it = entry.value;
+                  final qtyLabel = it['cartonCount'] != null
+                      ? '${it['cartonCount']} Carton (${it['quantity']} pcs)'
+                      : it['bucketCount'] != null
+                          ? '${it['bucketCount']} Bucket (${it['quantity']} pcs)'
+                          : '${it['quantity']} Pcs';
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(children: [
+                      const Icon(Icons.inventory_2_outlined,
+                          size: 16, color: AppTheme.textGrey),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${it['productName']}'
+                          '${(it['packSize'] ?? '').toString().isNotEmpty ? ' ${it['packSize']}' : ''}'
+                          ' — $qtyLabel',
+                          style: GoogleFonts.hindSiliguri(fontSize: 13),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _items.removeAt(i)),
+                        child: const Icon(Icons.close_rounded,
+                            size: 18, color: AppTheme.error),
+                      ),
+                    ]),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+
+        // Received by (person at destination branch)
+        Container(
+          decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.divider)),
+          child: TextField(
+            controller: _receivedByCtrl,
+            style: GoogleFonts.hindSiliguri(fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'Received By (optional)',
+              hintText: 'Name of receiver at destination branch',
+              labelStyle: GoogleFonts.hindSiliguri(
+                  fontSize: 13, color: AppTheme.textGrey),
+              hintStyle: GoogleFonts.hindSiliguri(
+                  fontSize: 12, color: AppTheme.textGrey),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
         // Notes
         Container(
           decoration: BoxDecoration(
@@ -785,6 +923,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     _weightCtrl.dispose();
     _notesCtrl.dispose();
     _productSearchCtrl.dispose();
+    _receivedByCtrl.dispose();
     super.dispose();
   }
 }

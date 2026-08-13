@@ -124,7 +124,30 @@ class _ExpenseScreenState extends State<ExpenseScreen>
               var rejected = '';
               if (await ApiService.isConnected) {
                 try {
-                  await ApiService.createExpense(e.toMap());
+                  // Upload supporting document photos (local camera captures)
+                  // so the ERP stores durable URLs instead of device paths.
+                  final payload = e.toMap();
+                  Future<void> uploadDocsIn(String key) async {
+                    final rows = payload[key];
+                    if (rows is! List) return;
+                    for (final row in rows) {
+                      if (row is! Map) continue;
+                      final doc = (row['supportingDoc'] ?? '').toString();
+                      if (doc.isNotEmpty && !doc.startsWith('http')) {
+                        try {
+                          row['supportingDoc'] = await ApiService.uploadPhoto(
+                              doc,
+                              folder: 'expenses');
+                        } catch (_) {
+                          // Keep local path — server still sees a non-empty doc.
+                        }
+                      }
+                    }
+                  }
+
+                  await uploadDocsIn('motoRows');
+                  await uploadDocsIn('motoServicingRows');
+                  await ApiService.createExpense(payload);
                   sent = true;
                   // The bill now lives in the ERP (with a server id) —
                   // drop the local copy so it doesn't show up twice.
@@ -965,17 +988,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         setState(() => docCtrl.text = picked.path);
       }
     } catch (_) {
-      // Camera unavailable — try gallery as fallback
-      try {
-        final picked = await ImagePicker().pickImage(
-          source: ImageSource.gallery,
-          maxWidth: 1280,
-          imageQuality: 75,
-        );
-        if (picked != null && mounted) {
-          setState(() => docCtrl.text = picked.path);
-        }
-      } catch (_) {}
+      // Camera-only policy: supporting documents must be captured live.
+      if (mounted) {
+        _formSnack('ক্যামেরা চালু করা যায়নি। সাপোর্টিং ডকুমেন্ট অবশ্যই ক্যামেরা দিয়ে তুলতে হবে।',
+            error: true);
+      }
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
     }

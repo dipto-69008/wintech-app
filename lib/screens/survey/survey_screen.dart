@@ -736,7 +736,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   List<String> _products = [];
   String _stock = '';
   String _photo = '';
+  List<String> _photos = [];
   bool _pickingPhoto = false;
+  static const int _maxPhotos = 5;
 
   // Dealer visit: zone-based party selection
   String _dealerZone = '';
@@ -797,6 +799,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     _stock = survey?.wintechStock ?? '';
     _products = [...(survey?.wintechProducts ?? [])];
     _photo = survey?.photo ?? '';
+    _photos = [...(survey?.photos ?? [])];
     _loadEmployees();
     _loadParties();
   }
@@ -864,14 +867,46 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_type == SurveyModel.typeFarmer &&
-        _farmName.text.trim().isEmpty &&
-        _farmerMobile.text.trim().isEmpty) {
-      _message('Please enter farm name or mobile number');
-      return;
+    // Required fields per visit type (matches server-side validation).
+    if (_type == SurveyModel.typeFarmer) {
+      if (_farmName.text.trim().isEmpty) {
+        _message('Farm/farmer name is required');
+        return;
+      }
+      if (_farmerMobile.text.trim().isEmpty) {
+        _message('Farmer mobile number is required');
+        return;
+      }
+      if (_village.text.trim().isEmpty) {
+        _message('Village is required');
+        return;
+      }
+      if (_diseases.text.trim().isEmpty) {
+        _message('Disease/problem is required');
+        return;
+      }
     }
-    if (_type == SurveyModel.typeDealer && _shopName.text.trim().isEmpty) {
-      _message('Please enter shop name');
+    if (_type == SurveyModel.typeDealer) {
+      if (_shopName.text.trim().isEmpty) {
+        _message('Shop name is required');
+        return;
+      }
+      if (_dealerName.text.trim().isEmpty) {
+        _message('Dealer name is required');
+        return;
+      }
+      if (_dealerMobile.text.trim().isEmpty) {
+        _message('Dealer mobile number is required');
+        return;
+      }
+      if (_bazarName.text.trim().isEmpty) {
+        _message('Bazar name is required');
+        return;
+      }
+    }
+    // Real-time photo is mandatory: at least one camera capture.
+    if (_photos.isEmpty && _photo.trim().isEmpty) {
+      _message('Please take at least one real-time photo with the camera');
       return;
     }
     setState(() => _saving = true);
@@ -898,6 +933,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       collectionAmount: amount,
       remarks: _remarks.text.trim(),
       photo: _photo,
+      photos: _photos,
       createdAt: existing?.createdAt ?? DateTime.now().toIso8601String(),
     );
     await LocalStorageService.saveSurvey(survey);
@@ -906,7 +942,17 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       var sent = false;
       if (await ApiService.isConnected) {
         try {
-          await ApiService.createSurvey(survey.toMap());
+          // Upload real-time photos first so the ERP stores durable URLs.
+          final payload = survey.toMap();
+          try {
+            payload['photos'] = await ApiService.uploadPhotos(
+                survey.allPhotos,
+                folder: 'surveys');
+          } catch (_) {
+            // Upload failed — still submit; server accepts legacy photo field.
+            payload['photos'] = survey.allPhotos;
+          }
+          await ApiService.createSurvey(payload);
           sent = true;
           // The survey now lives in the ERP (with a server id) —
           // drop the local copy so it doesn't show up twice.
@@ -1138,7 +1184,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   _field(_remarks, 'Remarks', maxLines: 3, required: false),
                 ],
                 const SizedBox(height: 14),
-                _section('Photo (Optional)'),
+                _section('Real-time Photos (Required)'),
                 _photoPicker(),
               ],
             ),
@@ -1175,87 +1221,107 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       );
 
   Widget _photoPicker() {
-    final hasPhoto = _photo.trim().isNotEmpty;
-    return Row(
-      children: [
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            color: AppTheme.lightAccent,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: AppTheme.divider),
+    // Camera-only, multi-photo (max _maxPhotos). Legacy single photo shown too.
+    final all = <String>[
+      if (_photo.trim().isNotEmpty && !_photos.contains(_photo)) _photo,
+      ..._photos,
+    ];
+    Widget thumb(String path) => Stack(children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: AppTheme.lightAccent,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: AppTheme.divider),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: path.startsWith('http')
+                ? Image.network(path,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppTheme.textGrey,
+                        size: 25))
+                : Image.file(
+                    File(path),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppTheme.textGrey,
+                        size: 25),
+                  ),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: hasPhoto
-              ? Image.file(
-                  File(_photo),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(
-                      Icons.broken_image_outlined,
-                      color: AppTheme.textGrey,
-                      size: 25),
-                )
-              : const Icon(Icons.photo_camera_outlined,
-                  color: AppTheme.primaryAccent, size: 27),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _pickingPhoto ? null : _pickPhoto,
-                icon: _pickingPhoto
-                    ? const SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.add_a_photo_rounded, size: 17),
-                label: Text(hasPhoto ? 'Change Photo' : 'Add Photo'),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: () => setState(() {
+                if (_photo == path) _photo = '';
+                _photos.remove(path);
+              }),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                    color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded,
+                    size: 14, color: Colors.white),
               ),
-              if (hasPhoto)
-                TextButton(
-                  onPressed: () => setState(() => _photo = ''),
-                  child: const Text('Remove Photo'),
-                ),
-            ],
+            ),
+          ),
+        ]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (all.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: all.map(thumb).toList(),
           ),
         ),
-      ],
-    );
+      Row(children: [
+        OutlinedButton.icon(
+          onPressed: (_pickingPhoto || all.length >= _maxPhotos)
+              ? null
+              : _pickPhoto,
+          icon: _pickingPhoto
+              ? const SizedBox(
+                  width: 15,
+                  height: 15,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.photo_camera_rounded, size: 17),
+          label: Text(all.isEmpty
+              ? 'Take Photo *'
+              : 'Add Photo (${all.length}/$_maxPhotos)'),
+        ),
+      ]),
+      if (all.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'Real-time camera photo is required (gallery not allowed)',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11, color: AppTheme.textGrey),
+          ),
+        ),
+    ]);
   }
 
   Future<void> _pickPhoto() async {
+    // Camera ONLY — real-time capture is mandatory; gallery is not allowed.
     setState(() => _pickingPhoto = true);
     try {
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        builder: (context) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera_rounded),
-                title: const Text('Take with Camera'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Choose from Gallery'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (source == null) return;
       final picked = await ImagePicker().pickImage(
-        source: source,
+        source: ImageSource.camera,
         imageQuality: 78,
         maxWidth: 1600,
       );
-      if (picked != null && mounted) setState(() => _photo = picked.path);
+      if (picked != null && mounted) {
+        setState(() => _photos = [..._photos, picked.path]);
+      }
+    } catch (_) {
+      if (mounted) _message('Camera unavailable — please enable camera access');
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
     }

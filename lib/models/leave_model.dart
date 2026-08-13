@@ -9,6 +9,10 @@ class LeaveModel {
   final String srName;
   final DateTime appliedAt;
   final String adminNote;
+  final List<String> attachments; // supporting document photos (paths/URLs)
+  final DateTime? joiningDate;    // re-joining date after leave
+  final bool isEncashment;        // leave encashment request (payout)
+  final int encashmentDays;       // days requested for encashment
 
   const LeaveModel({
     required this.id,
@@ -21,6 +25,10 @@ class LeaveModel {
     required this.srName,
     required this.appliedAt,
     this.adminNote = '',
+    this.attachments = const [],
+    this.joiningDate,
+    this.isEncashment = false,
+    this.encashmentDays = 0,
   });
 
   static const String typeCasual     = 'casual';
@@ -28,15 +36,16 @@ class LeaveModel {
   static const String typeAnnual     = 'annual';
   static const String typeEarn       = 'earn';
   static const String typeWithoutPay = 'without_pay';
-  static const String typeOther      = 'other';
+  static const String typeEncashment = 'encashment';
 
   static const String statusPending  = 'pending';
   static const String statusApproved = 'approved';
   static const String statusRejected = 'rejected';
 
+  /// Restricted list — only these leave types can be applied for.
   static const List<String> leaveTypes = [
     typeCasual, typeMedical, typeAnnual,
-    typeEarn, typeWithoutPay, typeOther,
+    typeEarn, typeWithoutPay, typeEncashment,
   ];
 
   String get typeLabel {
@@ -46,7 +55,8 @@ class LeaveModel {
       case typeAnnual:     return 'Annual Leave';
       case typeEarn:       return 'Earned Leave';
       case typeWithoutPay: return 'Leave Without Pay';
-      default:             return 'Other Leave';
+      case typeEncashment: return 'Leave Encashment';
+      default:             return 'Casual Leave';
     }
   }
 
@@ -71,6 +81,10 @@ class LeaveModel {
         'srName': srName,
         'appliedAt': appliedAt.toIso8601String(),
         'adminNote': adminNote,
+        'attachments': attachments,
+        if (joiningDate != null) 'joiningDate': joiningDate!.toIso8601String(),
+        'isEncashment': isEncashment,
+        'encashmentDays': encashmentDays,
       };
 
   factory LeaveModel.fromMap(Map<String, dynamic> m) => LeaveModel(
@@ -87,6 +101,15 @@ class LeaveModel {
         appliedAt: DateTime.parse(
             m['appliedAt'] ?? DateTime.now().toIso8601String()),
         adminNote: m['adminNote'] ?? '',
+        attachments: (m['attachments'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
+        joiningDate: (m['joiningDate'] ?? '').toString().isEmpty
+            ? null
+            : DateTime.tryParse(m['joiningDate'].toString()),
+        isEncashment: m['isEncashment'] == true,
+        encashmentDays: (m['encashmentDays'] as num?)?.toInt() ?? 0,
       );
 
   LeaveModel copyWith({String? status, String? adminNote}) => LeaveModel(
@@ -100,5 +123,9 @@ class LeaveModel {
         srName: srName,
         appliedAt: appliedAt,
         adminNote: adminNote ?? this.adminNote,
+        attachments: attachments,
+        joiningDate: joiningDate,
+        isEncashment: isEncashment,
+        encashmentDays: encashmentDays,
       );
 }
