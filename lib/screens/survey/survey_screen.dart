@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../data/wintech_catalog.dart';
 import '../../models/survey_model.dart';
-import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
@@ -720,7 +719,6 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   late String _type;
   late String _visitDate;
   bool _saving = false;
-  List<UserModel> _employees = [];
   final _worker = TextEditingController();
   final _posting = TextEditingController();
   final _farmName = TextEditingController();
@@ -802,8 +800,25 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     _products = [...(survey?.wintechProducts ?? [])];
     _photo = survey?.photo ?? '';
     _photos = [...(survey?.photos ?? [])];
-    _loadEmployees();
     _loadParties();
+    _loadCurrentOfficer();
+  }
+
+  /// Officer details are derived from the signed ERP session, not entered by
+  /// the visitor. The server enforces the same values on submission.
+  Future<void> _loadCurrentOfficer() async {
+    final erpUser = await ApiService.getErpUser();
+    final localUser = await LocalStorageService.getCurrentUser();
+    if (!mounted || widget.existing != null) return;
+    setState(() {
+      _worker.text = (erpUser?['name'] ?? localUser?.name ?? '').toString();
+      _posting.text = (erpUser?['employeeCode'] ??
+              erpUser?['legacyId'] ??
+              erpUser?['id'] ??
+              localUser?.id ??
+              '')
+          .toString();
+    });
   }
 
   /// Fetch live parties from the ERP for zone-wise dealer dropdown.
@@ -818,16 +833,41 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     }
   }
 
-  Future<void> _loadEmployees() async {
-    final employees = await LocalStorageService.getAllEmployees();
-    final currentUser = await LocalStorageService.getCurrentUser();
-    if (currentUser != null &&
-        currentUser.isEmployee &&
-        !employees.any((employee) => employee.id == currentUser.id)) {
-      employees.insert(0, currentUser);
+  Future<void> _fillExistingNumber(String number, {required bool dealer}) async {
+    final normalized = number.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length < 8 || !await ApiService.isConnected) return;
+    try {
+      final records = await ApiService.surveys(
+        type: dealer ? SurveyModel.typeDealer : SurveyModel.typeFarmer,
+        mineOnly: false,
+      );
+      // Records arrive newest-first, so the first match is the latest visit.
+      final found = records.cast<Map<String, dynamic>>().firstWhere(
+        (row) => (row[dealer ? 'dealerMobile' : 'farmerMobile'] ?? '')
+            .toString()
+            .replaceAll(RegExp(r'\D'), '') == normalized,
+        orElse: () => <String, dynamic>{},
+      );
+      if (found.isEmpty || !mounted) return;
+      setState(() {
+        if (dealer) {
+          _shopName.text = (found['shopName'] ?? '').toString();
+          _dealerName.text = (found['dealerName'] ?? '').toString();
+          _bazarName.text = (found['bazarName'] ?? '').toString();
+          _stock = (found['wintechStock'] ?? '').toString();
+          _competitor.text = (found['competitorProduct'] ?? '').toString();
+        } else {
+          _farmName.text = (found['farmName'] ?? '').toString();
+          _village.text = (found['village'] ?? '').toString();
+          _diseases.text = (found['diseases'] ?? '').toString();
+          _prescription.text = (found['prescription'] ?? '').toString();
+          _products = List<String>.from(found['wintechProducts'] ?? const []);
+        }
+      });
+      _message('Existing visit details filled from ERP');
+    } catch (_) {
+      // A new number remains a normal new visit entry.
     }
-    if (!mounted) return;
-    setState(() => _employees = employees.where((e) => e.isEmployee).toList());
   }
 
   @override
@@ -1023,7 +1063,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _field(_posting, 'Posting / ID',
-                          hint: 'Officer ID'),
+                          hint: 'Officer ID', readOnly: true),
                     ),
                   ],
                 ),
@@ -1047,7 +1087,8 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                       Expanded(child: _field(_farmName, 'Farm / Farmer Name')),
                       const SizedBox(width: 10),
                       Expanded(child: _field(_farmerMobile, 'Mobile / WhatsApp',
-                          keyboard: TextInputType.phone)),
+                          keyboard: TextInputType.phone,
+                          onSubmitted: (value) => _fillExistingNumber(value, dealer: false))),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1157,7 +1198,8 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                     children: [
                       Expanded(
                           child: _field(_dealerMobile, 'Mobile / WhatsApp',
-                              keyboard: TextInputType.phone)),
+                              keyboard: TextInputType.phone,
+                              onSubmitted: (value) => _fillExistingNumber(value, dealer: true))),
                       const SizedBox(width: 10),
                       Expanded(child: _field(_bazarName, 'Market / Bazar')),
                     ],
@@ -1336,28 +1378,22 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   }
 
   Widget _workerField() {
-    return DropdownButtonFormField<String>(
-      value: _employees.any((e) => e.name == _worker.text) ? _worker.text : null,
-      decoration: const InputDecoration(labelText: 'Officer Name *'),
-      hint: const Text('Select Officer'),
-      items: _employees
-          .map((employee) =>
-              DropdownMenuItem(value: employee.name, child: Text(employee.name)))
-          .toList(),
-      onChanged: (value) => setState(() => _worker.text = value ?? ''),
-      validator: (_) => _worker.text.trim().isEmpty ? 'Required' : null,
-    );
+    return _field(_worker, 'Officer Name', readOnly: true);
   }
 
   Widget _field(TextEditingController controller, String label,
       {String? hint,
       TextInputType? keyboard,
       int maxLines = 1,
-      bool required = false}) {
+       bool required = false,
+       bool readOnly = false,
+       ValueChanged<String>? onSubmitted}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboard,
       maxLines: maxLines,
+      readOnly: readOnly,
+      onFieldSubmitted: onSubmitted,
       decoration: InputDecoration(labelText: required ? '$label *' : label, hintText: hint),
       validator: required
           ? (value) => value == null || value.trim().isEmpty ? 'Required' : null

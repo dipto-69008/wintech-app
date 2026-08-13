@@ -6,6 +6,7 @@ import '../../services/local_storage_service.dart';
 import 'stock_transfer_screen.dart';
 import 'expense_screen.dart';
 import 'payment_collection_screen.dart';
+import 'return_products_screen.dart';
 import 'leave_screen.dart';
 import '../survey/survey_screen.dart';
 
@@ -54,6 +55,13 @@ class _MoreScreenState extends State<MoreScreen> {
       tag: 'payment',
     ),
     _ModuleDef(
+      title: 'Return Products',
+      subtitle: 'Create ERP sales return invoices',
+      icon: Icons.assignment_return_rounded,
+      color: Color(0xFFB45309),
+      tag: 'return',
+    ),
+    _ModuleDef(
       title: 'Leave Application',
       subtitle: 'Casual, medical, annual leave',
       icon: Icons.beach_access_rounded,
@@ -80,6 +88,9 @@ class _MoreScreenState extends State<MoreScreen> {
         break;
       case 'payment':
         screen = const PaymentCollectionScreen();
+        break;
+      case 'return':
+        screen = const ReturnProductsScreen();
         break;
       case 'leave':
         screen = const LeaveScreen();

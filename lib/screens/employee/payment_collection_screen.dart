@@ -808,9 +808,9 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
- static double _number(dynamic value) =>
+  static double _number(dynamic value) =>
       value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
-      
+
   @override
   void dispose() {
     _searchCtrl.dispose();

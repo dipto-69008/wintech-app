@@ -195,9 +195,14 @@ class ApiService {
     });
   }
 
-  static Future<List<Map<String, dynamic>>> surveys({String type = ''}) async {
-    final body =
-        await _get('/api/mobile/surveys', {if (type.isNotEmpty) 'type': type});
+  /// Live surveys. [mineOnly] false searches every officer's records, which is
+  /// what a mobile-number lookup needs.
+  static Future<List<Map<String, dynamic>>> surveys(
+      {String type = '', bool mineOnly = true}) async {
+    final body = await _get('/api/mobile/surveys', {
+      if (type.isNotEmpty) 'type': type,
+      if (!mineOnly) 'mine': '0',
+    });
     return List<Map<String, dynamic>>.from(body['data'] as List);
   }
 
