@@ -1291,22 +1291,42 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
             children: all.map(thumb).toList(),
           ),
         ),
-      Row(children: [
-        OutlinedButton.icon(
+      SizedBox(
+        width: double.infinity,
+        height: 72,
+        child: OutlinedButton.icon(
           onPressed: (_pickingPhoto || all.length >= _maxPhotos)
               ? null
               : _pickPhoto,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.primaryAccent,
+            side: BorderSide(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.85),
+              width: 1.5,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
           icon: _pickingPhoto
               ? const SizedBox(
-                  width: 15,
-                  height: 15,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.photo_camera_rounded, size: 17),
-          label: Text(all.isEmpty
-              ? 'Take Photo *'
-              : 'Add Photo (${all.length}/$_maxPhotos)'),
+              : const Icon(Icons.photo_camera_rounded, size: 25),
+          label: Text(
+            all.isEmpty
+                ? 'Take Photo'
+                : all.length >= _maxPhotos
+                    ? 'Maximum $_maxPhotos Photos Added'
+                    : 'Take Another Photo (${all.length}/$_maxPhotos)',
+            style: GoogleFonts.hindSiliguri(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
-      ]),
+      ),
       if (all.isEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 4),
