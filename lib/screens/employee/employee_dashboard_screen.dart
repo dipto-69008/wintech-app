@@ -475,10 +475,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: InkWell(
-        onTap: widget.onGoToMore,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
+      child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: cardBg,
@@ -500,32 +497,59 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               const Icon(Icons.arrow_forward_ios_rounded,
                   color: AppTheme.textGrey, size: 15),
             ]),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: tools.map((tool) => Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryAccent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(tool.$1, size: 15, color: AppTheme.primaryAccent),
-                  const SizedBox(width: 5),
-                  Text(tool.$2,
-                      style: GoogleFonts.hindSiliguri(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppTheme.darkText
-                              : AppTheme.textDark)),
-                ]),
-              )).toList(),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: tools.map((tool) => SizedBox(
+                    width: tileWidth,
+                    height: 68,
+                    child: Material(
+                      color: AppTheme.primaryAccent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: widget.onGoToMore,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          child: Row(children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryAccent
+                                    .withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(tool.$1,
+                                  size: 24, color: AppTheme.primaryAccent),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(tool.$2,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.hindSiliguri(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? AppTheme.darkText
+                                          : AppTheme.textDark)),
+                            ),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  )).toList(),
+                );
+              },
             ),
           ]),
         ),
-      ),
     );
   }
 
