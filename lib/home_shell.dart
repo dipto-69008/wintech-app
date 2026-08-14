@@ -107,6 +107,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         EmployeeDashboardScreen(
           onGoToOrders: () => _switchTab(1),
           onGoToTargets: () => _switchTab(2),
+          onGoToMore: () => _switchTab(3),
         ),
         const OrderListScreen(),
         const TargetAchievementScreen(),

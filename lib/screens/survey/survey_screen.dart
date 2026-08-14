@@ -801,24 +801,6 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     _photo = survey?.photo ?? '';
     _photos = [...(survey?.photos ?? [])];
     _loadParties();
-    _loadCurrentOfficer();
-  }
-
-  /// Officer details are derived from the signed ERP session, not entered by
-  /// the visitor. The server enforces the same values on submission.
-  Future<void> _loadCurrentOfficer() async {
-    final erpUser = await ApiService.getErpUser();
-    final localUser = await LocalStorageService.getCurrentUser();
-    if (!mounted || widget.existing != null) return;
-    setState(() {
-      _worker.text = (erpUser?['name'] ?? localUser?.name ?? '').toString();
-      _posting.text = (erpUser?['employeeCode'] ??
-              erpUser?['legacyId'] ??
-              erpUser?['id'] ??
-              localUser?.id ??
-              '')
-          .toString();
-    });
   }
 
   /// Fetch live parties from the ERP for zone-wise dealer dropdown.
@@ -995,7 +977,10 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       if (await ApiService.isConnected) {
         try {
           // Upload real-time photos first so the ERP stores durable URLs.
-          final payload = survey.toMap();
+          final payload = survey.toMap()
+            ..remove('workerName')
+            ..remove('postingId')
+            ..remove('visitDate');
           payload['photos'] = await ApiService.uploadPhotos(
               survey.allPhotos,
               folder: 'surveys');
@@ -1056,30 +1041,6 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _section('Visit Info'),
-                Row(
-                  children: [
-                    Expanded(child: _workerField()),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _field(_posting, 'Posting / ID',
-                          hint: 'Officer ID', readOnly: true),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                InkWell(
-                  onTap: _pickDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                        labelText: 'Visit Date & Time (Asia/Dhaka)',
-                        prefixIcon: Icon(Icons.calendar_today_rounded)),
-                    child: Text(_dateAndTime(
-                        DateTime.tryParse(_visitDate) ?? _dhakaNow())),
-                  ),
-                ),
-                const SizedBox(height: 16),
                 _section(isFarmer ? 'Farmer Info' : 'Shop / Dealer Info'),
                 if (isFarmer) ...[
                   Row(
@@ -1105,7 +1066,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                     value: null,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                        labelText: 'Select product (পণ্যের তালিকা)',
+                        labelText: 'Select product',
                         prefixIcon: Icon(Icons.inventory_2_rounded)),
                     items: _productOptions
                         .where((p) => !_products.contains(p))
@@ -1171,7 +1132,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                         prefixIcon: Icon(Icons.storefront_rounded)),
                     hint: Text(
                         _dealerZone.isEmpty
-                            ? 'Select zone first (জোন সিলেক্ট করুন)'
+                            ? 'Select zone first'
                             : 'Select party',
                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
                     items: _zoneParties
@@ -1368,17 +1329,24 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
         maxWidth: 1600,
       );
       if (picked != null && mounted) {
-        setState(() => _photos = [..._photos, picked.path]);
+        var storedPhoto = picked.path;
+        if (await ApiService.isConnected) {
+          try {
+            storedPhoto = await ApiService.uploadPhoto(
+              picked.path,
+              folder: 'surveys',
+            );
+          } catch (_) {
+            // Keep the camera file for the normal save-time upload retry.
+          }
+        }
+        if (mounted) setState(() => _photos = [..._photos, storedPhoto]);
       }
     } catch (_) {
       if (mounted) _message('Camera unavailable — please enable camera access');
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
     }
-  }
-
-  Widget _workerField() {
-    return _field(_worker, 'Officer Name', readOnly: true);
   }
 
   Widget _field(TextEditingController controller, String label,

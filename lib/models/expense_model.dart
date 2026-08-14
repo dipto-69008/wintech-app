@@ -19,9 +19,11 @@ class ExpenseModel {
   final List<Map<String, dynamic>> taRows;
 
   // Motorcycle log rows:
-  // [{date, destination, purposes, prevReading, latestReading, totalKm,
+  // [{date, from, to, destination (legacy), purposes, prevReading, latestReading, totalKm,
   //   petrol, petrolAmount, octane, octaneAmount, mobil, mobilAmount,
-  //   others, othersAmount, othersSupportingDoc}]
+  //   othersAmount, supportingDoc (legacy first photo), supportingDocs[]}]
+  // Petrol, octane and mobil each have their own voucher, so a row may carry
+  // several photos in supportingDocs[].
   final List<Map<String, dynamic>> motoRows;
 
   // Motorcycle servicing bill rows: [{date, description, amount, supportingDoc}]
@@ -33,7 +35,9 @@ class ExpenseModel {
   // TA/DA Top Sheet rows: [{date, place, ta, da, total}]
   final List<Map<String, dynamic>> tadaRows;
 
-  // Out Station rows: [{date, from, to, ta, da, hotel, total}]
+  // Out Station rows:
+  // [{date, from, to, place (legacy), ta, da, hotel, total, supportingDocs[]}]
+  // Supporting documents are optional here; a row may hold several vouchers.
   final List<Map<String, dynamic>> outStationRows;
 
   // DA bill: [{date, amount, note, dayOfWeek, adminApproved}]

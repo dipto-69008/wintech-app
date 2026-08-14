@@ -11,8 +11,9 @@ import '../../services/local_storage_service.dart';
 class EmployeeDashboardScreen extends StatefulWidget {
   final VoidCallback? onGoToOrders;
   final VoidCallback? onGoToTargets;
+  final VoidCallback? onGoToMore;
   const EmployeeDashboardScreen(
-      {super.key, this.onGoToOrders, this.onGoToTargets});
+      {super.key, this.onGoToOrders, this.onGoToTargets, this.onGoToMore});
 
   @override
   State<EmployeeDashboardScreen> createState() =>
@@ -146,6 +147,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                   SliverToBoxAdapter(child: _buildTargetCard(isDark)),
                   SliverToBoxAdapter(child: _buildTodayStats(isDark)),
                   SliverToBoxAdapter(child: _buildQuickActions(isDark)),
+                   SliverToBoxAdapter(child: _buildMoreToolsCard(isDark)),
                   SliverToBoxAdapter(child: _buildSectionTitle('Recent Orders', isDark)),
                   if (_orders.isEmpty)
                     SliverToBoxAdapter(child: _buildEmpty(isDark))
@@ -458,6 +460,72 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           ),
         ),
       ]),
+    );
+  }
+
+  Widget _buildMoreToolsCard(bool isDark) {
+    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    const tools = [
+      (Icons.swap_horiz_rounded, 'Transfer'),
+      (Icons.receipt_rounded, 'Expense'),
+      (Icons.payments_rounded, 'Payment'),
+      (Icons.assignment_return_rounded, 'Return'),
+      (Icons.beach_access_rounded, 'Leave'),
+      (Icons.assignment_rounded, 'Survey'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: InkWell(
+        onTap: widget.onGoToMore,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: AppTheme.primaryAccent.withValues(alpha: 0.18)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.grid_view_rounded,
+                  color: AppTheme.primaryAccent, size: 20),
+              const SizedBox(width: 8),
+              Text('More Tools',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+              const Spacer(),
+              const Icon(Icons.arrow_forward_ios_rounded,
+                  color: AppTheme.textGrey, size: 15),
+            ]),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: tools.map((tool) => Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryAccent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(tool.$1, size: 15, color: AppTheme.primaryAccent),
+                  const SizedBox(width: 5),
+                  Text(tool.$2,
+                      style: GoogleFonts.hindSiliguri(
+                          fontSize: 11,
+                          color: isDark
+                              ? AppTheme.darkText
+                              : AppTheme.textDark)),
+                ]),
+              )).toList(),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 

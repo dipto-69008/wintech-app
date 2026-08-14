@@ -135,6 +135,34 @@ class ApiService {
     return body;
   }
 
+  static Future<Map<String, dynamic>> _patch(
+      String path, Map<String, dynamic> data) async {
+    final base = await getBaseUrl();
+    final res = await http
+        .patch(Uri.parse('$base$path'),
+            headers: await _headers(), body: jsonEncode(data))
+        .timeout(const Duration(seconds: 20));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) {
+      throw ApiException(body['error']?.toString() ?? 'Server error', res.statusCode);
+    }
+    _markOnline();
+    return body;
+  }
+
+  static Future<Map<String, dynamic>> _delete(String path) async {
+    final base = await getBaseUrl();
+    final res = await http
+        .delete(Uri.parse('$base$path'), headers: await _headers())
+        .timeout(const Duration(seconds: 20));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) {
+      throw ApiException(body['error']?.toString() ?? 'Server error', res.statusCode);
+    }
+    _markOnline();
+    return body;
+  }
+
   // ── Auth ─────────────────────────────────────────────────────────
   /// Login against the ERP. Returns the ERP user map on success.
   static Future<Map<String, dynamic>> login(String identifier, String password) async {
@@ -435,6 +463,14 @@ class ApiService {
   /// Submit an expense/TA-DA bill — appears in ERP HR → Expenses.
   static Future<Map<String, dynamic>> createExpense(Map<String, dynamic> data) =>
       _post('/api/mobile/expenses', data);
+
+  /// Update a mobile TA/DA bill that already has an ERP id.
+  static Future<Map<String, dynamic>> updateExpense(Map<String, dynamic> data) =>
+      _patch('/api/mobile/expenses', data);
+
+  /// Delete a mobile TA/DA bill from the ERP.
+  static Future<Map<String, dynamic>> deleteExpense(String id) =>
+      _delete('/api/mobile/expenses/$id');
 
   static Future<List<Map<String, dynamic>>> leaves() async {
     final body = await _get('/api/mobile/leaves');

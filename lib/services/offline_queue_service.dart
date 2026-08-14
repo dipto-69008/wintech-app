@@ -91,9 +91,44 @@ class OfflineQueueService {
     await _saveQueue(q);
   }
 
-  /// Add an offline expense/TA-DA bill to the queue.
-  static Future<void> enqueueExpense(Map<String, dynamic> payload) async {
+  /// Queue an expense create, update, or delete. One pending operation is kept
+  /// per local bill id, so repeated offline edits never create duplicates.
+  static Future<void> enqueueExpense(Map<String, dynamic> payload,
+      {String action = 'create'}) async {
     final q = await getQueue();
+    final id = payload['id']?.toString() ?? '';
+    final matching = q.indexWhere((item) =>
+        item.type == QueueItemType.expense &&
+        item.payload['id']?.toString() == id);
+    // A bill that only ever existed on this device has no ERP record to
+    // delete, so the queue entry is dropped rather than retried forever.
+    final isLocalOnly = id.isEmpty || id.startsWith('EXP-');
+    if (action == 'delete' && isLocalOnly) {
+      if (matching >= 0) {
+        q.removeAt(matching);
+        await _saveQueue(q);
+      }
+      return;
+    }
+    if (matching >= 0) {
+      final priorAction = q[matching].payload['_syncAction']?.toString() ?? 'create';
+      if (action == 'delete' && priorAction == 'create') {
+        // A bill created only on this device can simply be discarded.
+        q.removeAt(matching);
+      } else {
+        payload['_syncAction'] = priorAction == 'create' ? 'create' : action;
+        q[matching] = QueueItem(
+          id: q[matching].id,
+          type: QueueItemType.expense,
+          payload: payload,
+          createdAt: q[matching].createdAt,
+          retries: q[matching].retries,
+        );
+      }
+      await _saveQueue(q);
+      return;
+    }
+    payload['_syncAction'] = action;
     q.add(QueueItem(
       id: 'QEXP-${DateTime.now().millisecondsSinceEpoch}',
       type: QueueItemType.expense,
@@ -209,8 +244,25 @@ class OfflineQueueService {
           }
           ok = true;
         } else if (item.type == QueueItemType.expense) {
-          await _uploadExpenseDocuments(item.payload);
-          await ApiService.createExpense(item.payload);
+          final action = item.payload['_syncAction']?.toString() ?? 'create';
+          final id = item.payload['id']?.toString() ?? '';
+          if (action == 'delete') {
+            await ApiService.deleteExpense(id);
+          } else {
+            await uploadExpenseDocuments(item.payload);
+            // `_syncAction` is queue bookkeeping — it must never be stored on
+            // the ERP record.
+            final body = Map<String, dynamic>.from(item.payload)
+              ..remove('_syncAction');
+            if (action == 'update') {
+              await ApiService.updateExpense(body);
+            } else {
+              // A queued create still carries a local EXP-* id; the ERP
+              // assigns the real one, so do not send the placeholder.
+              body.remove('id');
+              await ApiService.createExpense(body);
+            }
+          }
           ok = true;
         } else if (item.type == QueueItemType.leave) {
           final attachments = List<String>.from(item.payload['attachments'] ?? const []);
@@ -268,7 +320,9 @@ class OfflineQueueService {
     return SyncResult(synced: synced, failed: failed, remaining: keep.length);
   }
 
-  static Future<void> _uploadExpenseDocuments(Map<String, dynamic> payload) async {
+  /// Uploads all local receipt captures in an expense payload before it is
+  /// sent to ERP. Safe to call for both immediate and queued submissions.
+  static Future<void> uploadExpenseDocuments(Map<String, dynamic> payload) async {
     Future<void> uploadRows(String key) async {
       final rows = payload[key];
       if (rows is! List) return;
@@ -292,6 +346,7 @@ class OfflineQueueService {
 
     await uploadRows('motoRows');
     await uploadRows('motoServicingRows');
+    await uploadRows('outStationRows');
   }
 
   /// Errors worth retrying: missing route, auth hiccup, throttling, 5xx.

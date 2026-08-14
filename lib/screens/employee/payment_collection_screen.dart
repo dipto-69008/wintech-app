@@ -64,7 +64,9 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     setState(() {
       _user = user;
       _erpConnected = erp;
-      _payments = (user?.isAdmin ?? false)
+      // Live mobile records are already scoped to the signed-in officer.
+      // Local and ERP IDs can differ, so only filter offline-only entries.
+      _payments = erp || (user?.isAdmin ?? false)
           ? all
           : all.where((p) => p.srId == (user?.id ?? '')).toList();
       _loading = false;

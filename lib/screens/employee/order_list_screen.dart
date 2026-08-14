@@ -279,6 +279,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Widget _buildOrderTile(OrderModel order, bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    final productCount = order.items.where((item) => !item.isBonus).length;
+    final bonusCount = order.items.where((item) => item.isBonus).length;
+    final itemLabel = '$productCount item(s)'
+        '${bonusCount > 0 ? ' + $bonusCount bonus' : ''}';
     final statusColor = order.status == 'delivered'
         ? AppTheme.success
         : order.status == 'cancelled'
@@ -332,7 +336,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               Text(
-                  '${order.date.day}/${order.date.month}/${order.date.year} · ${order.items.length} item(s)',
+                  '${order.date.day}/${order.date.month}/${order.date.year} · $itemLabel',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

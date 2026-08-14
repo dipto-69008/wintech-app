@@ -59,7 +59,9 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     var all = local;
     var erp = false;
 
-    // ERP-first: fetch live expenses, merge with local-only entries.
+    // ERP records are authoritative when available. Pending local operations
+    // overlay them so an offline create/update/delete is never lost or shown
+    // twice while waiting to synchronize.
     if (await ApiService.isConnected) {
       try {
         final data = await ApiService.expenses();
@@ -68,11 +70,31 @@ class _ExpenseScreenState extends State<ExpenseScreen>
           map['id'] ??= map['_id']?.toString();
           return ExpenseModel.fromMap(map);
         }).toList();
-        final remoteIds = remote.map((e) => e.id).toSet();
-        all = [
-          ...remote,
-          ...local.where((e) => !remoteIds.contains(e.id)),
+        final queue = await OfflineQueueService.getQueue();
+        final pending = queue.where((q) => q.type == QueueItemType.expense);
+        final pendingCreateOrUpdate = <String, ExpenseModel>{};
+        final pendingDeletes = <String>{};
+        for (final item in pending) {
+          final action = item.payload['_syncAction']?.toString() ?? 'create';
+          final id = item.payload['id']?.toString() ?? '';
+          if (action == 'delete') {
+            pendingDeletes.add(id);
+          } else if (id.isNotEmpty) {
+            pendingCreateOrUpdate[id] =
+                ExpenseModel.fromMap(Map<String, dynamic>.from(item.payload));
+          }
+        }
+        // A queued edit replaces the ERP copy of the same record instead of
+        // appearing next to it, so a bill is never listed twice.
+        final reconciled = <ExpenseModel>[
+          ...remote.where((e) =>
+              !pendingDeletes.contains(e.id) &&
+              !pendingCreateOrUpdate.containsKey(e.id)),
+          ...pendingCreateOrUpdate.values,
         ];
+        // Keep a cached copy of the current ERP truth plus unsynced work.
+        await LocalStorageService.replaceExpenses(reconciled);
+        all = reconciled;
         erp = true;
       } catch (_) {
         // Offline or endpoint unavailable — keep local data.
@@ -83,7 +105,9 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     setState(() {
       _user = user;
       _erpConnected = erp;
-      _expenses = (user?.isAdmin ?? false)
+      // The mobile endpoint already returns this officer's ERP expenses.
+      // Do not re-filter those records by a potentially different local ID.
+      _expenses = erp || (user?.isAdmin ?? false)
           ? all
           : all.where((e) => e.srId == (user?.id ?? '')).toList();
       _loading = false;
@@ -118,55 +142,40 @@ class _ExpenseScreenState extends State<ExpenseScreen>
           user: _user,
           onSave: (e) async {
             await LocalStorageService.saveExpense(e);
-            // Only push brand-new bills to the ERP (edits stay local).
-            if (existing == null) {
-              var sent = false;
-              var rejected = '';
-              if (await ApiService.isConnected) {
-                try {
-                  // Upload supporting document photos (local camera captures)
-                  // so the ERP stores durable URLs instead of device paths.
-                  final payload = e.toMap();
-                  Future<void> uploadDocsIn(String key) async {
-                    final rows = payload[key];
-                    if (rows is! List) return;
-                    for (final row in rows) {
-                      if (row is! Map) continue;
-                      final doc = (row['supportingDoc'] ?? '').toString();
-                      if (doc.isNotEmpty && !doc.startsWith('http')) {
-                        row['supportingDoc'] = await ApiService.uploadPhoto(
-                            doc,
-                            folder: 'expenses');
-                      }
-                    }
-                  }
-
-                  await uploadDocsIn('motoRows');
-                  await uploadDocsIn('motoServicingRows');
-                  await ApiService.createExpense(payload);
-                  sent = true;
-                  // The bill now lives in the ERP (with a server id) —
-                  // drop the local copy so it doesn't show up twice.
+            final isNew = existing == null || existing.id.startsWith('EXP-');
+            var sent = false;
+            var rejected = '';
+            if (await ApiService.isConnected) {
+              try {
+                final payload = e.toMap();
+                await OfflineQueueService.uploadExpenseDocuments(payload);
+                if (isNew) {
+                  // The ERP assigns the real id, so the local EXP-* placeholder
+                  // is not sent and the local copy is dropped afterwards.
+                  await ApiService.createExpense(
+                      Map<String, dynamic>.from(payload)..remove('id'));
                   await LocalStorageService.deleteExpense(e.id);
-                } on ApiException catch (ex) {
-                  if (ex.statusCode == 400 || ex.statusCode == 403) {
-                    // Business rejection (month lock / missing doc / Friday DA)
-                    rejected = ex.message;
-                    await LocalStorageService.deleteExpense(e.id);
-                  }
-                } catch (_) {}
-              }
-              if (rejected.isNotEmpty) {
-                _snack(rejected.replaceFirst(RegExp(r'^[A-Z_]+: '), ''),
-                    error: true);
-              } else {
-                if (!sent) {
-                  await OfflineQueueService.enqueueExpense(e.toMap());
+                } else {
+                  await ApiService.updateExpense(payload);
                 }
-                _snack(sent
-                    ? '✅ Bill submitted to ERP!'
-                    : '📥 Offline — will sync to ERP when connected');
+                sent = true;
+              } on ApiException catch (ex) {
+                if (ex.statusCode == 400 || ex.statusCode == 403) {
+                  rejected = ex.message;
+                }
+              } catch (_) {}
+            }
+            if (rejected.isNotEmpty) {
+              _snack(rejected.replaceFirst(RegExp(r'^[A-Z_]+: '), ''),
+                  error: true);
+            } else {
+              if (!sent) {
+                await OfflineQueueService.enqueueExpense(e.toMap(),
+                    action: isNew ? 'create' : 'update');
               }
+              _snack(sent
+                  ? (isNew ? 'Bill submitted to ERP.' : 'Bill updated in ERP.')
+                  : 'Saved offline — it will sync with ERP when connected.');
             }
             await _load();
           },
@@ -207,7 +216,36 @@ class _ExpenseScreenState extends State<ExpenseScreen>
       ),
     );
     if (ok == true) {
+      final isNew = e.id.startsWith('EXP-');
+      var deleted = false;
+      var rejected = '';
+      if (!isNew && await ApiService.isConnected) {
+        try {
+          await ApiService.deleteExpense(e.id);
+          deleted = true;
+        } on ApiException catch (ex) {
+          // A locked or already-approved bill can never be deleted by retrying,
+          // so tell the officer instead of queueing it forever.
+          if (ex.statusCode == 400 || ex.statusCode == 403) {
+            rejected = ex.message;
+          }
+        } catch (_) {}
+      }
+      if (rejected.isNotEmpty) {
+        // The bill stays on the device because the ERP refused the delete.
+        _snack(rejected.replaceFirst(RegExp(r'^[A-Z_]+: '), ''), error: true);
+        _load();
+        return;
+      }
       await LocalStorageService.deleteExpense(e.id);
+      if (!deleted) {
+        // Locally-created bills that never reached the ERP simply drop out of
+        // the queue; server-backed bills keep a pending delete until it lands.
+        await OfflineQueueService.enqueueExpense(e.toMap(), action: 'delete');
+        _snack('Deleted offline — the ERP will be updated when connected.');
+      } else {
+        _snack('Bill deleted from ERP.');
+      }
       _load();
     }
   }
@@ -612,6 +650,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   // Out Station rows
   final List<Map<String, TextEditingController>> _outRows = [];
+  // Multiple supporting-document captures per row (petrol, mobil, octane and
+  // hotel/transport vouchers each have their own receipt).
+  final List<List<TextEditingController>> _outSupportingDocs = [];
+  final List<List<TextEditingController>> _motoSupportingDocs = [];
 
   // Motorcycle log rows
   final List<Map<String, TextEditingController>> _motoRows = [];
@@ -876,8 +918,21 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     });
   }
 
+  /// Builds one controller per already-saved supporting document, accepting
+  /// both the legacy single `supportingDoc` and the multi `supportingDocs[]`.
+  List<TextEditingController> _docControllers(Map<String, dynamic>? init) {
+    final legacy = (init?['supportingDoc'] ?? '').toString().trim();
+    final saved = List<String>.from(init?['supportingDocs'] ?? const [])
+        .map((doc) => doc.trim())
+        .where((doc) => doc.isNotEmpty)
+        .toList();
+    if (legacy.isNotEmpty && !saved.contains(legacy)) saved.insert(0, legacy);
+    return saved.map((doc) => TextEditingController(text: doc)).toList();
+  }
+
   void _addOutRow({Map<String, dynamic>? init}) {
     setState(() {
+      _outSupportingDocs.add(_docControllers(init));
       _outRows.add({
         'date':  TextEditingController(text: init?['date'] ?? _today()),
         'from':  TextEditingController(text: init?['from'] ?? ''),
@@ -889,11 +944,20 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     });
   }
 
+  /// Trimmed, non-empty paths/URLs from a row's supporting-document pickers.
+  List<String> _docPaths(List<TextEditingController> docs) => docs
+      .map((doc) => doc.text.trim())
+      .where((doc) => doc.isNotEmpty)
+      .toList();
+
   void _addMotoRow({Map<String, dynamic>? init}) {
     setState(() {
+      _motoSupportingDocs.add(_docControllers(init));
       _motoRows.add({
         'date':          TextEditingController(text: init?['date'] ?? _today()),
-        'destination':   TextEditingController(text: init?['destination'] ?? ''),
+        'from':          TextEditingController(text: init?['from'] ?? ''),
+        'to':            TextEditingController(
+            text: init?['to'] ?? init?['destination'] ?? ''),
         'purposes':      TextEditingController(text: init?['purposes'] ?? ''),
         'prevReading':   TextEditingController(text: (init?['prevReading'] ?? '').toString()),
         'latestReading': TextEditingController(text: (init?['latestReading'] ?? '').toString()),
@@ -904,7 +968,6 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         'mobil':         TextEditingController(text: (init?['mobil'] ?? '').toString()),
         'mobilAmount':   TextEditingController(text: (init?['mobilAmount'] ?? '').toString()),
         'othersAmount':  TextEditingController(text: (init?['othersAmount'] ?? '').toString()),
-        'supportingDoc': TextEditingController(text: init?['supportingDoc'] ?? ''),
       });
     });
   }
@@ -936,6 +999,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         }
       }
     }
+    for (final rowDocs in [..._outSupportingDocs, ..._motoSupportingDocs]) {
+      for (final controller in rowDocs) {
+        controller.dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -963,7 +1031,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           _daAdminApproved[daIndex];
       if (!approved) {
         _formSnack(
-            'শুক্রবার DA বিল বন্ধ। স্পেশাল কাজের ক্ষেত্রে এডমিনের এপ্রোভাল প্রয়োজন।',
+            'Friday DA is not allowed. Special-duty Friday DA needs admin approval.',
             error: true);
         return;
       }
@@ -986,7 +1054,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     } catch (_) {
       // Camera-only policy: supporting documents must be captured live.
       if (mounted) {
-        _formSnack('ক্যামেরা চালু করা যায়নি। সাপোর্টিং ডকুমেন্ট অবশ্যই ক্যামেরা দিয়ে তুলতে হবে।',
+        _formSnack(
+            'Could not open the camera. Supporting documents must be captured with the camera.',
             error: true);
       }
     } finally {
@@ -1012,7 +1081,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     final adminUnlocked = widget.existing?.adminUnlocked ?? false;
     if (locked && !_isAdmin && !adminUnlocked) {
       _formSnack(
-          'সিস্টেম লক: $_month-এর বিল জমার সময় শেষ। এডমিন আনলক করলে পুনরায় জমা দিতে পারবেন।',
+          'System lock: the submission window for $_month has closed. You can submit again once an admin unlocks it.',
           error: true);
       return;
     }
@@ -1025,9 +1094,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             _dbl(r['octane']!) > 0 || _dbl(r['octaneAmount']!) > 0 ||
             _dbl(r['mobil']!) > 0 || _dbl(r['mobilAmount']!) > 0 ||
             _dbl(r['othersAmount']!) > 0;
-        if (hasFuel && r['supportingDoc']!.text.trim().isEmpty) {
+        if (hasFuel && _docPaths(_motoSupportingDocs[i]).isEmpty) {
           _formSnack(
-              'Row ${i + 1}: পেট্রোল/অকটেন/মবিল বিলের সাপোর্টিং ডকুমেন্টের ছবি বাধ্যতামূলক।',
+              'Row ${i + 1}: a supporting document photo is required for petrol / octane / mobil bills.',
               error: true);
           return;
         }
@@ -1037,7 +1106,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       final r = _servRows[i];
       if (_dbl(r['amount']!) > 0 && r['supportingDoc']!.text.trim().isEmpty) {
         _formSnack(
-            'Servicing Row ${i + 1}: সাপোর্টিং ডকুমেন্টের ছবি বাধ্যতামূলক।',
+            'Servicing Row ${i + 1}: a supporting document photo is required.',
             error: true);
         return;
       }
@@ -1049,7 +1118,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         if (_isFriday(_daRows[i]['date']!.text) &&
             !(_isAdmin || _daAdminApproved[i])) {
           _formSnack(
-              'Row ${i + 1}: শুক্রবারের DA বিলের জন্য এডমিনের এপ্রোভাল প্রয়োজন।',
+              'Row ${i + 1}: Friday DA needs admin approval.',
               error: true);
           return;
         }
@@ -1104,28 +1173,38 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         }).toList();
         break;
       case ExpenseModel.typeOutStation:
-        outRows = _outRows.map((r) {
+        outRows = _outRows.asMap().entries.map((entry) {
+          final r     = entry.value;
           final ta    = _dbl(r['ta']!);
           final da    = _dbl(r['da']!);
           final hotel = _dbl(r['hotel']!);
+          final docs  = _docPaths(_outSupportingDocs[entry.key]);
           return {
             'date':  r['date']!.text,
             'from':  r['from']!.text,
             'to':    r['to']!.text,
+            // Kept so older ERP reports that read a single place still work.
+            'place': r['to']!.text,
             'ta':    ta,
             'da':    da,
             'hotel': hotel,
             'total': ta + da + hotel,
+            'supportingDocs': docs,
           };
         }).toList();
         break;
       case ExpenseModel.typeMotorcycle:
-        motoRows = _motoRows.map((r) {
+        motoRows = _motoRows.asMap().entries.map((entry) {
+          final r      = entry.value;
           final prev   = _dbl(r['prevReading']!);
           final latest = _dbl(r['latestReading']!);
+          final docs   = _docPaths(_motoSupportingDocs[entry.key]);
           return {
             'date':          r['date']!.text,
-            'destination':   r['destination']!.text,
+            'from':          r['from']!.text,
+            'to':            r['to']!.text,
+            // Legacy single-destination field kept for existing ERP views.
+            'destination':   r['to']!.text,
             'purposes':      r['purposes']!.text,
             'prevReading':   prev,
             'latestReading': latest,
@@ -1137,7 +1216,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             'mobil':         _dbl(r['mobil']!),
             'mobilAmount':   _dbl(r['mobilAmount']!),
             'othersAmount':  _dbl(r['othersAmount']!),
-            'supportingDoc': r['supportingDoc']!.text,
+            // First voucher also written to the legacy single-doc field.
+            'supportingDoc': docs.isEmpty ? '' : docs.first,
+            'supportingDocs': docs,
           };
         }).toList();
         break;
@@ -1317,7 +1398,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-                '$_month-এর বিল সাবমিট লক হয়ে গেছে। এডমিন আনলক করলে জমা দিতে পারবেন।',
+                'Bill submission for $_month is locked. You can submit once an admin unlocks it.',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1569,7 +1650,16 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             const Spacer(),
             if (_outRows.length > 1)
               GestureDetector(
-                onTap: () => setState(() => _outRows.removeAt(i)),
+                onTap: () => setState(() {
+                  for (final controller in _outRows[i].values) {
+                    controller.dispose();
+                  }
+                  for (final controller in _outSupportingDocs[i]) {
+                    controller.dispose();
+                  }
+                  _outRows.removeAt(i);
+                  _outSupportingDocs.removeAt(i);
+                }),
                 child: const Icon(Icons.remove_circle_outline_rounded,
                     size: 18, color: AppTheme.error),
               ),
@@ -1605,6 +1695,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primaryAccent)),
+          const SizedBox(height: 10),
+          _multiDocPicker(_outSupportingDocs[i],
+              label: 'Supporting Documents (optional)'),
         ]);
       }),
       _totalRow('Total', _outRows.fold(0.0,
@@ -1650,16 +1743,27 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             const Spacer(),
             if (_motoRows.length > 1)
               GestureDetector(
-                onTap: () => setState(() => _motoRows.removeAt(i)),
+                onTap: () => setState(() {
+                  for (final controller in _motoRows[i].values) {
+                    controller.dispose();
+                  }
+                  for (final controller in _motoSupportingDocs[i]) {
+                    controller.dispose();
+                  }
+                  _motoRows.removeAt(i);
+                  _motoSupportingDocs.removeAt(i);
+                }),
                 child: const Icon(Icons.remove_circle_outline_rounded,
                     size: 18, color: AppTheme.error),
               ),
           ]),
           const SizedBox(height: 8),
+          _dateField('Date', r['date']!),
+          const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _dateField('Date', r['date']!)),
+            Expanded(child: _field('From', r['from']!)),
             const SizedBox(width: 8),
-            Expanded(flex: 2, child: _field('Destination/Place', r['destination']!)),
+            Expanded(child: _field('To', r['to']!)),
           ]),
           const SizedBox(height: 8),
           _field('Purpose', r['purposes']!),
@@ -1738,7 +1842,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     color: AppTheme.primaryAccent)),
           ],
           const SizedBox(height: 8),
-          _docPicker(r['supportingDoc']!, required: needsDoc),
+          _multiDocPicker(_motoSupportingDocs[i],
+              label: 'Supporting Documents',
+              required: needsDoc,
+              hint: 'Petrol, octane and mobil vouchers can each be added separately.'),
         ]);
       }),
       _totalRow(
@@ -1780,7 +1887,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
-            'Previous dues, sales target, sales amount, achievement, recovery — সব ERP থেকে স্বয়ংক্রিয়ভাবে চলে আসবে।',
+            'Previous dues, sales target, sales amount, achievement and recovery all come from the ERP automatically.',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 11, color: AppTheme.textGrey)),
       ),
@@ -1830,8 +1937,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
             autoAmount != null
-                ? 'Designation অনুযায়ী DA: ৳ ${_stripZeros(autoAmount)}/দিন। শুক্রবার DA বন্ধ (এডমিন এপ্রোভাল ছাড়া)।'
-                : 'Designation সিলেক্ট করলে DA amount অটোমেটিক চলে আসবে। শুক্রবার DA বন্ধ।',
+                ? 'DA by designation: ৳ ${_stripZeros(autoAmount)}/day. Friday DA is closed unless an admin approves it.'
+                : 'Select a designation and the DA amount fills in automatically. Friday DA is closed.',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 11, color: AppTheme.textGrey)),
       ),
@@ -1897,7 +2004,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     setState(() => _daAdminApproved[i] = v ?? false),
               ),
               Expanded(
-                child: Text('Admin approval — শুক্রবারের স্পেশাল কাজ অনুমোদিত',
+                child: Text('Admin approval — Friday special duty approved',
                     style: GoogleFonts.hindSiliguri(fontSize: 12)),
               ),
             ]),
@@ -1923,8 +2030,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       const SizedBox(height: 4),
       Text(
           _motoRegSaved
-              ? 'সংরক্ষিত নম্বর অটোমেটিক অ্যাড হয়েছে'
-              : 'একবার লিখলেই পরবর্তীতে অটোমেটিক অ্যাড হয়ে যাবে',
+              ? 'Your saved registration number was added automatically'
+              : 'Enter it once and it will be filled in automatically next time',
           style: GoogleFonts.hindSiliguri(
               fontSize: 11, color: AppTheme.textGrey)),
       const SizedBox(height: 8),
@@ -2040,7 +2147,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 color: AppTheme.textGrey)),
         if (required) ...[
           const SizedBox(width: 4),
-          Text('(বাধ্যতামূলক)',
+          Text('(required)',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -2110,6 +2217,108 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               ]),
         ),
       ]),
+    ]);
+  }
+
+  Widget _docThumbFallback() => Container(
+        width: 56,
+        height: 56,
+        color: AppTheme.divider,
+        child: const Icon(Icons.receipt_long_rounded,
+            size: 22, color: AppTheme.textGrey),
+      );
+
+  Widget _multiDocPicker(List<TextEditingController> docs,
+      {required String label, bool required = false, String hint = ''}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(label,
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textGrey)),
+        if (required) ...[
+          const SizedBox(width: 4),
+          Text('(required)',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.error)),
+        ],
+      ]),
+      if (hint.isNotEmpty) ...[
+        const SizedBox(height: 2),
+        Text(hint,
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 10, color: AppTheme.textGrey)),
+      ],
+      const SizedBox(height: 6),
+      if (docs.isNotEmpty)
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: docs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final controller = entry.value;
+            final path = controller.text.trim();
+            final isUploaded = path.startsWith('http');
+            return Stack(clipBehavior: Clip.none, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: isUploaded
+                    ? Image.network(
+                        path,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _docThumbFallback(),
+                      )
+                    : Image.file(
+                        File(path),
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _docThumbFallback(),
+                      ),
+              ),
+              Positioned(
+                top: -7,
+                right: -7,
+                child: InkWell(
+                  onTap: () => setState(() {
+                    docs.removeAt(index).dispose();
+                  }),
+                  child: const CircleAvatar(
+                    radius: 10,
+                    backgroundColor: AppTheme.error,
+                    child: Icon(Icons.close_rounded, size: 13, color: Colors.white),
+                  ),
+                ),
+              ),
+            ]);
+          }).toList(),
+        ),
+      const SizedBox(height: 6),
+      OutlinedButton.icon(
+        onPressed: _pickingPhoto
+            ? null
+            : () async {
+                final controller = TextEditingController();
+                await _captureDoc(controller);
+                if (controller.text.trim().isEmpty) {
+                  controller.dispose();
+                  return;
+                }
+                if (mounted) setState(() => docs.add(controller));
+              },
+        icon: _pickingPhoto
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.add_a_photo_rounded, size: 17),
+        label: Text('Add Document', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+      ),
     ]);
   }
 

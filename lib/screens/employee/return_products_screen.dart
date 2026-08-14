@@ -18,6 +18,7 @@ class ReturnProductsScreen extends StatefulWidget {
 class _ReturnProductsScreenState extends State<ReturnProductsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
+  int _listRefreshId = 0;
 
   @override
   void initState() {
@@ -50,15 +51,19 @@ class _ReturnProductsScreenState extends State<ReturnProductsScreen>
         body: TabBarView(
           controller: _tab,
           children: [
-            const _ReturnListTab(),
-            _NewReturnTab(onCreated: () => _tab.animateTo(0)),
+            _ReturnListTab(refreshId: _listRefreshId),
+            _NewReturnTab(onCreated: () {
+              setState(() => _listRefreshId++);
+              _tab.animateTo(0);
+            }),
           ],
         ),
       );
 }
 
 class _ReturnListTab extends StatefulWidget {
-  const _ReturnListTab();
+  final int refreshId;
+  const _ReturnListTab({required this.refreshId});
 
   @override
   State<_ReturnListTab> createState() => _ReturnListTabState();
@@ -76,6 +81,12 @@ class _ReturnListTabState extends State<_ReturnListTab>
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReturnListTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshId != widget.refreshId) _load();
   }
 
   Future<void> _load() async {

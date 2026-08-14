@@ -151,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       enableSuggestions: false,
                       textCapitalization: TextCapitalization.none,
                       validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Employee ID বা Email দিন' : null,
+                          (v == null || v.trim().isEmpty) ? 'Enter your Employee ID or Email' : null,
                     ),
                     const SizedBox(height: 16),
                     BanglaTextField(

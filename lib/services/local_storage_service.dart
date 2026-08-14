@@ -542,6 +542,14 @@ class LocalStorageService {
         _keyExpenses, jsonEncode(list.map((x) => x.toMap()).toList()));
   }
 
+  /// Replaces stale ERP-backed cache entries in one write. Callers retain
+  /// unsynced queued records before handing the list to this method.
+  static Future<void> replaceExpenses(List<ExpenseModel> expenses) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyExpenses, jsonEncode(expenses.map((x) => x.toMap()).toList()));
+  }
+
   static Future<void> deleteExpense(String id) async {
     final list = await getExpenses();
     list.removeWhere((x) => x.id == id);

@@ -21,6 +21,7 @@ class StockTransferScreen extends StatefulWidget {
 class _StockTransferScreenState extends State<StockTransferScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
+  int _listRefreshId = 0;
   @override
   void initState() {
     super.initState();
@@ -51,8 +52,9 @@ class _StockTransferScreenState extends State<StockTransferScreen>
       body: TabBarView(
         controller: _tab,
         children: [
-          _TransferListTab(),
+          _TransferListTab(refreshId: _listRefreshId),
           _NewTransferTab(onCreated: () {
+            setState(() => _listRefreshId++);
             _tab.animateTo(0);
           }),
         ],
@@ -64,6 +66,9 @@ class _StockTransferScreenState extends State<StockTransferScreen>
 // ── Transfer List Tab ─────────────────────────────────────────────────────────
 
 class _TransferListTab extends StatefulWidget {
+  final int refreshId;
+  const _TransferListTab({required this.refreshId});
+
   @override
   State<_TransferListTab> createState() => _TransferListTabState();
 }
@@ -83,6 +88,12 @@ class _TransferListTabState extends State<_TransferListTab>
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TransferListTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshId != widget.refreshId) _load();
   }
 
   Future<void> _load() async {
