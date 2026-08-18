@@ -22,10 +22,11 @@ class _StockTransferScreenState extends State<StockTransferScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
   int _listRefreshId = 0;
+  int _inboxRefreshId = 0;
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 3, vsync: this);
   }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
@@ -46,15 +47,23 @@ class _StockTransferScreenState extends State<StockTransferScreen>
           unselectedLabelColor: Colors.white60,
           labelStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700, fontSize: 13),
           unselectedLabelStyle: GoogleFonts.hindSiliguri(fontSize: 13),
-          tabs: const [Tab(text: 'List'), Tab(text: 'New Transfer')],
+          tabs: const [
+            Tab(text: 'Sent'),
+            Tab(text: 'Receive'),
+            Tab(text: 'New Transfer'),
+          ],
         ),
       ),
       body: TabBarView(
         controller: _tab,
         children: [
           _TransferListTab(refreshId: _listRefreshId),
+          _ReceiveTab(refreshId: _inboxRefreshId),
           _NewTransferTab(onCreated: () {
-            setState(() => _listRefreshId++);
+            setState(() {
+              _listRefreshId++;
+              _inboxRefreshId++;
+            });
             _tab.animateTo(0);
           }),
         ],
@@ -274,6 +283,385 @@ class _TransferCard extends StatelessWidget {
           Text('📝 ${t['notes']}',
               style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
         ],
+        if (!queued) ...[
+          const SizedBox(height: 8),
+          _StatusChip(status: t['status']?.toString() ?? 'pending'),
+          if ((t['receivedBy'] ?? '').toString().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+                '${t['status'] == 'rejected' ? 'Rejected' : 'Received'} by ${t['receivedBy']}'
+                '${(t['receiveNote'] ?? '').toString().isNotEmpty ? ' — ${t['receiveNote']}' : ''}',
+                style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+          ],
+        ],
+      ]),
+    );
+  }
+}
+
+/// Coloured pill for a transfer's receiving state.
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    late final Color color;
+    late final String label;
+    late final IconData icon;
+    switch (status) {
+      case 'received':
+        color = AppTheme.success;
+        label = 'Received';
+        icon = Icons.inventory_rounded;
+        break;
+      case 'rejected':
+        color = AppTheme.error;
+        label = 'Rejected';
+        icon = Icons.cancel_rounded;
+        break;
+      default:
+        color = AppTheme.warning;
+        label = 'Awaiting receipt';
+        icon = Icons.hourglass_bottom_rounded;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 4),
+        Text(label,
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+      ]),
+    );
+  }
+}
+
+// ── Receive Tab ───────────────────────────────────────────────────────────────
+
+/// Consignments addressed to the officer's own branch. They confirm receipt or
+/// reject the delivery here; history of past decisions stays visible below.
+class _ReceiveTab extends StatefulWidget {
+  final int refreshId;
+  const _ReceiveTab({required this.refreshId});
+
+  @override
+  State<_ReceiveTab> createState() => _ReceiveTabState();
+}
+
+class _ReceiveTabState extends State<_ReceiveTab>
+    with AutomaticKeepAliveClientMixin {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _incoming = [];
+  String? _busyId;
+  final _fmt = NumberFormat('#,##0.##', 'en_US');
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReceiveTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshId != widget.refreshId) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final data = await ApiService.incomingStockTransfers();
+      if (!mounted) return;
+      setState(() { _incoming = data; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException ? e.message : 'Could not load incoming transfers';
+        _incoming = [];
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _decide(Map<String, dynamic> t, bool receive) async {
+    final note = await _askNote(receive);
+    if (note == null) return; // cancelled
+
+    setState(() => _busyId = t['_id']?.toString());
+    try {
+      await ApiService.decideStockTransfer(
+        id: t['_id'].toString(),
+        receive: receive,
+        receiveNote: note,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(receive ? 'Consignment received' : 'Consignment rejected',
+            style: GoogleFonts.hindSiliguri()),
+        backgroundColor: receive ? AppTheme.success : AppTheme.error,
+      ));
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is ApiException ? e.message : 'Could not update the transfer',
+            style: GoogleFonts.hindSiliguri()),
+        backgroundColor: AppTheme.error,
+      ));
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  /// Returns the note, or null if the officer backed out.
+  Future<String?> _askNote(bool receive) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(receive ? 'Confirm receipt' : 'Reject consignment',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          style: GoogleFonts.hindSiliguri(),
+          decoration: InputDecoration(
+            hintText: receive
+                ? 'Note (optional) — e.g. 2 cartons damaged'
+                : 'Reason for rejection (optional)',
+            hintStyle: GoogleFonts.hindSiliguri(fontSize: 13),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.hindSiliguri()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: receive ? AppTheme.success : AppTheme.error,
+                foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text(receive ? 'Receive' : 'Reject',
+                style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryAccent));
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.wifi_off_rounded, size: 56, color: Colors.orange),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(_error!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.hindSiliguri(color: AppTheme.textGrey, fontSize: 14)),
+          ),
+          TextButton(onPressed: _load,
+              child: Text('Try again', style: GoogleFonts.hindSiliguri())),
+        ]),
+      );
+    }
+
+    final pending = _incoming.where((t) => (t['status'] ?? 'pending') == 'pending').toList();
+    final history = _incoming.where((t) => (t['status'] ?? 'pending') != 'pending').toList();
+
+    return RefreshIndicator(
+      color: AppTheme.primaryAccent,
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          _sectionLabel('Awaiting your confirmation', pending.length),
+          if (pending.isEmpty)
+            _emptyNote('Nothing to receive right now.')
+          else
+            ...pending.map((t) => _IncomingCard(
+                  t: t,
+                  fmt: _fmt,
+                  isDark: isDark,
+                  busy: _busyId == t['_id']?.toString(),
+                  onReceive: () => _decide(t, true),
+                  onReject: () => _decide(t, false),
+                )),
+          const SizedBox(height: 16),
+          _sectionLabel('Receiving history', history.length),
+          if (history.isEmpty)
+            _emptyNote('No consignments have been decided yet.')
+          else
+            ...history.map((t) => _TransferCard(t: t, fmt: _fmt, isDark: isDark)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text, int count) => Padding(
+        padding: const EdgeInsets.only(bottom: 8, top: 4),
+        child: Row(children: [
+          Text(text,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textGrey)),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('$count',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
+          ),
+        ]),
+      );
+
+  Widget _emptyNote(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: Text(text,
+              style: GoogleFonts.hindSiliguri(fontSize: 13, color: AppTheme.textGrey)),
+        ),
+      );
+}
+
+/// A pending consignment with Receive / Reject actions.
+class _IncomingCard extends StatelessWidget {
+  final Map<String, dynamic> t;
+  final NumberFormat fmt;
+  final bool isDark;
+  final bool busy;
+  final VoidCallback onReceive;
+  final VoidCallback onReject;
+
+  const _IncomingCard({
+    required this.t,
+    required this.fmt,
+    required this.isDark,
+    required this.busy,
+    required this.onReceive,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final qty = (t['quantity'] as num?)?.toDouble() ?? 0;
+    final unitLabel = t['quantityUnit']?.toString() ?? 'Pcs';
+    final items = (t['items'] as List?) ?? const [];
+    final date = t['date'] != null
+        ? DateFormat('dd MMM yy, hh:mm a')
+            .format(DateTime.tryParse(t['date'].toString()) ?? DateTime.now())
+        : '—';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const _StatusChip(status: 'pending'),
+          const Spacer(),
+          Text('× ${fmt.format(qty)} $unitLabel',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
+        ]),
+        const SizedBox(height: 8),
+        Text(t['productName']?.toString() ?? '—',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+        const SizedBox(height: 6),
+        Row(children: [
+          const Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.textGrey),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text('${t['fromBranch'] ?? '—'}  →  ${t['toBranch'] ?? '—'}',
+                style: GoogleFonts.hindSiliguri(fontSize: 12, color: AppTheme.textGrey)),
+          ),
+        ]),
+        if (items.length > 1) ...[
+          const SizedBox(height: 6),
+          ...items.map((raw) {
+            final item = Map<String, dynamic>.from(raw as Map);
+            return Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                  '• ${item['productName'] ?? '—'} × ${fmt.format((item['quantity'] as num?)?.toDouble() ?? 0)}',
+                  style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+            );
+          }),
+        ],
+        const SizedBox(height: 4),
+        Text('Sent by ${t['transferredBy'] ?? '—'} · $date',
+            style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+        if ((t['notes'] ?? '').toString().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text('📝 ${t['notes']}',
+              style: GoogleFonts.hindSiliguri(fontSize: 11, color: AppTheme.textGrey)),
+        ],
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: busy ? null : onReceive,
+              icon: busy
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_rounded, size: 16),
+              label: Text('Receive',
+                  style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : onReject,
+              icon: const Icon(Icons.cancel_rounded, size: 16),
+              label: Text('Reject',
+                  style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.error,
+                side: const BorderSide(color: AppTheme.error),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ]),
       ]),
     );
   }

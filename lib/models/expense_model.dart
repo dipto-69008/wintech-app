@@ -1,5 +1,6 @@
-/// ExpenseModel covers all 6 bill types:
-/// ta_bill | da | ta_da_top_sheet | out_station | motorcycle_log | others_bill
+/// ExpenseModel covers all bill types:
+/// ta_bill | da | ta_da_top_sheet | out_station | motorcycle_log |
+/// others_bill | entertainment_bill | courier_bill
 class ExpenseModel {
   final String id;
   final String type;
@@ -43,8 +44,23 @@ class ExpenseModel {
   // DA bill: [{date, amount, note, dayOfWeek, adminApproved}]
   final List<Map<String, dynamic>> daRows;
 
+  // Entertainment bill rows:
+  // [{date, place, purpose, guestCount, amount, supportingDocs[]}]
+  // A receipt photo is mandatory on every row.
+  final List<Map<String, dynamic>> entertainmentRows;
+
+  // Courier bill rows:
+  // [{date, courierName, docketNo, sentTo, particulars, amount, supportingDocs[]}]
+  // A receipt photo is mandatory on every row.
+  final List<Map<String, dynamic>> courierRows;
+
   // TA/DA Top Sheet summary (Others Bill renamed to top sheet)
   final Map<String, dynamic> othersBill;
+
+  /// Amount as recorded by the ERP. The head office can correct the payable
+  /// figure of a bill submitted from the app; when it does, that number wins
+  /// over the locally computed row total so both sides show the same value.
+  final double? erpAmount;
 
   const ExpenseModel({
     required this.id,
@@ -65,7 +81,10 @@ class ExpenseModel {
     this.tadaRows = const [],
     this.outStationRows = const [],
     this.daRows = const [],
+    this.entertainmentRows = const [],
+    this.courierRows = const [],
     this.othersBill = const {},
+    this.erpAmount,
   });
 
   static const String typeTaBill      = 'ta_bill';
@@ -74,6 +93,17 @@ class ExpenseModel {
   static const String typeOutStation  = 'out_station';
   static const String typeMotorcycle  = 'motorcycle_log';
   static const String typeOthersBill  = 'others_bill';  // kept for legacy
+  static const String typeEntertainment = 'entertainment_bill';
+  static const String typeCourier       = 'courier_bill';
+
+  /// Bill types the head office reimburses only against an uploaded receipt.
+  static const List<String> docMandatoryTypes = [
+    typeEntertainment,
+    typeCourier,
+  ];
+
+  static bool requiresSupportingDoc(String type) =>
+      docMandatoryTypes.contains(type);
 
   static const String statusPending  = 'pending';
   static const String statusApproved = 'approved';
@@ -152,6 +182,8 @@ class ExpenseModel {
       case typeOutStation: return 'Out Station';
       case typeMotorcycle: return 'Motorcycle Log';
       case typeOthersBill: return 'TA/DA Top Sheet';
+      case typeEntertainment: return 'Entertainment Bill';
+      case typeCourier:       return 'Courier Bill';
       default:             return type;
     }
   }
@@ -165,6 +197,15 @@ class ExpenseModel {
   }
 
   double get totalAmount {
+    // An ERP correction is authoritative: when the head office changes the
+    // payable amount, the app must show that figure, not the row sum.
+    final adjusted = erpAmount;
+    if (adjusted != null && adjusted > 0) return adjusted;
+    return rowTotal;
+  }
+
+  /// Total computed purely from the entered rows, before any ERP correction.
+  double get rowTotal {
     switch (type) {
       case typeTaBill:
         return taRows.fold(0.0,
@@ -180,6 +221,12 @@ class ExpenseModel {
             (s, r) => s + ((r['total'] as num?)?.toDouble() ?? 0));
       case typeDa:
         return daRows.fold(0.0,
+            (s, r) => s + ((r['amount'] as num?)?.toDouble() ?? 0));
+      case typeEntertainment:
+        return entertainmentRows.fold(0.0,
+            (s, r) => s + ((r['amount'] as num?)?.toDouble() ?? 0));
+      case typeCourier:
+        return courierRows.fold(0.0,
             (s, r) => s + ((r['amount'] as num?)?.toDouble() ?? 0));
       default:
         return (othersBill['totalTaka'] as num?)?.toDouble() ?? 0;
@@ -224,7 +271,10 @@ class ExpenseModel {
         'tadaRows': tadaRows,
         'outStationRows': outStationRows,
         'daRows': daRows,
+        'entertainmentRows': entertainmentRows,
+        'courierRows': courierRows,
         'othersBill': othersBill,
+        if (erpAmount != null) 'totalAmount': erpAmount,
       };
 
   factory ExpenseModel.fromMap(Map<String, dynamic> m) => ExpenseModel(
@@ -248,7 +298,10 @@ class ExpenseModel {
         tadaRows: _mapList(m['tadaRows']),
         outStationRows: _mapList(m['outStationRows']),
         daRows: _mapList(m['daRows']),
+        entertainmentRows: _mapList(m['entertainmentRows']),
+        courierRows: _mapList(m['courierRows']),
         othersBill: Map<String, dynamic>.from(m['othersBill'] as Map? ?? {}),
+        erpAmount: (m['totalAmount'] as num?)?.toDouble(),
       );
 
   static List<Map<String, dynamic>> _mapList(dynamic raw) =>

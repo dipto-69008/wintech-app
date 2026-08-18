@@ -35,6 +35,8 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     (ExpenseModel.typeTaDaSheet,  'Top Sheet'),
     (ExpenseModel.typeOutStation, 'Out Station'),
     (ExpenseModel.typeMotorcycle, 'Motorcycle'),
+    (ExpenseModel.typeEntertainment, 'Entertainment'),
+    (ExpenseModel.typeCourier,       'Courier'),
   ];
 
   final _fmt = NumberFormat('#,##0', 'en_US');
@@ -449,6 +451,8 @@ class _ExpenseScreenState extends State<ExpenseScreen>
       ExpenseModel.typeMotorcycle: const Color(0xFF1565C0),
       ExpenseModel.typeOthersBill: const Color(0xFF2E7D32),
       ExpenseModel.typeDa:         AppTheme.warning,
+      ExpenseModel.typeEntertainment: const Color(0xFF8E24AA),
+      ExpenseModel.typeCourier:       const Color(0xFF00838F),
     };
     final typeColor = typeColors[e.type] ?? AppTheme.primaryAccent;
 
@@ -549,6 +553,8 @@ class _TypePickerSheet extends StatelessWidget {
     (ExpenseModel.typeDa,         'DA Bill',          Icons.account_balance_wallet_rounded, AppTheme.warning),
     (ExpenseModel.typeOutStation, 'Out Station Bill', Icons.hotel_rounded,          Color(0xFFE65100)),
     (ExpenseModel.typeMotorcycle, 'Motorcycle Log',   Icons.two_wheeler_rounded,    Color(0xFF1565C0)),
+    (ExpenseModel.typeEntertainment, 'Entertainment Bill', Icons.restaurant_rounded, Color(0xFF8E24AA)),
+    (ExpenseModel.typeCourier,       'Courier Bill',       Icons.local_shipping_rounded, Color(0xFF00838F)),
     (ExpenseModel.typeOthersBill, 'TA/DA Top Sheet', Icons.summarize_rounded, Color(0xFF2E7D32)),
   ];
 
@@ -662,6 +668,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   final List<Map<String, TextEditingController>> _daRows = [];
   final List<bool> _daAdminApproved = [];
 
+  // Entertainment bill rows — the head office reimburses only against a
+  // receipt, so every row carries at least one supporting document.
+  final List<Map<String, TextEditingController>> _entRows = [];
+  final List<List<TextEditingController>> _entSupportingDocs = [];
+
+  // Courier bill rows — same receipt rule as entertainment.
+  final List<Map<String, TextEditingController>> _courierRows = [];
+  final List<List<TextEditingController>> _courierSupportingDocs = [];
+
   // Top Sheet controllers
   late Map<String, TextEditingController> _othersCtrl;
   bool _topSheetLoading = false;
@@ -733,6 +748,16 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             _addDaRow(init: r);
           }
           break;
+        case ExpenseModel.typeEntertainment:
+          for (final r in e.entertainmentRows) {
+            _addEntRow(init: r);
+          }
+          break;
+        case ExpenseModel.typeCourier:
+          for (final r in e.courierRows) {
+            _addCourierRow(init: r);
+          }
+          break;
       }
     }
 
@@ -750,6 +775,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     }
     if (_daRows.isEmpty && widget.type == ExpenseModel.typeDa) {
       _addDaRow();
+    }
+    if (_entRows.isEmpty && widget.type == ExpenseModel.typeEntertainment) {
+      _addEntRow();
+    }
+    if (_courierRows.isEmpty && widget.type == ExpenseModel.typeCourier) {
+      _addCourierRow();
     }
 
     _loadEmployees();
@@ -986,20 +1017,53 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     });
   }
 
+  void _addEntRow({Map<String, dynamic>? init}) {
+    setState(() {
+      _entSupportingDocs.add(_docControllers(init));
+      _entRows.add({
+        'date':       TextEditingController(text: init?['date'] ?? _today()),
+        'place':      TextEditingController(text: init?['place'] ?? ''),
+        'purpose':    TextEditingController(text: init?['purpose'] ?? ''),
+        'guestCount': TextEditingController(text: (init?['guestCount'] ?? '').toString()),
+        'amount':     TextEditingController(text: (init?['amount'] ?? '').toString()),
+      });
+    });
+  }
+
+  void _addCourierRow({Map<String, dynamic>? init}) {
+    setState(() {
+      _courierSupportingDocs.add(_docControllers(init));
+      _courierRows.add({
+        'date':        TextEditingController(text: init?['date'] ?? _today()),
+        'courierName': TextEditingController(text: init?['courierName'] ?? ''),
+        'docketNo':    TextEditingController(text: init?['docketNo'] ?? ''),
+        'sentTo':      TextEditingController(text: init?['sentTo'] ?? ''),
+        'particulars': TextEditingController(text: init?['particulars'] ?? ''),
+        'amount':      TextEditingController(text: (init?['amount'] ?? '').toString()),
+      });
+    });
+  }
+
   @override
   void dispose() {
     _motoRegCtrl.dispose();
     for (final c in _othersCtrl.values) {
       c.dispose();
     }
-    for (final rows in [_taRows, _tadaRows, _outRows, _motoRows, _servRows, _daRows]) {
+    for (final rows in [
+      _taRows, _tadaRows, _outRows, _motoRows, _servRows, _daRows,
+      _entRows, _courierRows,
+    ]) {
       for (final r in rows) {
         for (final c in r.values) {
           c.dispose();
         }
       }
     }
-    for (final rowDocs in [..._outSupportingDocs, ..._motoSupportingDocs]) {
+    for (final rowDocs in [
+      ..._outSupportingDocs, ..._motoSupportingDocs,
+      ..._entSupportingDocs, ..._courierSupportingDocs,
+    ]) {
       for (final controller in rowDocs) {
         controller.dispose();
       }
@@ -1112,6 +1176,28 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       }
     }
 
+    // ── Entertainment / Courier: a receipt is mandatory on every row ──────
+    if (widget.type == ExpenseModel.typeEntertainment) {
+      for (var i = 0; i < _entRows.length; i++) {
+        if (_docPaths(_entSupportingDocs[i]).isEmpty) {
+          _formSnack(
+              'Row ${i + 1}: an entertainment bill is reimbursed only with a supporting document.',
+              error: true);
+          return;
+        }
+      }
+    }
+    if (widget.type == ExpenseModel.typeCourier) {
+      for (var i = 0; i < _courierRows.length; i++) {
+        if (_docPaths(_courierSupportingDocs[i]).isEmpty) {
+          _formSnack(
+              'Row ${i + 1}: a courier bill is reimbursed only with a supporting document.',
+              error: true);
+          return;
+        }
+      }
+    }
+
     // ── Friday DA check ────────────────────────────────────────────────────
     if (widget.type == ExpenseModel.typeDa) {
       for (var i = 0; i < _daRows.length; i++) {
@@ -1139,6 +1225,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     List<Map<String, dynamic>> outRows = [];
     List<Map<String, dynamic>> motoRows = [];
     List<Map<String, dynamic>> daRows = [];
+    List<Map<String, dynamic>> entRows = [];
+    List<Map<String, dynamic>> courierRows = [];
     Map<String, dynamic> othersBill = {};
 
     final servRows = _servRows.map((r) => {
@@ -1244,6 +1332,39 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           };
         });
         break;
+      case ExpenseModel.typeEntertainment:
+        entRows = _entRows.asMap().entries.map((entry) {
+          final r = entry.value;
+          final docs = _docPaths(_entSupportingDocs[entry.key]);
+          return {
+            'date':       r['date']!.text,
+            'place':      r['place']!.text.trim(),
+            'purpose':    r['purpose']!.text.trim(),
+            'guestCount': int.tryParse(r['guestCount']!.text.trim()) ?? 0,
+            'amount':     _dbl(r['amount']!),
+            // First receipt also written to the legacy single-doc field so
+            // older ERP views keep rendering a thumbnail.
+            'supportingDoc': docs.isEmpty ? '' : docs.first,
+            'supportingDocs': docs,
+          };
+        }).toList();
+        break;
+      case ExpenseModel.typeCourier:
+        courierRows = _courierRows.asMap().entries.map((entry) {
+          final r = entry.value;
+          final docs = _docPaths(_courierSupportingDocs[entry.key]);
+          return {
+            'date':        r['date']!.text,
+            'courierName': r['courierName']!.text.trim(),
+            'docketNo':    r['docketNo']!.text.trim(),
+            'sentTo':      r['sentTo']!.text.trim(),
+            'particulars': r['particulars']!.text.trim(),
+            'amount':      _dbl(r['amount']!),
+            'supportingDoc': docs.isEmpty ? '' : docs.first,
+            'supportingDocs': docs,
+          };
+        }).toList();
+        break;
     }
 
     final model = ExpenseModel(
@@ -1266,6 +1387,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       motoServicingRows: servRows,
       motoRegNumber: motoReg,
       daRows: daRows,
+      entertainmentRows: entRows,
+      courierRows: courierRows,
       othersBill: othersBill,
     );
 
@@ -1421,6 +1544,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         return _buildTopSheetFields(isDark);
       case ExpenseModel.typeDa:
         return _buildDaFields(isDark);
+      case ExpenseModel.typeEntertainment:
+        return _buildEntertainmentFields(isDark);
+      case ExpenseModel.typeCourier:
+        return _buildCourierFields(isDark);
       default:
         return [];
     }
@@ -1704,6 +1831,173 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           (s, r) => s + _dbl(r['ta']!) + _dbl(r['da']!) + _dbl(r['hotel']!))),
     ];
   }
+
+  // ── Entertainment Bill ───────────────────────────────────────────────
+  List<Widget> _buildEntertainmentFields(bool isDark) {
+    return [
+      _receiptNotice('Entertainment bills are reimbursed only against a receipt. '
+          'Attach at least one supporting document to every row.'),
+      Row(children: [
+        Text('Entertainment Bill',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _addEntRow,
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+        ),
+      ]),
+      ..._entRows.asMap().entries.map((entry) {
+        final i = entry.key;
+        final r = entry.value;
+        return _sectionCard(isDark, children: [
+          Row(children: [
+            Text('Row ${i + 1}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textGrey)),
+            const Spacer(),
+            if (_entRows.length > 1)
+              GestureDetector(
+                onTap: () => setState(() {
+                  for (final controller in _entRows[i].values) {
+                    controller.dispose();
+                  }
+                  for (final controller in _entSupportingDocs[i]) {
+                    controller.dispose();
+                  }
+                  _entRows.removeAt(i);
+                  _entSupportingDocs.removeAt(i);
+                }),
+                child: const Icon(Icons.remove_circle_outline_rounded,
+                    size: 18, color: AppTheme.error),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          _dateField('Date', r['date']!),
+          const SizedBox(height: 8),
+          _field('Place / Restaurant', r['place']!),
+          const SizedBox(height: 8),
+          _field('Purpose / Guest Details', r['purpose']!),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+                child: _field('Number of Guests', r['guestCount']!,
+                    keyboardType: TextInputType.number)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _field('Amount (৳)', r['amount']!,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
+          ]),
+          const SizedBox(height: 10),
+          _multiDocPicker(_entSupportingDocs[i],
+              label: 'Supporting Documents',
+              required: true,
+              hint: 'Photo of the restaurant bill or money receipt.'),
+        ]);
+      }),
+      _totalRow('Total',
+          _entRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
+    ];
+  }
+
+  // ── Courier Bill ─────────────────────────────────────────────────────
+  List<Widget> _buildCourierFields(bool isDark) {
+    return [
+      _receiptNotice('Courier bills are reimbursed only against a receipt. '
+          'Attach at least one supporting document to every row.'),
+      Row(children: [
+        Text('Courier Bill',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 14, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _addCourierRow,
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
+        ),
+      ]),
+      ..._courierRows.asMap().entries.map((entry) {
+        final i = entry.key;
+        final r = entry.value;
+        return _sectionCard(isDark, children: [
+          Row(children: [
+            Text('Row ${i + 1}',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textGrey)),
+            const Spacer(),
+            if (_courierRows.length > 1)
+              GestureDetector(
+                onTap: () => setState(() {
+                  for (final controller in _courierRows[i].values) {
+                    controller.dispose();
+                  }
+                  for (final controller in _courierSupportingDocs[i]) {
+                    controller.dispose();
+                  }
+                  _courierRows.removeAt(i);
+                  _courierSupportingDocs.removeAt(i);
+                }),
+                child: const Icon(Icons.remove_circle_outline_rounded,
+                    size: 18, color: AppTheme.error),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          _dateField('Date', r['date']!),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _field('Courier Service', r['courierName']!)),
+            const SizedBox(width: 8),
+            Expanded(child: _field('Docket / Consignment No.', r['docketNo']!)),
+          ]),
+          const SizedBox(height: 8),
+          _field('Sent To', r['sentTo']!),
+          const SizedBox(height: 8),
+          _field('Particulars', r['particulars']!),
+          const SizedBox(height: 8),
+          _field('Amount (৳)', r['amount']!,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {})),
+          const SizedBox(height: 10),
+          _multiDocPicker(_courierSupportingDocs[i],
+              label: 'Supporting Documents',
+              required: true,
+              hint: 'Photo of the courier receipt or consignment slip.'),
+        ]);
+      }),
+      _totalRow('Total',
+          _courierRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
+    ];
+  }
+
+  /// Banner shown on bill types the head office pays only against a receipt.
+  Widget _receiptNotice(String message) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.warning.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.receipt_long_rounded,
+              color: AppTheme.warning, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message,
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.warning)),
+          ),
+        ]),
+      );
 
   // ── Motorcycle Log ───────────────────────────────────────────────────
   List<Widget> _buildMotoFields(bool isDark) {

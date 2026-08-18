@@ -29,7 +29,7 @@ class _LeaveScreenState extends State<LeaveScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
     _load();
   }
 
@@ -154,6 +154,8 @@ class _LeaveScreenState extends State<LeaveScreen>
        _leaves;
   List<LeaveModel> get _approvedLeaves =>
        _leaves.where((l) => l.status == LeaveModel.statusApproved).toList();
+  List<LeaveModel> get _rejectedLeaves =>
+       _leaves.where((l) => l.status == LeaveModel.statusRejected).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -179,9 +181,12 @@ class _LeaveScreenState extends State<LeaveScreen>
                       labelColor: AppTheme.primaryAccent,
                       unselectedLabelColor: AppTheme.textGrey,
                       indicatorColor: AppTheme.primaryAccent,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
                       tabs: const [
                         Tab(text: 'Pending'),
                         Tab(text: 'Approved'),
+                        Tab(text: 'Rejected'),
                         Tab(text: 'History'),
                       ],
                     ),
@@ -194,6 +199,7 @@ class _LeaveScreenState extends State<LeaveScreen>
                 children: [
                   _buildList(_pendingLeaves, isDark),
                   _buildList(_approvedLeaves, isDark),
+                  _buildList(_rejectedLeaves, isDark),
                   _buildList(_historyLeaves, isDark),
                 ],
               ),
@@ -381,6 +387,26 @@ class _LeaveScreenState extends State<LeaveScreen>
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 11, color: AppTheme.textGrey)),
+            // HR's rejection note — the officer needs to know why.
+            if (l.status == LeaveModel.statusRejected && l.adminNote.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.error),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text('Reason: ${l.adminNote}',
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 11, color: AppTheme.error)),
+                  ),
+                ]),
+              ),
+            ],
           ]),
         ),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [

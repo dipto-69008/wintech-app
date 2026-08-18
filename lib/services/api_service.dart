@@ -276,10 +276,41 @@ class ApiService {
     return body;
   }
 
-  static Future<List<Map<String, dynamic>>> stockTransfers({bool mineOnly = false}) async {
-    final body = await _get(
-        '/api/mobile/stock-transfers', {if (mineOnly) 'mine': '1'});
+  static Future<List<Map<String, dynamic>>> stockTransfers({
+    bool mineOnly = false,
+    String? status,
+  }) async {
+    final body = await _get('/api/mobile/stock-transfers', {
+      if (mineOnly) 'mine': '1',
+      if (status != null && status.isNotEmpty) 'status': status,
+    });
     return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Consignments addressed to the logged-in officer's own branch — the
+  /// transfers they are expected to receive or reject.
+  static Future<List<Map<String, dynamic>>> incomingStockTransfers({
+    String? status,
+  }) async {
+    final body = await _get('/api/mobile/stock-transfers', {
+      'inbox': '1',
+      if (status != null && status.isNotEmpty) 'status': status,
+    });
+    return List<Map<String, dynamic>>.from(body['data'] as List);
+  }
+
+  /// Confirm or refuse an incoming consignment. Only the destination branch
+  /// may decide; the ERP rejects anyone else with a 403.
+  static Future<Map<String, dynamic>> decideStockTransfer({
+    required String id,
+    required bool receive,
+    String receiveNote = '',
+  }) {
+    return _patch('/api/mobile/stock-transfers', {
+      'id': id,
+      'action': receive ? 'receive' : 'reject',
+      if (receiveNote.isNotEmpty) 'receiveNote': receiveNote,
+    });
   }
 
   /// ERP transfer-ledger stock available for a product at a branch.
