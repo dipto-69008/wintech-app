@@ -639,7 +639,6 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               fontWeight: FontWeight.w700,
               color: isDark ? AppTheme.darkText : AppTheme.textDark)),
     ]);
-    );
   }
 
   Widget _buildLineCard(int index, _LineItem line, bool isDark, Color cardBg) {

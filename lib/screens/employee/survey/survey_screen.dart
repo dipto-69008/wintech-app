@@ -5,12 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import '../../config/theme.dart';
-import '../../data/wintech_catalog.dart';
-import '../../models/survey_model.dart';
-import '../../services/api_service.dart';
-import '../../services/local_storage_service.dart';
-import '../../services/offline_queue_service.dart';
+import '../../../config/theme.dart';
+import '../../../data/wintech_catalog.dart';
+import '../../../models/survey_model.dart';
+import '../../../services/api_service.dart';
+import '../../../services/local_storage_service.dart';
+import '../../../services/offline_queue_service.dart';
 
 class SurveyScreen extends StatefulWidget {
   const SurveyScreen({super.key});

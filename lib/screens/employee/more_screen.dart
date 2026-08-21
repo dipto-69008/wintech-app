@@ -8,7 +8,7 @@ import 'expense_screen.dart';
 import 'payment_collection_screen.dart';
 import 'return_products_screen.dart';
 import 'leave_screen.dart';
-import '../survey/survey_screen.dart';
+import 'survey/survey_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
