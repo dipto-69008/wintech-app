@@ -22,7 +22,7 @@ import 'screens/employee/more_screen.dart';
 import 'screens/employee/expense_screen.dart';
 import 'screens/employee/leave_screen.dart';
 import 'screens/employee/payment_collection_screen.dart';
-import 'screens/survey/survey_screen.dart';
+import 'screens/employee/survey/survey_screen.dart';
 import 'home_shell.dart';
 
 void main() async {

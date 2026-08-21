@@ -25,6 +25,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   double _erpMonthSales = 0;
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
+  double _erpIncentivePercent = 0;
+  double _erpIncentiveEarned = 0;
   String _erpTargetTitle = '';
 
   final _fmt = NumberFormat('#,##0', 'en_US');
@@ -50,8 +52,21 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
           _erpConnected = true;
           _erpMonthSales =
               (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
+          _erpIncentivePercent =
+              (thisMonth['incentivePercent'] as num?)?.toDouble() ?? 0;
+          _erpIncentiveEarned =
+              (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
-            final t = targets.first as Map<String, dynamic>;
+            final currentMonth =
+                '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+            var t = Map<String, dynamic>.from(targets.first as Map);
+            for (final rawTarget in targets) {
+              final candidate = Map<String, dynamic>.from(rawTarget as Map);
+              if (candidate['month']?.toString() == currentMonth) {
+                t = candidate;
+                break;
+              }
+            }
             _erpTargetValue = (t['targetValue'] as num?)?.toDouble() ?? 0;
             _erpCurrentValue = (t['currentValue'] as num?)?.toDouble() ?? 0;
             _erpTargetTitle = t['title']?.toString() ?? '';
@@ -92,6 +107,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   double get _progress =>
       _target > 0 ? (_monthRevenue / _target).clamp(0.0, 1.0) : 0;
   double get _remaining => (_target - _monthRevenue).clamp(0, double.infinity);
+  bool get _incentiveEligible => _erpIncentiveEarned > 0;
 
   String get _achievementBadge {
     if (_progress >= 1.0) return '🏆 Target Achieved!';
@@ -232,18 +248,65 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(children: [
-        Expanded(child: _statCard(cardBg, 'Monthly Orders',
-            '${_monthOrders.length}', Icons.receipt_long_rounded,
-            AppTheme.primaryAccent, isDark)),
-        const SizedBox(width: 10),
-        Expanded(child: _statCard(cardBg, 'Achieved',
-            '৳${_fmt.format(_monthRevenue)}', Icons.payments_rounded,
-            AppTheme.success, isDark)),
-        const SizedBox(width: 10),
-        Expanded(child: _statCard(cardBg, 'Remaining',
-            _target > 0 ? '৳${_fmt.format(_remaining)}' : 'N/A',
-            Icons.schedule_rounded, AppTheme.warning, isDark)),
+      child: Column(children: [
+        Row(children: [
+          Expanded(child: _statCard(cardBg, 'Monthly Orders',
+              '${_monthOrders.length}', Icons.receipt_long_rounded,
+              AppTheme.primaryAccent, isDark)),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard(cardBg, 'Achieved',
+              '৳${_fmt.format(_monthRevenue)}', Icons.payments_rounded,
+              AppTheme.success, isDark)),
+          const SizedBox(width: 10),
+          Expanded(child: _statCard(cardBg, 'Remaining',
+              _target > 0 ? '৳${_fmt.format(_remaining)}' : 'N/A',
+              Icons.schedule_rounded, AppTheme.warning, isDark)),
+        ]),
+        if (_erpIncentivePercent > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: (_incentiveEligible ? AppTheme.success : AppTheme.warning)
+                  .withValues(alpha: 0.09),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: (_incentiveEligible ? AppTheme.success : AppTheme.warning)
+                    .withValues(alpha: 0.35),
+              ),
+            ),
+            child: Row(children: [
+              Icon(
+                _incentiveEligible
+                    ? Icons.workspace_premium_rounded
+                    : Icons.flag_rounded,
+                color: _incentiveEligible ? AppTheme.success : AppTheme.warning,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _incentiveEligible
+                      ? 'Sales Incentive Earned (${_erpIncentivePercent.toStringAsFixed(0)}%)'
+                      : 'Sales Incentive (${_erpIncentivePercent.toStringAsFixed(0)}%) unlocks after target achievement',
+                  style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppTheme.darkText : AppTheme.textDark,
+                  ),
+                ),
+              ),
+              Text(
+                '৳${_fmt.format(_erpIncentiveEarned)}',
+                style: GoogleFonts.hindSiliguri(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _incentiveEligible ? AppTheme.success : AppTheme.textGrey,
+                ),
+              ),
+            ]),
+          ),
+        ],
       ]),
     );
   }

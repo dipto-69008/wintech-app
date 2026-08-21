@@ -27,6 +27,7 @@ class _LineItem {
   double quantity = 1;
   bool isBonus = false;
   List<Map<String, dynamic>> packOptions = [];
+  double availableStock = -1; // -1 means offline stock is not known.
 
   bool get isValid => productName.isNotEmpty && quantity > 0;
   double get total => isBonus ? 0 : quantity * rate;
@@ -116,6 +117,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                     'packSize': p['packSize']?.toString() ?? '',
                     'unit': p['unit']?.toString() ?? 'Pcs',
                     'price': (p['sellingPrice'] as num?)?.toDouble() ?? 0.0,
+                     'stock': (p['stock'] as num?)?.toDouble() ?? 0.0,
                   })
               .toList();
         }
@@ -143,6 +145,40 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   double get _commissionAmount => _subTotal * _cashCommissionPct / 100;
   double get _grandTotal => _subTotal - _commissionAmount;
   double get _due => (_grandTotal - _paid).clamp(0, double.infinity);
+
+  bool _hasAvailableStock(_LineItem line) => line.availableStock >= 0;
+
+  bool _validateStock() {
+    final requestedByProduct = <String, double>{};
+    final linesByProduct = <String, _LineItem>{};
+    for (final line in _validLines) {
+      if (!_hasAvailableStock(line)) continue;
+      final key = line.productId.isNotEmpty ? line.productId : line.displayName;
+      requestedByProduct[key] = (requestedByProduct[key] ?? 0) + line.quantity;
+      linesByProduct[key] = line;
+    }
+    for (final entry in requestedByProduct.entries) {
+      final line = linesByProduct[entry.key]!;
+      if (entry.value > line.availableStock) {
+        _showError(
+          'Only ${line.availableStock.toStringAsFixed(0)} pcs of ${line.displayName} are available in your branch.',
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _increaseQuantity(_LineItem line) {
+    final next = line.quantity + 1;
+    if (_hasAvailableStock(line) && next > line.availableStock) {
+      _showError(
+        'Only ${line.availableStock.toStringAsFixed(0)} pcs are available in your branch.',
+      );
+      return;
+    }
+    setState(() => line.quantity = next);
+  }
 
   // ── Pickers ───────────────────────────────────────────────────────────
   void _pickParty() {
@@ -213,7 +249,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         title: 'Select Product',
         hint: 'Search Wintech products…',
         items: _products,
-        itemBuilder: (p, isDark) => ListTile(
+        itemBuilder: (p, isDark) {
+          final stock = (p['stock'] as num?)?.toDouble() ?? 0;
+          final outOfStock = _erpConnected && stock <= 0;
+          return ListTile(
           contentPadding: const EdgeInsets.symmetric(vertical: 2),
           leading: Container(
             width: 42,
@@ -243,29 +282,37 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               color: AppTheme.primaryAccent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text('Add',
+            child: Text(
+                _erpConnected
+                    ? (outOfStock ? 'Out of stock' : '${stock.toStringAsFixed(0)} pcs')
+                    : 'Add',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
-                    color: AppTheme.primaryAccent,
+                    color: outOfStock ? AppTheme.error : AppTheme.primaryAccent,
                     fontWeight: FontWeight.w700)),
           ),
-        ),
+        );
+        },
         matcher: (p, q) =>
             (p['name'] as String).toLowerCase().contains(q) ||
             (p['packSize'] as String? ?? '').toLowerCase().contains(q),
         onSelect: (p) => setState(() {
           final line = _lines[index];
+          final wasBlank = line.productName.isEmpty;
           line.productId = p['id']?.toString() ?? '';
           line.productName = p['name'] as String;
           line.packSize = p['packSize'] as String? ?? '';
           line.rate = (p['price'] as num?)?.toDouble() ?? 0;
+          line.availableStock = _erpConnected
+              ? (p['stock'] as num?)?.toDouble() ?? 0
+              : -1;
           if (line.quantity <= 0) line.quantity = 1;
           // Pack-size variants of the same base product
           line.packOptions = _products
               .where((x) => x['name'] == p['name'])
               .toList();
-          // Auto-append an empty row (web behavior)
-          if (index == _lines.length - 1) _lines.add(_LineItem());
+          // Keep the product search row at the top and chosen products below.
+          if (wasBlank) _lines.insert(0, _LineItem());
         }),
       ),
     );
@@ -281,6 +328,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       _showError('Add at least one (non-bonus) product');
       return;
     }
+    if (!_validateStock()) return;
 
     setState(() => _saving = true);
 
@@ -577,32 +625,20 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   }
 
   Widget _buildLinesHeader(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(children: [
-          Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                  color: AppTheme.primaryAccent,
-                  borderRadius: BorderRadius.circular(2))),
-          const SizedBox(width: 8),
-          Text('Products',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppTheme.darkText : AppTheme.textDark)),
-        ]),
-        TextButton.icon(
-          onPressed: () => setState(() => _lines.add(_LineItem())),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text('Add Row',
-              style: GoogleFonts.hindSiliguri(fontSize: 13)),
-          style:
-              TextButton.styleFrom(foregroundColor: AppTheme.primaryAccent),
-        ),
-      ],
+    return Row(children: [
+      Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+              color: AppTheme.primaryAccent,
+              borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 8),
+      Text('Products',
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+    ]);
     );
   }
 
@@ -667,7 +703,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               ),
             ),
           ),
-          if (_lines.length > 1) ...[
+          if (hasProduct) ...[
             const SizedBox(width: 6),
             GestureDetector(
               onTap: () => setState(() => _lines.removeAt(index)),
@@ -712,6 +748,9 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                         line.productId = opt['id']?.toString() ?? '';
                         line.rate =
                             (opt['price'] as num?)?.toDouble() ?? 0;
+                        line.availableStock = _erpConnected
+                            ? (opt['stock'] as num?)?.toDouble() ?? 0
+                            : -1;
                       }),
                     )
                   : InputDecorator(
@@ -738,8 +777,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                     Text(line.quantity.toStringAsFixed(0),
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 15, fontWeight: FontWeight.w800)),
-                    _qtyBtn(Icons.add_rounded,
-                        () => setState(() => line.quantity++)),
+                    _qtyBtn(Icons.add_rounded, () => _increaseQuantity(line)),
                   ],
                 ),
               ),
@@ -770,6 +808,30 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             ),
           ]),
           const SizedBox(height: 8),
+          if (_hasAvailableStock(line))
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: line.quantity > line.availableStock
+                    ? AppTheme.error.withValues(alpha: 0.08)
+                    : AppTheme.success.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                line.quantity > line.availableStock
+                    ? 'Requested quantity is above your branch stock (${line.availableStock.toStringAsFixed(0)} pcs).'
+                    : 'Available in your branch: ${line.availableStock.toStringAsFixed(0)} pcs',
+                style: GoogleFonts.hindSiliguri(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: line.quantity > line.availableStock
+                      ? AppTheme.error
+                      : AppTheme.success,
+                ),
+              ),
+            ),
           Row(children: [
             // Bonus tick — mark this line as a free bonus item
             Expanded(
