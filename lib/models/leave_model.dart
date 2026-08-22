@@ -32,9 +32,10 @@ class LeaveModel {
   });
 
   static const String typeCasual     = 'casual';
-  static const String typeMedical    = 'medical';
-  static const String typeAnnual     = 'annual';
-  static const String typeEarn       = 'earn';
+  static const String typeSick      = 'sick';
+  static const String typeFuneral   = 'funeral';
+  static const String typePaternity = 'paternity';
+  static const String typeMarriage  = 'marriage';
   static const String typeWithoutPay = 'without_pay';
   static const String typeEncashment = 'encashment';
 
@@ -44,16 +45,17 @@ class LeaveModel {
 
   /// Restricted list — only these leave types can be applied for.
   static const List<String> leaveTypes = [
-    typeCasual, typeMedical, typeAnnual,
-    typeEarn, typeWithoutPay, typeEncashment,
+    typeCasual, typeSick, typeFuneral, typePaternity,
+    typeMarriage, typeWithoutPay, typeEncashment,
   ];
 
   String get typeLabel {
     switch (leaveType) {
       case typeCasual:     return 'Casual Leave';
-      case typeMedical:    return 'Medical Leave';
-      case typeAnnual:     return 'Annual Leave';
-      case typeEarn:       return 'Earned Leave';
+      case typeSick:       return 'Sick Leave';
+      case typeFuneral:    return 'Funeral Leave';
+      case typePaternity:  return 'Paternity Leave';
+      case typeMarriage:   return 'Marriage Leave';
       case typeWithoutPay: return 'Leave Without Pay';
       case typeEncashment: return 'Leave Encashment';
       default:             return 'Casual Leave';

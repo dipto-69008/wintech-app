@@ -913,10 +913,6 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
         _message('Village is required');
         return;
       }
-      if (_diseases.text.trim().isEmpty) {
-        _message('Disease/problem is required');
-        return;
-      }
     }
     if (_type == SurveyModel.typeDealer) {
       if (_shopName.text.trim().isEmpty) {

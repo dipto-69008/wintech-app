@@ -63,7 +63,7 @@ class _MoreScreenState extends State<MoreScreen> {
     ),
     _ModuleDef(
       title: 'Leave Application',
-      subtitle: 'Casual, medical, annual leave',
+      subtitle: 'Casual, sick, funeral, paternity, marriage, unpaid leave',
       icon: Icons.beach_access_rounded,
       color: Color(0xFFE65100),
       tag: 'leave',

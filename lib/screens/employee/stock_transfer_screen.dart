@@ -1349,6 +1349,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         const SizedBox(height: 14),
 
         // Received by (person at destination branch)
+        // Received by (person at destination branch)
         Container(
           decoration: BoxDecoration(
               color: cardBg,
@@ -1429,6 +1430,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     _receivedByCtrl.dispose();
     super.dispose();
   }
+
 }
 
 // ── Product picker bottom sheet ───────────────────────────────────────────────
