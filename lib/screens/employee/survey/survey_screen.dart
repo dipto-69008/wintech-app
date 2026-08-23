@@ -181,10 +181,38 @@ class _SurveyScreenState extends State<SurveyScreen> {
     );
   }
 
-  void _view(SurveyModel survey) {
+  Future<void> _view(SurveyModel survey) async {
+    final previous = <SurveyModel>[];
+    try {
+      if (await ApiService.isConnected) {
+        final records = await ApiService.surveys(
+          type: survey.type,
+          mineOnly: false,
+        );
+        final number = survey.type == SurveyModel.typeFarmer
+            ? survey.farmerMobile
+            : survey.dealerMobile;
+        previous.addAll(records
+            .map((m) => SurveyModel.fromMap({
+                  ...m,
+                  'id': m['id'] ?? m['_id']?.toString(),
+                }))
+            .where((item) {
+              final itemNumber = item.type == SurveyModel.typeFarmer
+                  ? item.farmerMobile
+                  : item.dealerMobile;
+              return itemNumber.replaceAll(RegExp(r'\D'), '') ==
+                  number.replaceAll(RegExp(r'\D'), '');
+            })
+            .where((item) => item.id != survey.id));
+      }
+    } catch (_) {}
     showDialog<void>(
       context: context,
-      builder: (_) => _SurveyDetailsDialog(survey: survey),
+      builder: (_) => _SurveyDetailsDialog(
+        survey: survey,
+        previousVisits: previous,
+      ),
     );
   }
 
@@ -738,6 +766,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   String _photo = '';
   List<String> _photos = [];
   bool _pickingPhoto = false;
+  String _lastLookupNumber = '';
   static const int _maxPhotos = 5;
 
   // Dealer visit: zone-based party selection
@@ -818,6 +847,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   Future<void> _fillExistingNumber(String number, {required bool dealer}) async {
     final normalized = number.replaceAll(RegExp(r'\D'), '');
     if (normalized.length < 8 || !await ApiService.isConnected) return;
+    final lookupKey = '${dealer ? 'dealer' : 'farmer'}:$normalized';
+    if (_lastLookupNumber == lookupKey) return;
+    _lastLookupNumber = lookupKey;
     try {
       final records = await ApiService.surveys(
         type: dealer ? SurveyModel.typeDealer : SurveyModel.typeFarmer,
@@ -970,7 +1002,10 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     // Only push brand-new surveys to the ERP (edits stay local).
     if (existing == null) {
       var sent = false;
-      if (await ApiService.isConnected) {
+      final connected = await ApiService.isConnected;
+      var shouldQueue = !connected;
+      String? erpError;
+      if (connected) {
         try {
           // Upload real-time photos first so the ERP stores durable URLs.
           final payload = survey.toMap()
@@ -985,15 +1020,24 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
           // The survey now lives in the ERP (with a server id) —
           // drop the local copy so it doesn't show up twice.
           await LocalStorageService.deleteSurvey(survey.id);
-        } catch (_) {}
+        } on ApiException catch (error) {
+          // A live ERP validation/auth error is not an offline condition.
+          // Keep the local copy, but do not queue a request that can never
+          // succeed without user action.
+          erpError = error.message;
+        } catch (_) {
+          shouldQueue = true;
+        }
       }
-      if (!sent) {
+      if (!sent && shouldQueue) {
         await OfflineQueueService.enqueueSurvey(survey.toMap());
       }
       if (mounted) {
         _message(sent
             ? '✅ Survey submitted to ERP!'
-            : '📥 Offline — will sync to ERP when connected');
+            : erpError != null
+                ? 'ERP rejected survey: $erpError'
+                : '📥 Offline — will sync to ERP when connected');
       }
     }
     if (!mounted) return;
@@ -1045,7 +1089,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                       const SizedBox(width: 10),
                       Expanded(child: _field(_farmerMobile, 'Mobile / WhatsApp',
                           keyboard: TextInputType.phone,
-                          onSubmitted: (value) => _fillExistingNumber(value, dealer: false))),
+                           onSubmitted: (value) => _fillExistingNumber(value, dealer: false),
+                           onChanged: (value) {
+                             if (value.replaceAll(RegExp(r'\D'), '').length >= 10) {
+                               _fillExistingNumber(value, dealer: false);
+                             }
+                           })),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1156,7 +1205,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                       Expanded(
                           child: _field(_dealerMobile, 'Mobile / WhatsApp',
                               keyboard: TextInputType.phone,
-                              onSubmitted: (value) => _fillExistingNumber(value, dealer: true))),
+                               onSubmitted: (value) => _fillExistingNumber(value, dealer: true),
+                               onChanged: (value) {
+                                 if (value.replaceAll(RegExp(r'\D'), '').length >= 10) {
+                                   _fillExistingNumber(value, dealer: true);
+                                 }
+                               })),
                       const SizedBox(width: 10),
                       Expanded(child: _field(_bazarName, 'Market / Bazar')),
                     ],
@@ -1371,13 +1425,15 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       int maxLines = 1,
        bool required = false,
        bool readOnly = false,
-       ValueChanged<String>? onSubmitted}) {
+       ValueChanged<String>? onSubmitted,
+       ValueChanged<String>? onChanged}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboard,
       maxLines: maxLines,
       readOnly: readOnly,
       onFieldSubmitted: onSubmitted,
+      onChanged: onChanged,
       decoration: InputDecoration(labelText: required ? '$label *' : label, hintText: hint),
       validator: required
           ? (value) => value == null || value.trim().isEmpty ? 'Required' : null
@@ -1388,8 +1444,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
 
 class _SurveyDetailsDialog extends StatelessWidget {
   final SurveyModel survey;
+  final List<SurveyModel> previousVisits;
 
-  const _SurveyDetailsDialog({required this.survey});
+  const _SurveyDetailsDialog({
+    required this.survey,
+    this.previousVisits = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1435,24 +1495,37 @@ class _SurveyDetailsDialog extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              if (survey.photo.trim().isNotEmpty)
+              if (survey.allPhotos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.file(
-                      File(survey.photo),
-                      height: 170,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 70,
-                        alignment: Alignment.center,
-                        color: AppTheme.lightAccent,
-                        child: Text('Photo no longer available on this device',
-                            style: GoogleFonts.hindSiliguri(
-                                color: AppTheme.textGrey, fontSize: 12)),
-                      ),
+                  child: SizedBox(
+                    height: 170,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: survey.allPhotos.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, index) {
+                        final path = survey.allPhotos[index];
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: path.startsWith('http')
+                              ? Image.network(path,
+                                  width: 220,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.broken_image_outlined))
+                              : Image.file(File(path),
+                                  width: 220,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                      width: 220,
+                                      alignment: Alignment.center,
+                                      color: AppTheme.lightAccent,
+                                      child: Text('Photo unavailable',
+                                          style: GoogleFonts.hindSiliguri(
+                                              color: AppTheme.textGrey)))),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1478,6 +1551,37 @@ class _SurveyDetailsDialog extends StatelessWidget {
                           ],
                         ),
                       )),
+              if (previousVisits.isNotEmpty) ...[
+                const Divider(height: 24),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Previous visits (${previousVisits.length})',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ...previousVisits.map((visit) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                          visit.type == SurveyModel.typeFarmer
+                              ? Icons.grass_rounded
+                              : Icons.storefront_rounded,
+                          color: AppTheme.primaryAccent),
+                      title: Text(
+                          visit.type == SurveyModel.typeFarmer
+                              ? visit.farmName
+                              : visit.shopName,
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 12, fontWeight: FontWeight.w700)),
+                      subtitle: Text(
+                          '${_SurveyCard._formatDate(visit.visitDate)} · ${visit.workerName}',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 11, color: AppTheme.textGrey)),
+                    )),
+              ],
             ],
           ),
         ),
