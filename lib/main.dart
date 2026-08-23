@@ -14,7 +14,7 @@ import 'screens/settings/edit_profile_screen.dart';
 import 'screens/settings/digital_id_card_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/employee/target_achievement_screen.dart';
-import 'screens/commission/commission_screen.dart';
+import 'screens/employee/commission/commission_screen.dart';
 import 'models/order_model.dart';
 import 'screens/employee/pos_order_screen.dart';
 import 'screens/employee/order_detail_screen.dart';
