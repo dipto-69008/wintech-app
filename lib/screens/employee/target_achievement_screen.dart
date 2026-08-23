@@ -208,23 +208,11 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                     fontWeight: FontWeight.w700,
                     color: Colors.white)),
             const SizedBox(height: 4),
-            Text(
-                _target > 0
-                    ? 'This Month\'s Target: ৳ ${_fmt.format(_target)}'
-                    : 'Target not set yet',
+             Text(
+                 'Achieved Incentive: ৳ ${_fmt.format(_erpIncentiveEarned)}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: Colors.white70)),
             const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: _progress,
-                minHeight: 14,
-                backgroundColor: Colors.white.withValues(alpha: 0.25),
-                valueColor: const AlwaysStoppedAnimation(Colors.white),
-              ),
-            ),
-            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -349,13 +337,6 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
 
   Widget _buildMonthlyHistory(bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    final now = DateTime.now();
-    // last 3 months stats (demo)
-    final months = [
-      {'label': _monthName(now.month - 2 < 1 ? now.month - 2 + 12 : now.month - 2), 'sales': 380000.0, 'target': 500000.0},
-      {'label': _monthName(now.month - 1 < 1 ? now.month - 1 + 12 : now.month - 1), 'sales': 620000.0, 'target': 600000.0},
-      {'label': _monthName(now.month), 'sales': _monthRevenue, 'target': _target > 0 ? _target : 500000.0},
-    ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -368,7 +349,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                     color: AppTheme.primaryAccent,
                     borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
-            Text('Monthly Performance',
+             Text('Current Month Achievement',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -378,75 +359,36 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
           Container(
             decoration: BoxDecoration(
                 color: cardBg, borderRadius: BorderRadius.circular(16)),
-            child: Column(
-              children: months.asMap().entries.map((entry) {
-                final i = entry.key;
-                final m = entry.value;
-                final sales = m['sales'] as double;
-                final target = m['target'] as double;
-                final pct = target > 0 ? (sales / target).clamp(0.0, 1.0) : 0.0;
-                final achieved = pct >= 1.0;
-                final isLast = i == months.length - 1;
-                return Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Text(m['label'] as String,
-                              style: GoogleFonts.hindSiliguri(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          const Spacer(),
-                          if (achieved)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                  color: AppTheme.success.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20)),
-                              child: Text('✅ Achieved',
-                                  style: GoogleFonts.hindSiliguri(
-                                      fontSize: 11,
-                                      color: AppTheme.success,
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                          Text(
-                              '৳${_fmt.format(sales)} / ৳${_fmt.format(target)}',
-                              style: GoogleFonts.hindSiliguri(
-                                  fontSize: 12, color: AppTheme.textGrey)),
-                        ]),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: pct,
-                            minHeight: 8,
-                            backgroundColor: AppTheme.primaryAccent
-                                .withValues(alpha: 0.1),
-                            valueColor: AlwaysStoppedAnimation(
-                                achieved ? AppTheme.success : AppTheme.primaryAccent),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!isLast) const Divider(height: 1),
-                ]);
-              }).toList(),
-            ),
+             child: Padding(
+               padding: const EdgeInsets.all(16),
+               child: Column(children: [
+                 _achievementRow('Sales achieved',
+                     '৳${_fmt.format(_monthRevenue)}', Icons.trending_up_rounded),
+                 const Divider(height: 22),
+                 _achievementRow('Incentive earned',
+                     '৳${_fmt.format(_erpIncentiveEarned)}',
+                     Icons.workspace_premium_rounded),
+               ]),
+             ),
           ),
         ],
       ),
     );
   }
 
-  String _monthName(int m) {
-    const names = [
-      '', 'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return names[m.clamp(1, 12)];
-  }
+  Widget _achievementRow(String label, String value, IconData icon) => Row(
+        children: [
+          Icon(icon, color: AppTheme.primaryAccent, size: 21),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 13, color: AppTheme.textGrey))),
+          Text(value,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.primaryAccent)),
+        ],
+      );
 
 }

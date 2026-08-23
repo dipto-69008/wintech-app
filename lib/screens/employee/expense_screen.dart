@@ -857,6 +857,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           put('currentDues',        ts['currentDues']);
           put('tadaAmount',         ts['tadaAmount']);
           put('outStationBill',     ts['outStationBill']);
+           put('approvedExpenseTotal', ts['approvedExpenseTotal']);
           final sales = (ts['salesAmount'] as num?)?.toDouble() ?? 0;
           final recovery = (ts['recoveryAmount'] as num?)?.toDouble() ?? 0;
           if (sales > 0) {
@@ -882,7 +883,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     'previousDues', 'salesTarget', 'salesAmount', 'salesAchievement',
     'recoveryAmount', 'salesRecoveryPercent', 'tadaPercent', 'currentDues',
     'tadaAmount', 'outStationBill', 'entertainment', 'telephoneBill',
-    'ddttCommission', 'courierBill', 'othersBill',
+    'ddttCommission', 'courierBill', 'othersBill', 'approvedExpenseTotal',
   ];
 
   static const Map<String, String> _otherLabels = {
@@ -901,6 +902,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     'ddttCommission':     'DD/TT Commission',
     'courierBill':        'Courier Bill',
     'othersBill':         'Others Bill',
+    'approvedExpenseTotal': 'Approved ERP Expenses',
   };
 
   String _currentMonth() {
@@ -1316,7 +1318,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         }
         othersBill['totalTaka'] = [
           'tadaAmount', 'outStationBill', 'entertainment',
-          'telephoneBill', 'ddttCommission', 'courierBill', 'othersBill'
+                 'telephoneBill', 'ddttCommission', 'courierBill', 'othersBill',
+                 'approvedExpenseTotal'
         ].fold<double>(0.0, (s, k) => s + ((othersBill[k] as double?) ?? 0));
         break;
       case ExpenseModel.typeDa:
@@ -2200,7 +2203,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           Text(
               '৳ ${_fmt.format([
                 'tadaAmount', 'outStationBill', 'entertainment',
-                'telephoneBill', 'ddttCommission', 'courierBill', 'othersBill'
+                'telephoneBill', 'ddttCommission', 'courierBill', 'othersBill',
+                'approvedExpenseTotal'
               ].fold<double>(0.0,
                   (s, k) => s + _dbl(_othersCtrl[k]!)))}',
               style: GoogleFonts.hindSiliguri(

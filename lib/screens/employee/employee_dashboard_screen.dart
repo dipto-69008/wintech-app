@@ -33,6 +33,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   int _erpMonthOrders = 0;
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
+  double _erpIncentiveEarned = 0;
 
   final _fmt = NumberFormat('#,##0', 'en_US');
   Timer? _liveTimer;
@@ -70,6 +71,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           _erpTodayOrders = (today['orders'] as num?)?.toInt() ?? 0;
           _erpMonthSales = (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
           _erpMonthOrders = (thisMonth['orders'] as num?)?.toInt() ?? 0;
+          _erpIncentiveEarned =
+              (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
             final t = targets.first as Map<String, dynamic>;
             _erpTargetValue = (t['targetValue'] as num?)?.toDouble() ?? 0;
@@ -249,13 +252,6 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   }
 
   Widget _buildTargetCard(bool isDark) {
-    final target = _targetValue;
-    final achieved = _achievedValue;
-    final progress = target > 0
-        ? (achieved / target).clamp(0.0, 1.0)
-        : 0.0;
-    final remaining = (target - achieved).clamp(0, double.infinity);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: Container(
@@ -280,36 +276,20 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
             Row(children: [
               const Icon(Icons.flag_rounded, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
-              Text('Monthly Target Progress',
+               Text('Achieved Incentive',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 13, color: Colors.white70)),
               const Spacer(),
-              Text('${(progress * 100).toStringAsFixed(0)}%',
+               Text('৳${_fmt.format(_erpIncentiveEarned)}',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: Colors.white)),
             ]),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 10,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: const AlwaysStoppedAnimation(Colors.white),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              _targetChip(
-                  Icons.check_circle_rounded,
-                  'Achieved: ৳${_fmt.format(achieved)}'),
-              const SizedBox(width: 10),
-              _targetChip(
-                  Icons.schedule_rounded,
-                  target > 0 ? 'Remaining: ৳${_fmt.format(remaining)}' : 'Set Target'),
-            ]),
+             const SizedBox(height: 12),
+             Text('This month’s incentive earned',
+                 style: GoogleFonts.hindSiliguri(
+                     fontSize: 12, color: Colors.white70)),
             if (_erpConnected) ...[
               const SizedBox(height: 8),
               Row(children: [

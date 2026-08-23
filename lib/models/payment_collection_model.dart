@@ -66,19 +66,18 @@ class PaymentCollectionModel {
 
   factory PaymentCollectionModel.fromMap(Map<String, dynamic> m) =>
       PaymentCollectionModel(
-        id: m['id'] ?? '',
-        customerName: m['customerName'] ?? '',
-        customerId: m['customerId'] ?? '',
+        id: m['id']?.toString() ?? '',
+        customerName: m['customerName']?.toString() ?? '',
+        customerId: m['customerId']?.toString() ?? '',
         amount: (m['amount'] as num?)?.toDouble() ?? 0,
-        paymentMethod: m['paymentMethod'] ?? 'cash',
-        notes: m['notes'] ?? '',
-        date: DateTime.parse(
-            m['date'] ?? DateTime.now().toIso8601String()),
-        status: m['status'] ?? statusPending,
-        srId: m['srId'] ?? '',
-        srName: m['srName'] ?? '',
-        chequeNumber: m['chequeNumber'] ?? '',
-        proofImage: m['proofImage'] ?? '',
+        paymentMethod: m['paymentMethod']?.toString() ?? 'cash',
+        notes: m['notes']?.toString() ?? '',
+        date: DateTime.tryParse(m['date']?.toString() ?? '') ?? DateTime.now(),
+        status: m['status']?.toString() ?? statusPending,
+        srId: m['srId']?.toString() ?? '',
+        srName: m['srName']?.toString() ?? '',
+        chequeNumber: m['chequeNumber']?.toString() ?? '',
+        proofImage: m['proofImage']?.toString() ?? '',
       );
 
   PaymentCollectionModel copyWith({String? status, String? proofImage}) =>

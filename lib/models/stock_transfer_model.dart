@@ -59,8 +59,8 @@ class StockTransferModel {
         productName: m['productName'] ?? '',
         quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
         unit: m['unit'] ?? '',
-        date: DateTime.parse(
-            m['date'] ?? DateTime.now().toIso8601String()),
+        date: DateTime.tryParse(m['date']?.toString() ?? '') ??
+            DateTime.now(),
         notes: m['notes'] ?? '',
         status: m['status'] ?? statusPending,
         srId: m['srId'] ?? '',

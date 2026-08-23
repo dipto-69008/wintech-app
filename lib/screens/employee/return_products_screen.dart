@@ -134,6 +134,16 @@ class _ReturnListTabState extends State<_ReturnListTab>
                   item['createdAt'] ??
                   '')
               .toString());
+          final status = (item['status'] ?? 'pending').toString().toLowerCase();
+          final statusColor = status == 'approved' || status == 'refunded'
+              ? AppTheme.success
+              : status == 'replace'
+                  ? Colors.blue
+                  : status == 'rejected'
+                      ? AppTheme.error
+                      : AppTheme.warning;
+          final statusLabel =
+              status.isEmpty ? 'Pending' : '${status[0].toUpperCase()}${status.substring(1)}';
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             child: Padding(
@@ -161,6 +171,20 @@ class _ReturnListTabState extends State<_ReturnListTab>
                             : DateFormat('dd MMM yy, hh:mm a').format(date),
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11, color: AppTheme.textGrey)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(statusLabel,
+                          style: GoogleFonts.hindSiliguri(
+                              color: statusColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700)),
+                    ),
                   ]),
                   const SizedBox(height: 9),
                   Text(item['partyName']?.toString() ?? 'Customer',

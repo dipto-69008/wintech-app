@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wintech ERP real-time API connection.
@@ -380,11 +381,27 @@ class ApiService {
       {String folder = 'misc'}) async {
     final base = await getBaseUrl();
     final token = await getToken();
+    // image_picker camera files do not always expose a MIME type to
+    // MultipartFile.fromPath. Without an explicit content type the ERP
+    // correctly sees application/octet-stream and rejects the upload.
+    final lower = filePath.toLowerCase();
+    final contentType = lower.endsWith('.png')
+        ? MediaType('image', 'png')
+        : lower.endsWith('.webp')
+            ? MediaType('image', 'webp')
+            : lower.endsWith('.gif')
+                ? MediaType('image', 'gif')
+                : MediaType('image', 'jpeg');
     final req = http.MultipartRequest(
         'POST', Uri.parse('$base/api/mobile/upload'))
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['folder'] = folder
-      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+      ..files.add(await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        filename: lower.endsWith('.png') ? 'camera.png' : 'camera.jpg',
+        contentType: contentType,
+      ));
     final streamed = await req.send().timeout(const Duration(seconds: 60));
     final res = await http.Response.fromStream(streamed);
     final body = jsonDecode(res.body) as Map<String, dynamic>;

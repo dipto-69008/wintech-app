@@ -285,8 +285,8 @@ class ExpenseModel {
         applicantName: m['applicantName'] ?? '',
         designation: m['designation'] ?? '',
         zone: m['zone'] ?? '',
-        createdAt: DateTime.parse(
-            m['createdAt'] ?? DateTime.now().toIso8601String()),
+        createdAt: DateTime.tryParse(m['createdAt']?.toString() ?? '') ??
+            DateTime.now(),
         status: m['status'] ?? statusPending,
         srId: m['srId'] ?? '',
         isLocked: m['isLocked'] as bool? ?? false,

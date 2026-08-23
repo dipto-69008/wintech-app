@@ -376,7 +376,11 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     final methodColor =
         methodColors[p.paymentMethod] ?? AppTheme.primaryAccent;
 
-    return Container(
+    return InkWell(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => PaymentCollectionDetailScreen(payment: p))),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -468,8 +472,116 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
           ]),
         ]),
       ]),
+      ),
     );
   }
+}
+
+class PaymentCollectionDetailScreen extends StatelessWidget {
+  final PaymentCollectionModel payment;
+  const PaymentCollectionDetailScreen({super.key, required this.payment});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusColor = payment.status == PaymentCollectionModel.statusConfirmed
+        ? AppTheme.success
+        : payment.status == PaymentCollectionModel.statusRejected
+            ? AppTheme.error
+            : AppTheme.warning;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Collection Details',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+        backgroundColor: AppTheme.primaryAccent,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.primaryAccent.withValues(alpha: .2)),
+            ),
+            child: Column(children: [
+              const Icon(Icons.payments_rounded,
+                  color: AppTheme.primaryAccent, size: 42),
+              const SizedBox(height: 8),
+              Text('৳ ${NumberFormat('#,##0', 'en_US').format(payment.amount)}',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 27, fontWeight: FontWeight.w800,
+                      color: AppTheme.primaryAccent)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(payment.statusLabel,
+                    style: GoogleFonts.hindSiliguri(
+                        color: statusColor, fontWeight: FontWeight.w700)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          _detailCard(context, [
+            _detail('Customer', payment.customerName),
+            _detail('Payment Method', payment.methodLabel),
+            _detail('Collection Date',
+                DateFormat('dd MMM yyyy, hh:mm a').format(payment.date)),
+            if (payment.chequeNumber.isNotEmpty)
+              _detail('Cheque Number', payment.chequeNumber),
+            if (payment.srName.isNotEmpty) _detail('Collected By', payment.srName),
+            if (payment.notes.isNotEmpty) _detail('Notes', payment.notes),
+          ]),
+          if (payment.proofImage.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text('Payment Proof',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 15, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(payment.proofImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Padding(
+                      padding: EdgeInsets.all(18),
+                      child: Text('Proof image unavailable'))),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailCard(BuildContext context, List<Widget> children) =>
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkCard
+                : Colors.white,
+            borderRadius: BorderRadius.circular(14)),
+        child: Column(children: children),
+      );
+
+  Widget _detail(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+              width: 125,
+              child: Text(label,
+                  style: GoogleFonts.hindSiliguri(
+                      color: AppTheme.textGrey, fontSize: 12))),
+          Expanded(
+              child: Text(value,
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 13, fontWeight: FontWeight.w600))),
+        ]),
+      );
 }
 
 // ── Add/Edit Dialog ───────────────────────────────────────────────────────

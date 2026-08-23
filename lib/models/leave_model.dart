@@ -92,16 +92,16 @@ class LeaveModel {
   factory LeaveModel.fromMap(Map<String, dynamic> m) => LeaveModel(
         id: m['id'] ?? '',
         leaveType: m['leaveType'] ?? typeCasual,
-        fromDate: DateTime.parse(
-            m['fromDate'] ?? DateTime.now().toIso8601String()),
-        toDate: DateTime.parse(
-            m['toDate'] ?? DateTime.now().toIso8601String()),
+        fromDate: DateTime.tryParse(m['fromDate']?.toString() ?? '') ??
+            DateTime.now(),
+        toDate: DateTime.tryParse(m['toDate']?.toString() ?? '') ??
+            DateTime.now(),
         reason: m['reason'] ?? '',
         status: m['status'] ?? statusPending,
         srId: m['srId'] ?? '',
         srName: m['srName'] ?? '',
-        appliedAt: DateTime.parse(
-            m['appliedAt'] ?? DateTime.now().toIso8601String()),
+        appliedAt: DateTime.tryParse(m['appliedAt']?.toString() ?? '') ??
+            DateTime.now(),
         adminNote: m['adminNote'] ?? '',
         attachments: (m['attachments'] as List<dynamic>?)
                 ?.map((e) => e.toString())
