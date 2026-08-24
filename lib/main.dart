@@ -24,6 +24,7 @@ import 'screens/employee/leave_screen.dart';
 import 'screens/employee/payment_collection_screen.dart';
 import 'screens/employee/survey/survey_screen.dart';
 import 'screens/employee/survey/survey_detail_screen.dart';
+import 'models/survey_model.dart';
 import 'home_shell.dart';
 
 void main() async {
