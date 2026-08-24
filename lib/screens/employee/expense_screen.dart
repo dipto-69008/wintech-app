@@ -26,6 +26,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   bool _loading = true;
   bool _erpConnected = false;
   String _typeFilter = 'all';
+  Map<String, dynamic> _topSheet = {};
   late TabController _tabCtrl;
 
   static const _typeOptions = [
@@ -100,6 +101,12 @@ class _ExpenseScreenState extends State<ExpenseScreen>
         erp = true;
       } catch (_) {
         // Offline or endpoint unavailable — keep local data.
+      }
+      try {
+        final topSheet = await ApiService.taDaTopSheet();
+        if (topSheet.isNotEmpty) _topSheet = topSheet;
+      } catch (_) {
+        // Keep the last generated sheet when the summary request is offline.
       }
     }
 
@@ -267,28 +274,34 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                 slivers: [
                   SliverToBoxAdapter(child: _buildHeader(isDark)),
                   SliverToBoxAdapter(child: _buildTypeFilter(isDark)),
-                  SliverToBoxAdapter(child: _buildSummary(isDark)),
-                  if (_filtered.isEmpty)
-                    SliverToBoxAdapter(child: _buildEmpty(isDark))
-                  else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => _buildTile(_filtered[i], isDark),
-                        childCount: _filtered.length,
-                      ),
-                    ),
+                   if (_typeFilter == ExpenseModel.typeTaDaSheet)
+                     SliverToBoxAdapter(child: _buildTopSheetSummary(isDark))
+                   else ...[
+                     SliverToBoxAdapter(child: _buildSummary(isDark)),
+                     if (_filtered.isEmpty)
+                       SliverToBoxAdapter(child: _buildEmpty(isDark))
+                     else
+                       SliverList(
+                         delegate: SliverChildBuilderDelegate(
+                           (_, i) => _buildTile(_filtered[i], isDark),
+                           childCount: _filtered.length,
+                         ),
+                       ),
+                   ],
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAdd,
-        backgroundColor: AppTheme.primaryAccent,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('New Bill',
-            style: GoogleFonts.hindSiliguri(
-                color: Colors.white, fontWeight: FontWeight.w700)),
-      ),
+      floatingActionButton: _typeFilter == ExpenseModel.typeTaDaSheet
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _openAdd,
+              backgroundColor: AppTheme.primaryAccent,
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: Text('New Bill',
+                  style: GoogleFonts.hindSiliguri(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
     );
   }
 
@@ -412,6 +425,136 @@ class _ExpenseScreenState extends State<ExpenseScreen>
           ],
         ]),
       ),
+    );
+  }
+
+  Widget _buildTopSheetSummary(bool isDark) {
+    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    double amount(String key) => (_topSheet[key] as num?)?.toDouble() ?? 0;
+    final month = (_topSheet['month'] ?? '').toString();
+    final entries = (_topSheet['taDaBills'] as List?)
+            ?.whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList() ??
+        <Map<String, dynamic>>[];
+    final approvedExpenses = (_topSheet['approvedExpenses'] as List?)
+            ?.whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList() ??
+        <Map<String, dynamic>>[];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppTheme.primaryAccent.withValues(alpha: 0.25)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.summarize_rounded,
+                  color: AppTheme.primaryAccent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  month.isEmpty ? 'Monthly Top Sheet' : 'Monthly Top Sheet · $month',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                onPressed: _load,
+                tooltip: 'Refresh',
+                icon: const Icon(Icons.refresh_rounded, size: 19),
+              ),
+            ]),
+            Text(
+              _topSheet.isEmpty
+                  ? 'No approved expenses for this month yet.'
+                  : 'Created automatically from approved expenses. New approved bills append here.',
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 11, color: AppTheme.textGrey),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(child: _sheetMetric('Approved bills',
+                  '${entries.length}', Icons.receipt_long_rounded)),
+              const SizedBox(width: 8),
+              Expanded(child: _sheetMetric('Expense total',
+                  '৳ ${_fmt.format(amount('grandTotal'))}', Icons.payments_rounded)),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _sheetMetric('TA/DA',
+                  '৳ ${_fmt.format(amount('tadaAmount'))}', Icons.directions_car_rounded)),
+              const SizedBox(width: 8),
+              Expanded(child: _sheetMetric('Other approved',
+                  '৳ ${_fmt.format(amount('approvedExpenseTotal'))}',
+                  Icons.verified_rounded)),
+            ]),
+          ]),
+        ),
+        if (entries.isNotEmpty || approvedExpenses.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...entries.map((item) => _sheetEntry(item, isDark, 'TA/DA')),
+          ...approvedExpenses.map((item) => _sheetEntry(item, isDark, 'Expense')),
+        ],
+      ]),
+    );
+  }
+
+  Widget _sheetMetric(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryAccent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(children: [
+        Icon(icon, size: 16, color: AppTheme.primaryAccent),
+        const SizedBox(width: 6),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: GoogleFonts.hindSiliguri(
+              fontSize: 10, color: AppTheme.textGrey)),
+          Text(value, overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+      ]),
+    );
+  }
+
+  Widget _sheetEntry(Map<String, dynamic> item, bool isDark, String kind) {
+    final amount = (item['amount'] as num?)?.toDouble() ?? 0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(children: [
+        const Icon(Icons.receipt_long_rounded, size: 19,
+            color: AppTheme.primaryAccent),
+        const SizedBox(width: 9),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text((item['category'] ?? item['type'] ?? kind).toString(),
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 12, fontWeight: FontWeight.w700)),
+          Text((item['description'] ?? item['date'] ?? '').toString(),
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.hindSiliguri(
+                  fontSize: 10, color: AppTheme.textGrey)),
+        ])),
+        Text('৳ ${_fmt.format(amount)}',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 12, fontWeight: FontWeight.w800,
+                color: AppTheme.primaryAccent)),
+      ]),
     );
   }
 
