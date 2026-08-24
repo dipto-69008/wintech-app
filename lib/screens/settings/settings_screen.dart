@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,11 +25,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _checkingErp = false;
   int _pendingSync = 0;
   String _erpUrl = '';
+  Timer? _syncStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _syncStatusTimer = Timer.periodic(
+        const Duration(seconds: 5), (_) => _checkErp());
+  }
+
+  @override
+  void dispose() {
+    _syncStatusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

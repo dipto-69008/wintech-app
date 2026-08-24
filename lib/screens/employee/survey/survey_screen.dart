@@ -11,6 +11,7 @@ import '../../../models/survey_model.dart';
 import '../../../services/api_service.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../services/offline_queue_service.dart';
+import 'survey_detail_screen.dart';
 
 class SurveyScreen extends StatefulWidget {
   const SurveyScreen({super.key});
@@ -183,15 +184,24 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   Future<void> _view(SurveyModel survey) async {
     final previous = <SurveyModel>[];
+    final number = survey.type == SurveyModel.typeFarmer
+        ? survey.farmerMobile
+        : survey.dealerMobile;
+    final normalizedNumber = number.replaceAll(RegExp(r'\D'), '');
+    final localRecords = await LocalStorageService.getSurveys();
+    previous.addAll(localRecords.where((item) {
+      final itemNumber = item.type == SurveyModel.typeFarmer
+          ? item.farmerMobile
+          : item.dealerMobile;
+      return item.id != survey.id &&
+          itemNumber.replaceAll(RegExp(r'\D'), '') == normalizedNumber;
+    }));
     try {
       if (await ApiService.isConnected) {
         final records = await ApiService.surveys(
           type: survey.type,
           mineOnly: false,
         );
-        final number = survey.type == SurveyModel.typeFarmer
-            ? survey.farmerMobile
-            : survey.dealerMobile;
         previous.addAll(records
             .map((m) => SurveyModel.fromMap({
                   ...m,
@@ -202,16 +212,20 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   ? item.farmerMobile
                   : item.dealerMobile;
               return itemNumber.replaceAll(RegExp(r'\D'), '') ==
-                  number.replaceAll(RegExp(r'\D'), '');
+                  normalizedNumber;
             })
-            .where((item) => item.id != survey.id));
+            .where((item) => item.id != survey.id)
+            .where((item) => !previous.any((existing) => existing.id == item.id)));
       }
     } catch (_) {}
-    showDialog<void>(
-      context: context,
-      builder: (_) => _SurveyDetailsDialog(
-        survey: survey,
-        previousVisits: previous,
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SurveyDetailsScreen(
+          survey: survey,
+          previousVisits: previous,
+        ),
       ),
     );
   }

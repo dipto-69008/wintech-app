@@ -23,6 +23,7 @@ import 'screens/employee/expense_screen.dart';
 import 'screens/employee/leave_screen.dart';
 import 'screens/employee/payment_collection_screen.dart';
 import 'screens/employee/survey/survey_screen.dart';
+import 'screens/employee/survey/survey_detail_screen.dart';
 import 'home_shell.dart';
 
 void main() async {
@@ -155,6 +156,16 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
             return _slide(const PaymentCollectionScreen(), settings);
           case '/survey':
             return _slide(const SurveyScreen(), settings);
+          case '/survey-details':
+            final args = settings.arguments as Map<String, dynamic>;
+            return _slide(
+              SurveyDetailsScreen(
+                survey: args['survey'] as SurveyModel,
+                previousVisits:
+                    (args['previousVisits'] as List? ?? []).cast<SurveyModel>(),
+              ),
+              settings,
+            );
           case '/commission':
             return _slide(const CommissionScreen(), settings);
           case '/order-detail':

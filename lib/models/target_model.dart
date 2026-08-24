@@ -5,7 +5,7 @@ class TargetModel {
   final String setById;
   final String setByName;
   final double targetAmount;
-  final double commissionPercent;
+  final double incentivePerSale;
   final String month; // e.g. "2026-07"
   final DateTime createdAt;
 
@@ -16,7 +16,7 @@ class TargetModel {
     required this.setById,
     required this.setByName,
     required this.targetAmount,
-    required this.commissionPercent,
+    required this.incentivePerSale,
     required this.month,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -28,7 +28,7 @@ class TargetModel {
         'setById': setById,
         'setByName': setByName,
         'targetAmount': targetAmount,
-        'commissionPercent': commissionPercent,
+        'incentivePerSale': incentivePerSale,
         'month': month,
         'createdAt': createdAt.toIso8601String(),
       };
@@ -40,7 +40,7 @@ class TargetModel {
         setById: m['setById'] ?? '',
         setByName: m['setByName'] ?? '',
         targetAmount: (m['targetAmount'] as num?)?.toDouble() ?? 0,
-        commissionPercent: (m['commissionPercent'] as num?)?.toDouble() ?? 0,
+        incentivePerSale: ((m['incentivePerSale'] ?? m['commissionPercent']) as num?)?.toDouble() ?? 0,
         month: m['month'] ?? '',
         createdAt: DateTime.tryParse(m['createdAt'] ?? '') ?? DateTime.now(),
       );

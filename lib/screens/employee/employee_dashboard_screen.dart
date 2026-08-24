@@ -34,6 +34,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
   double _erpIncentiveEarned = 0;
+  double _erpIncentivePerSale = 0;
 
   final _fmt = NumberFormat('#,##0', 'en_US');
   Timer? _liveTimer;
@@ -73,6 +74,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           _erpMonthOrders = (thisMonth['orders'] as num?)?.toInt() ?? 0;
           _erpIncentiveEarned =
               (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
+          _erpIncentivePerSale =
+               (thisMonth['incentivePerSale'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
             final t = targets.first as Map<String, dynamic>;
             _erpTargetValue = (t['targetValue'] as num?)?.toDouble() ?? 0;
@@ -129,7 +132,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   int get _monthOrderCount =>
       _erpConnected ? _erpMonthOrders : _monthOrders.length;
   double get _targetValue =>
-      _erpConnected && _erpTargetValue > 0 ? _erpTargetValue : (_user?.targetAmount ?? 0);
+      _erpConnected ? _erpTargetValue : 0;
   double get _achievedValue =>
       _erpConnected && _erpCurrentValue > 0 ? _erpCurrentValue : _monthRevenue;
 
@@ -287,9 +290,38 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                       color: Colors.white)),
             ]),
              const SizedBox(height: 12),
-             Text('This month’s incentive earned',
+               Text(_erpConnected
+                   ? (_targetValue > 0
+                        ? 'Target: ৳${_fmt.format(_targetValue)}  •  ৳${_fmt.format(_erpIncentivePerSale)} per approved sale'
+                       : 'Not set target yet')
+                   : 'Not set target yet',
                  style: GoogleFonts.hindSiliguri(
                      fontSize: 12, color: Colors.white70)),
+             if (_targetValue > 0) ...[
+               const SizedBox(height: 12),
+               ClipRRect(
+                 borderRadius: BorderRadius.circular(8),
+                 child: LinearProgressIndicator(
+                   value: (_achievedValue / _targetValue).clamp(0.0, 1.0),
+                   minHeight: 11,
+                   backgroundColor: Colors.white.withValues(alpha: 0.25),
+                   valueColor: const AlwaysStoppedAnimation(Colors.white),
+                 ),
+               ),
+               const SizedBox(height: 8),
+               Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: [
+                   Text('৳${_fmt.format(_achievedValue)} achieved',
+                       style: GoogleFonts.hindSiliguri(
+                           fontSize: 12, color: Colors.white)),
+                   Text('${((_achievedValue / _targetValue).clamp(0.0, 1.0) * 100).toStringAsFixed(1)}%',
+                       style: GoogleFonts.hindSiliguri(
+                           fontSize: 16, fontWeight: FontWeight.w800,
+                           color: Colors.white)),
+                 ],
+               ),
+             ],
             if (_erpConnected) ...[
               const SizedBox(height: 8),
               Row(children: [

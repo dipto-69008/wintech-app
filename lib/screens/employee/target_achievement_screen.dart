@@ -25,7 +25,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   double _erpMonthSales = 0;
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
-  double _erpIncentivePercent = 0;
+  double _erpIncentivePerSale = 0;
   double _erpIncentiveEarned = 0;
   String _erpTargetTitle = '';
 
@@ -52,8 +52,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
           _erpConnected = true;
           _erpMonthSales =
               (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
-          _erpIncentivePercent =
-              (thisMonth['incentivePercent'] as num?)?.toDouble() ?? 0;
+          _erpIncentivePerSale =
+               (thisMonth['incentivePerSale'] as num?)?.toDouble() ?? 0;
           _erpIncentiveEarned =
               (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
@@ -103,7 +103,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
       : _monthOrders.fold(0.0, (s, o) => s + o.total);
   double get _target => _erpConnected && _erpTargetValue > 0
       ? _erpTargetValue
-      : (_user?.targetAmount ?? 0);
+      : 0;
   double get _progress =>
       _target > 0 ? (_monthRevenue / _target).clamp(0.0, 1.0) : 0;
   double get _remaining => (_target - _monthRevenue).clamp(0, double.infinity);
@@ -212,7 +212,18 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                  'Achieved Incentive: ৳ ${_fmt.format(_erpIncentiveEarned)}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, color: Colors.white70)),
-            const SizedBox(height: 16),
+             if (_target > 0) ...[
+             const SizedBox(height: 16),
+             ClipRRect(
+               borderRadius: BorderRadius.circular(8),
+               child: LinearProgressIndicator(
+                 value: _progress,
+                 minHeight: 12,
+                 backgroundColor: Colors.white.withValues(alpha: 0.25),
+                 valueColor: const AlwaysStoppedAnimation(Colors.white),
+               ),
+             ),
+             const SizedBox(height: 9),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -226,6 +237,13 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
                         color: Colors.white)),
               ],
             ),
+             ] else
+               Padding(
+                 padding: const EdgeInsets.only(top: 14),
+                 child: Text('Not set target yet',
+                     style: GoogleFonts.hindSiliguri(
+                         fontSize: 14, color: Colors.white)),
+               ),
           ],
         ),
       ),
@@ -250,7 +268,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               _target > 0 ? '৳${_fmt.format(_remaining)}' : 'N/A',
               Icons.schedule_rounded, AppTheme.warning, isDark)),
         ]),
-        if (_erpIncentivePercent > 0) ...[
+         if (_erpIncentivePerSale > 0) ...[
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -275,8 +293,8 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               Expanded(
                 child: Text(
                   _incentiveEligible
-                      ? 'Sales Incentive Earned (${_erpIncentivePercent.toStringAsFixed(0)}%)'
-                      : 'Sales Incentive (${_erpIncentivePercent.toStringAsFixed(0)}%) unlocks after target achievement',
+                       ? 'Sales Incentive Earned'
+                        : 'Per-sale Incentive (৳${_fmt.format(_erpIncentivePerSale)})',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

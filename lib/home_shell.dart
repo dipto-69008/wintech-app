@@ -46,12 +46,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Real-time link: on start, on app-resume, and every 30 seconds —
+  /// Real-time link: on start, on app-resume, and every 5 seconds —
   /// ping the ERP and push any offline items immediately.
   void _startAutoSync() {
     _runSync();
     _syncTimer =
-        Timer.periodic(const Duration(seconds: 30), (_) => _runSync());
+        Timer.periodic(const Duration(seconds: 5), (_) => _runSync());
   }
 
   @override

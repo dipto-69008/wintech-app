@@ -252,7 +252,7 @@ class ApiService {
       _post('/api/mobile/targets', {'targetId': targetId, 'currentValue': value});
 
   /// ADMIN ONLY — set yearly (Jan–Dec) monthly targets for an officer.
-  /// months: [{month: 1..12, targetAmount, commissionPercent}]
+  /// months: [{month: 1..12, targetAmount, incentivePerSale}]
   static Future<Map<String, dynamic>> setYearlyTargets({
     required String assignedTo,
     required int year,
