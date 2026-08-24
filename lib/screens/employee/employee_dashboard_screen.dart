@@ -483,7 +483,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       (Icons.payments_rounded, 'Payment'),
       (Icons.assignment_return_rounded, 'Return'),
       (Icons.beach_access_rounded, 'Leave'),
-      (Icons.assignment_rounded, 'Survey'),
+      (Icons.assignment_rounded, 'Field Visit Report'),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),

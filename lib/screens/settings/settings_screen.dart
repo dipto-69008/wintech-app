@@ -550,7 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _divider(),
                                 _settingTile(
                                   icon: Icons.grid_view_rounded,
-                                  label: 'More Modules (Expense, Leave, Survey...)',
+                                  label: 'More Modules (Expense, Leave, Field Visit Report...)',
                                   iconColor: AppTheme.primaryAccent,
                                   isDark: isDark,
                                   onTap: () => Navigator.pushNamed(

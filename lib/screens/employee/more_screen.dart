@@ -69,8 +69,8 @@ class _MoreScreenState extends State<MoreScreen> {
       tag: 'leave',
     ),
     _ModuleDef(
-      title: 'Survey',
-      subtitle: 'Create field-level surveys',
+      title: 'Field Visit Report',
+      subtitle: 'Create field-level visit reports',
       icon: Icons.assignment_rounded,
       color: Color(0xFF1565C0),
       tag: 'survey',

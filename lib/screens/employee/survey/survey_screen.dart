@@ -175,7 +175,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
     _load();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Survey record deleted',
+        content: Text('Field Visit Report deleted',
             style: GoogleFonts.hindSiliguri()),
         behavior: SnackBarBehavior.floating,
       ),
@@ -314,7 +314,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Field Survey',
+                Text('Field Visit Report',
                     style: GoogleFonts.hindSiliguri(
                         color: Colors.white,
                         fontSize: 20,
@@ -1048,9 +1048,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       }
       if (mounted) {
         _message(sent
-            ? '✅ Survey submitted to ERP!'
+            ? '✅ Field Visit Report submitted to ERP!'
             : erpError != null
-                ? 'ERP rejected survey: $erpError'
+                ? 'ERP rejected Field Visit Report: $erpError'
                 : '📥 Offline — will sync to ERP when connected');
       }
     }
