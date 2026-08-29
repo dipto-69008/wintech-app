@@ -721,6 +721,15 @@ class _CollectionDialogState extends State<_CollectionDialog> {
         maxWidth: 1280,
       );
       if (image != null && mounted) setState(() => _proofImage = image.path);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Unable to open camera. Please try again.',
+              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     } finally {
       if (mounted) setState(() => _pickingImage = false);
     }
@@ -944,32 +953,93 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               ),
             const SizedBox(height: 12),
             _label('Payment Collection Image (optional)'),
-            Row(children: [
-              OutlinedButton.icon(
-                onPressed: _pickingImage ? null : _pickProofImage,
-                icon: _pickingImage
-                    ? const SizedBox(width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.photo_camera_rounded, size: 17),
-                label: Text(_proofImage.isEmpty ? 'Take a Photo' : 'Retake Photo',
-                    style: GoogleFonts.hindSiliguri(fontSize: 12)),
-              ),
-              if (_proofImage.isNotEmpty) ...[
-                const SizedBox(width: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: _proofImage.startsWith('http')
-                      ? Image.network(_proofImage, width: 42, height: 42,
-                          fit: BoxFit.cover)
-                      : Image.file(File(_proofImage), width: 42, height: 42,
-                          fit: BoxFit.cover),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _pickingImage ? null : _pickProofImage,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkCard2 : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryAccent.withValues(alpha: 0.45),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_proofImage.isEmpty)
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryAccent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: _pickingImage
+                              ? const Padding(
+                                  padding: EdgeInsets.all(13),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.photo_camera_rounded,
+                                  color: AppTheme.primaryAccent, size: 23),
+                        )
+                      else
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: _proofImage.startsWith('http')
+                              ? Image.network(_proofImage,
+                                  width: 58, height: 58, fit: BoxFit.cover)
+                              : Image.file(File(_proofImage),
+                                  width: 58, height: 58, fit: BoxFit.cover),
+                        ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _proofImage.isEmpty
+                                  ? 'Take Photo'
+                                  : 'Payment photo added',
+                              style: GoogleFonts.hindSiliguri(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppTheme.darkText
+                                    : AppTheme.textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _proofImage.isEmpty
+                                  ? 'Tap here to open camera'
+                                  : 'Tap to retake photo',
+                              style: GoogleFonts.hindSiliguri(
+                                fontSize: 11,
+                                color: AppTheme.textGrey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_proofImage.isNotEmpty)
+                        IconButton(
+                          tooltip: 'Remove image',
+                          onPressed: () => setState(() => _proofImage = ''),
+                          icon: const Icon(Icons.close_rounded, size: 19),
+                        )
+                      else
+                        const Icon(Icons.chevron_right_rounded,
+                            color: AppTheme.primaryAccent),
+                    ],
+                  ),
                 ),
-                IconButton(
-                    tooltip: 'Remove image',
-                    onPressed: () => setState(() => _proofImage = ''),
-                    icon: const Icon(Icons.close_rounded, size: 18)),
-              ],
-            ]),
+              ),
+            ),
             const SizedBox(height: 12),
             _label('Notes (optional)'),
             TextFormField(

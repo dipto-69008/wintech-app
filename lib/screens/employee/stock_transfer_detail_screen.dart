@@ -52,17 +52,12 @@ class StockTransferDetailScreen extends StatelessWidget {
 
   String _quantity(Map<String, dynamic> item) {
     final quantity = (item['quantity'] as num?)?.toDouble() ?? 0;
-    final unit = item['quantityUnit']?.toString() ??
-        item['unit']?.toString() ??
-        'Pcs';
     final carton = item['cartonCount'];
     final bucket = item['bucketCount'];
-    final extra = [
-      if (carton != null) '$carton Ctn',
-      if (bucket != null) '$bucket Bkt',
-    ];
-    return '× ${NumberFormat('#,##0.##', 'en_US').format(quantity)} $unit'
-        '${extra.isEmpty ? '' : ' (${extra.join(' · ')})'}';
+    final pcs = NumberFormat('#,##0.##', 'en_US').format(quantity);
+    if (carton != null) return '$carton Carton = $pcs Pcs';
+    if (bucket != null) return '$bucket Bucket = $pcs Pcs';
+    return '$pcs Pcs';
   }
 
   @override

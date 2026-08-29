@@ -208,9 +208,14 @@ class _TransferCard extends StatelessWidget {
 
     // Build quantity display: pcs + carton/bucket
     final qty = (t['quantity'] as num?)?.toDouble() ?? 0;
-    final unitLabel = t['quantityUnit']?.toString() ?? 'Pcs';
-    final carton = t['cartonCount'] != null ? '${t['cartonCount']} Ctn' : null;
-    final bucket = t['bucketCount'] != null ? '${t['bucketCount']} Bkt' : null;
+    final items = (t['items'] as List?) ?? const [];
+    final quantityLabel = items.length > 1
+        ? '${items.length} products · ${fmt.format(qty)} Pcs total'
+        : t['cartonCount'] != null
+            ? '${t['cartonCount']} Carton = ${fmt.format(qty)} Pcs'
+            : t['bucketCount'] != null
+                ? '${t['bucketCount']} Bucket = ${fmt.format(qty)} Pcs'
+                : '${fmt.format(qty)} Pcs';
 
     return Container(
       child: InkWell(
@@ -257,9 +262,7 @@ class _TransferCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis),
           ),
           Text(
-            '× ${fmt.format(qty)} $unitLabel'
-            '${carton != null ? ' ($carton)' : ''}'
-            '${bucket != null ? ' ($bucket)' : ''}',
+            quantityLabel,
             style: GoogleFonts.hindSiliguri(
                 fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
         ]),
@@ -589,8 +592,14 @@ class _IncomingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final qty = (t['quantity'] as num?)?.toDouble() ?? 0;
-    final unitLabel = t['quantityUnit']?.toString() ?? 'Pcs';
     final items = (t['items'] as List?) ?? const [];
+    final quantityLabel = items.length > 1
+        ? '${items.length} products · ${fmt.format(qty)} Pcs total'
+        : t['cartonCount'] != null
+            ? '${t['cartonCount']} Carton = ${fmt.format(qty)} Pcs'
+            : t['bucketCount'] != null
+                ? '${t['bucketCount']} Bucket = ${fmt.format(qty)} Pcs'
+                : '${fmt.format(qty)} Pcs';
     final date = t['date'] != null
         ? DateFormat('dd MMM yy, hh:mm a')
             .format(DateTime.tryParse(t['date'].toString()) ?? DateTime.now())
@@ -612,7 +621,7 @@ class _IncomingCard extends StatelessWidget {
         Row(children: [
           const _StatusChip(status: 'pending'),
           const Spacer(),
-          Text('× ${fmt.format(qty)} $unitLabel',
+          Text(quantityLabel,
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryAccent)),
         ]),
@@ -818,11 +827,11 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   (double, int?, int?) _resolveQuantity() {
     final raw = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
     if (_qtyUnit == 'Carton') {
-      final ppc = (_selectedProduct?['pcsPerCarton'] as num?)?.toInt() ?? 1;
+      final ppc = (_selectedProduct?['pcsPerCarton'] as num).toInt();
       final pcs = raw * ppc;
       return (pcs, raw.toInt(), null);
     } else if (_qtyUnit == 'Bucket') {
-      final ppb = (_selectedProduct?['pcsPerBucket'] as num?)?.toInt() ?? 1;
+      final ppb = (_selectedProduct?['pcsPerBucket'] as num).toInt();
       final pcs = raw * ppb;
       return (pcs, null, raw.toInt());
     }
@@ -842,6 +851,24 @@ class _NewTransferTabState extends State<_NewTransferTab> {
       if (showErrors) _snack('Please enter quantity', error: true);
       return null;
     }
+    if (_qtyUnit != 'Pcs' && rawQty != rawQty.roundToDouble()) {
+      if (showErrors) {
+        _snack('Carton and Bucket quantity must be a whole number', error: true);
+      }
+      return null;
+    }
+    final conversion = _qtyUnit == 'Carton'
+        ? (_selectedProduct?['pcsPerCarton'] as num?)?.toInt()
+        : _qtyUnit == 'Bucket'
+            ? (_selectedProduct?['pcsPerBucket'] as num?)?.toInt()
+            : 1;
+    if (conversion == null || conversion <= 0) {
+      if (showErrors) {
+        _snack('Pcs per $_qtyUnit is not configured for this product',
+            error: true);
+      }
+      return null;
+    }
     final (pcs, cartons, buckets) = _resolveQuantity();
     final weight = _weightCtrl.text.trim();
     return {
@@ -852,6 +879,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         'packSize': _selectedProduct!['packSize'].toString(),
       'quantity': pcs,
       'quantityUnit': _qtyUnit,
+      'pcsCount': pcs,
       if (cartons != null) 'cartonCount': cartons,
       if (buckets != null) 'bucketCount': buckets,
       if (weight.isNotEmpty) 'totalWeight': weight,
