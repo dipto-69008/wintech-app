@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/theme.dart';
 import '../../services/api_service.dart';
+import 'return_detail_screen.dart';
 
 /// Sales return invoices created in the field. Every successful submission is
 /// stored in ERP Sales → Return Entry through the mobile sales-returns route.
@@ -74,6 +75,27 @@ class _ReturnListTabState extends State<_ReturnListTab>
   bool _loading = true;
   List<Map<String, dynamic>> _returns = [];
 
+  String _money(dynamic value) {
+    final amount =
+        value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+    return NumberFormat('#,##0.00', 'en_US').format(amount);
+  }
+
+  double _totalAmount(Map<String, dynamic> item, List<dynamic> products) {
+    final saved = item['totalAmount'];
+    if (saved is num) return saved.toDouble();
+    return products.fold<double>(0, (sum, raw) {
+      if (raw is! Map) return sum;
+      final quantity = raw['quantity'] is num
+          ? (raw['quantity'] as num).toDouble()
+          : double.tryParse('${raw['quantity']}') ?? 0;
+      final rate = raw['rate'] is num
+          ? (raw['rate'] as num).toDouble()
+          : double.tryParse('${raw['rate']}') ?? 0;
+      return sum + quantity * rate;
+    });
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -130,6 +152,7 @@ class _ReturnListTabState extends State<_ReturnListTab>
         itemBuilder: (_, index) {
           final item = _returns[index];
           final products = List<dynamic>.from(item['items'] ?? const []);
+           final totalAmount = _totalAmount(item, products);
           final date = DateTime.tryParse((item['returnDate'] ??
                   item['createdAt'] ??
                   '')
@@ -146,11 +169,18 @@ class _ReturnListTabState extends State<_ReturnListTab>
               status.isEmpty ? 'Pending' : '${status[0].toUpperCase()}${status.substring(1)}';
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+             child: InkWell(
+               borderRadius: BorderRadius.circular(12),
+               onTap: () => Navigator.of(context).push(
+                 MaterialPageRoute(
+                   builder: (_) => ReturnDetailScreen(returnData: item),
+                 ),
+               ),
+               child: Padding(
+                 padding: const EdgeInsets.all(14),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
                   Row(children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -201,13 +231,39 @@ class _ReturnListTabState extends State<_ReturnListTab>
                               '${p['productName'] ?? 'Product'} × ${p['quantity'] ?? 0}')
                           .join(' • '),
                       style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                   const SizedBox(height: 9),
+                   Container(
+                     width: double.infinity,
+                     padding: const EdgeInsets.symmetric(
+                         horizontal: 11, vertical: 8),
+                     decoration: BoxDecoration(
+                       color: AppTheme.primaryAccent.withValues(alpha: .09),
+                       borderRadius: BorderRadius.circular(9),
+                     ),
+                     child: Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                       children: [
+                         Text('Total Return Amount',
+                             style: GoogleFonts.hindSiliguri(
+                                 fontSize: 12,
+                                 fontWeight: FontWeight.w700,
+                                 color: AppTheme.primaryAccent)),
+                         Text('৳ ${_money(totalAmount)}',
+                             style: GoogleFonts.hindSiliguri(
+                                 fontSize: 14,
+                                 fontWeight: FontWeight.w800,
+                                 color: AppTheme.primaryAccent)),
+                       ],
+                     ),
+                   ),
                   if ((item['reason'] ?? '').toString().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text('Reason: ${item['reason']}',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11, color: AppTheme.textGrey)),
                   ],
-                ],
+                   ],
+                 ),
               ),
             ),
           );

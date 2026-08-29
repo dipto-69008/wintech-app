@@ -10,6 +10,62 @@ import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
 import 'stock_transfer_detail_screen.dart';
 
+String _packagingKey(String name, String pack) =>
+    '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}|'
+    '${pack.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
+
+// Keep the transfer form safe when an older/cached ERP product response does
+// not yet include the new packaging fields.
+const Map<String, Map<String, int>> _packagingFallbacks = {
+  'aquaamla|100gm': {'carton': 160},
+  'aquaamla|500gm': {'carton': 40},
+  'aquamilkpremium|500gm': {'bucket': 20},
+  'aquasafeplus|5kg': {'carton': 4},
+  'bencidalplus|100ml': {'carton': 80},
+  'bencidalplus|500ml': {'carton': 15},
+  'bottomlight|100gm': {'bucket': 70},
+  'bottomlight|500gm': {'bucket': 15},
+  'broodplus|500gm': {'bucket': 16},
+  'ecofresh|1kg': {'carton': 22},
+  'ecofreshplus|1kg': {'bucket': 15},
+  'energyflow|500gm': {'carton': 32},
+  'greenvita|500gm': {'carton': 20},
+  'liverwin|500ml': {'bucket': 20},
+  'oxywingranular|1kg': {'bucket': 20},
+  'oxywintablet|1kg': {'bucket': 20},
+  'proyuccaforfish|100ml': {'carton': 80},
+  'proyuccaforfish|500ml': {'carton': 15},
+  'proyuccafish|100ml': {'carton': 80},
+  'proyuccafish|500ml': {'carton': 15},
+  'soilguard|500gm': {'bucket': 20},
+  'vitagrowaqua|500ml': {'carton': 15},
+  'vitafortaqua|500gm': {'bucket': 20},
+  'vitazymeaqua|500gm': {'bucket': 18},
+  'winc|100gm': {'carton': 160},
+  'winhealth|500ml': {'carton': 15},
+  'winmaxplus|50ml': {'carton': 100},
+  'winmaxplus|200ml': {'carton': 48},
+  'winproaqua|100gm': {'bucket': 70},
+  'winproaqua|200gm': {'bucket': 45},
+  'winxideaqua|100ml': {'carton': 60},
+  'winxideaqua|500ml': {'carton': 24},
+};
+
+Map<String, dynamic> _withPackagingFallback(Map<String, dynamic> product) {
+  final fallback = _packagingFallbacks[_packagingKey(
+    product['name']?.toString() ?? '',
+    product['packSize']?.toString() ?? '',
+  )];
+  if (fallback == null) return product;
+  return {
+    ...product,
+    if (product['pcsPerCarton'] == null && fallback['carton'] != null)
+      'pcsPerCarton': fallback['carton'],
+    if (product['pcsPerBucket'] == null && fallback['bucket'] != null)
+      'pcsPerBucket': fallback['bucket'],
+  };
+}
+
 /// Native stock-transfer screen.
 /// — CREATE: submits directly to ERP via API; if offline, queues locally.
 /// — LIST  : loads live ERP data; falls back to local queue preview.
@@ -775,7 +831,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         ApiService.branches(),
       ]);
       if (!mounted) return;
-      final prods = results[0];
+       final prods = results[0].map(_withPackagingFallback).toList();
       final branches = results[1];
       setState(() {
         _erpConnected = true;
@@ -1074,6 +1130,16 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     // Derived: pcs-per-carton / pcs-per-bucket from selected product
     final ppc = (_selectedProduct?['pcsPerCarton'] as num?)?.toInt();
     final ppb = (_selectedProduct?['pcsPerBucket'] as num?)?.toInt();
+    final availableQtyUnits = [
+      'Pcs',
+      if (ppc != null && ppc > 0) 'Carton',
+      if (ppb != null && ppb > 0) 'Bucket',
+    ];
+    if (!availableQtyUnits.contains(_qtyUnit)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _qtyUnit = 'Pcs');
+      });
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1242,7 +1308,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primaryAccent),
-              items: _qtyUnits
+               items: availableQtyUnits
                   .map((u) => DropdownMenuItem(
                       value: u,
                       child: Text(u,
