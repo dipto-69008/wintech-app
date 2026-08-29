@@ -204,7 +204,7 @@ class ApiService {
   static Future<Map<String, dynamic>> createOrder({
     String? partyId,
     required String partyName,
-    required List<Map<String, dynamic>> items, // {productId?, productName, quantity, rate, unit?, isBonus?}
+    required List<Map<String, dynamic>> items, // {productId?, productName, packSize?, quantity, rate, unit?, isBonus?}
     String paymentType = 'Cash',
     double paidAmount = 0,
     String notes = '',
@@ -252,7 +252,8 @@ class ApiService {
       _post('/api/mobile/targets', {'targetId': targetId, 'currentValue': value});
 
   /// ADMIN ONLY — set yearly (Jan–Dec) monthly targets for an officer.
-  /// months: [{month: 1..12, targetAmount, incentivePerSale}]
+  /// months: [{month: 1..12, targetAmount, commissionPercent,
+  /// commissionPercentAtFull}]
   static Future<Map<String, dynamic>> setYearlyTargets({
     required String assignedTo,
     required int year,
@@ -471,7 +472,7 @@ class ApiService {
   }
 
   /// Create a product return invoice.
-  /// items: [{productName, quantity, rate}]
+  /// items: [{productName, packSize?, quantity, rate}]
   static Future<Map<String, dynamic>> createSalesReturn({
     required String partyName,
     required List<Map<String, dynamic>> items,

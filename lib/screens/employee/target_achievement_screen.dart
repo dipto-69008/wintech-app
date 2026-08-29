@@ -25,7 +25,9 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   double _erpMonthSales = 0;
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
-  double _erpIncentivePerSale = 0;
+  double _erpCommissionPercent = 0;
+  double _erpCollectionAmount = 0;
+  double _erpCollectionPercent = 0;
   double _erpIncentiveEarned = 0;
   String _erpTargetTitle = '';
 
@@ -52,8 +54,12 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
           _erpConnected = true;
           _erpMonthSales =
               (thisMonth['salesAmount'] as num?)?.toDouble() ?? 0;
-          _erpIncentivePerSale =
-               (thisMonth['incentivePerSale'] as num?)?.toDouble() ?? 0;
+          _erpCommissionPercent =
+              (thisMonth['commissionPercent'] as num?)?.toDouble() ?? 0;
+          _erpCollectionAmount =
+              (thisMonth['collectionAmount'] as num?)?.toDouble() ?? 0;
+          _erpCollectionPercent =
+              (thisMonth['collectionPercent'] as num?)?.toDouble() ?? 0;
           _erpIncentiveEarned =
               (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
@@ -268,7 +274,7 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               _target > 0 ? '৳${_fmt.format(_remaining)}' : 'N/A',
               Icons.schedule_rounded, AppTheme.warning, isDark)),
         ]),
-         if (_erpIncentivePerSale > 0) ...[
+          if (_erpCommissionPercent > 0 || _erpCollectionAmount > 0) ...[
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -292,9 +298,9 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  _incentiveEligible
-                       ? 'Sales Incentive Earned'
-                        : 'Per-sale Incentive (৳${_fmt.format(_erpIncentivePerSale)})',
+                   _incentiveEligible
+                        ? 'Collection Incentive Earned'
+                         : 'Collection: ৳${_fmt.format(_erpCollectionAmount)} (${_erpCollectionPercent.toStringAsFixed(1)}%) • Rate: ${_erpCommissionPercent.toStringAsFixed(1)}%',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

@@ -230,6 +230,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
   final _invoiceCtrl = TextEditingController();
   final _reasonCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController();
+  final _rateCtrl = TextEditingController();
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _parties = [];
   Map<String, dynamic>? _product;
@@ -295,7 +296,15 @@ class _NewReturnTabState extends State<_NewReturnTab> {
                   .where((v) => v.isNotEmpty)
                   .join(' • ')),
     );
-    if (product != null) setState(() => _product = product);
+    if (product != null) {
+      final rate = (product['sellingPrice'] as num?)?.toDouble() ??
+          (product['wholesaleRate'] as num?)?.toDouble() ??
+          0;
+      setState(() {
+        _product = product;
+        _rateCtrl.text = rate > 0 ? rate.toStringAsFixed(2) : '';
+      });
+    }
   }
 
   /// Builds a return line from the currently-filled product/quantity fields.
@@ -310,9 +319,11 @@ class _NewReturnTabState extends State<_NewReturnTab> {
       if (showErrors) _message('Please enter a valid quantity', error: true);
       return null;
     }
-    final rate = (_product!['sellingPrice'] as num?)?.toDouble() ??
-        (_product!['wholesaleRate'] as num?)?.toDouble() ??
-        0;
+    final rate = double.tryParse(_rateCtrl.text.trim()) ?? 0;
+    if (rate < 0) {
+      if (showErrors) _message('Please enter a valid rate', error: true);
+      return null;
+    }
     return {
       'productName': _product!['name'].toString(),
       'quantity': qty,
@@ -328,6 +339,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
       _items.add(entry);
       _product = null;
       _qtyCtrl.clear();
+      _rateCtrl.clear();
     });
   }
 
@@ -363,6 +375,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
           items: items
               .map((item) => {
                     'productName': item['productName'],
+                    'packSize': item['packSize'],
                     'quantity': item['quantity'],
                     'rate': item['rate'],
                   })
@@ -376,6 +389,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
         _invoiceCtrl.clear();
         _reasonCtrl.clear();
         _qtyCtrl.clear();
+        _rateCtrl.clear();
         _product = null;
         _items.clear();
       });
@@ -443,16 +457,39 @@ class _NewReturnTabState extends State<_NewReturnTab> {
                     fontSize: 11, color: AppTheme.textGrey)),
           ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _qtyCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _qtyCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))
+                ],
+                style: GoogleFonts.hindSiliguri(),
+                decoration: const InputDecoration(
+                    labelText: 'Quantity *',
+                    prefixIcon: Icon(Icons.numbers_rounded)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _rateCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                ],
+                style: GoogleFonts.hindSiliguri(),
+                decoration: const InputDecoration(
+                    labelText: 'Rate *',
+                    prefixIcon: Icon(Icons.price_change_outlined)),
+              ),
+            ),
           ],
-          style: GoogleFonts.hindSiliguri(),
-          decoration: const InputDecoration(
-              labelText: 'Quantity *',
-              prefixIcon: Icon(Icons.numbers_rounded)),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
@@ -539,6 +576,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
     _invoiceCtrl.dispose();
     _reasonCtrl.dispose();
     _qtyCtrl.dispose();
+    _rateCtrl.dispose();
     super.dispose();
   }
 }

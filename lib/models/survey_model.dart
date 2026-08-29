@@ -21,6 +21,7 @@ class SurveyModel {
   final String prescription;
 
   // ── Dealer fields ──────────────────────────────────────────────────────
+  final String partyId;
   final String shopName;
   final String dealerName;
   final String dealerMobile;
@@ -49,6 +50,7 @@ class SurveyModel {
     this.wintechProducts = const [],
     this.prescription = '',
     // dealer
+    this.partyId = '',
     this.shopName = '',
     this.dealerName = '',
     this.dealerMobile = '',
@@ -81,6 +83,7 @@ class SurveyModel {
         'diseases': diseases,
         'wintechProducts': wintechProducts,
         'prescription': prescription,
+        'partyId': partyId,
         'shopName': shopName,
         'dealerName': dealerName,
         'dealerMobile': dealerMobile,
@@ -109,6 +112,7 @@ class SurveyModel {
                 .toList() ??
             [],
         prescription: m['prescription'] as String? ?? '',
+        partyId: m['partyId']?.toString() ?? '',
         shopName: m['shopName'] as String? ?? '',
         dealerName: m['dealerName'] as String? ?? '',
         dealerMobile: m['dealerMobile'] as String? ?? '',
@@ -137,6 +141,7 @@ class SurveyModel {
     String? diseases,
     List<String>? wintechProducts,
     String? prescription,
+    String? partyId,
     String? shopName,
     String? dealerName,
     String? dealerMobile,
@@ -162,6 +167,7 @@ class SurveyModel {
         diseases: diseases ?? this.diseases,
         wintechProducts: wintechProducts ?? this.wintechProducts,
         prescription: prescription ?? this.prescription,
+        partyId: partyId ?? this.partyId,
         shopName: shopName ?? this.shopName,
         dealerName: dealerName ?? this.dealerName,
         dealerMobile: dealerMobile ?? this.dealerMobile,

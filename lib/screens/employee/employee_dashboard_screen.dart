@@ -34,7 +34,9 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   double _erpTargetValue = 0;
   double _erpCurrentValue = 0;
   double _erpIncentiveEarned = 0;
-  double _erpIncentivePerSale = 0;
+  double _erpCommissionPercent = 0;
+  double _erpCollectionAmount = 0;
+  double _erpCollectionPercent = 0;
 
   final _fmt = NumberFormat('#,##0', 'en_US');
   Timer? _liveTimer;
@@ -74,8 +76,12 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
           _erpMonthOrders = (thisMonth['orders'] as num?)?.toInt() ?? 0;
           _erpIncentiveEarned =
               (thisMonth['incentiveEarned'] as num?)?.toDouble() ?? 0;
-          _erpIncentivePerSale =
-               (thisMonth['incentivePerSale'] as num?)?.toDouble() ?? 0;
+          _erpCommissionPercent =
+              (thisMonth['commissionPercent'] as num?)?.toDouble() ?? 0;
+          _erpCollectionAmount =
+              (thisMonth['collectionAmount'] as num?)?.toDouble() ?? 0;
+          _erpCollectionPercent =
+              (thisMonth['collectionPercent'] as num?)?.toDouble() ?? 0;
           if (targets.isNotEmpty) {
             final t = targets.first as Map<String, dynamic>;
             _erpTargetValue = (t['targetValue'] as num?)?.toDouble() ?? 0;
@@ -292,7 +298,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
              const SizedBox(height: 12),
                Text(_erpConnected
                    ? (_targetValue > 0
-                        ? 'Target: ৳${_fmt.format(_targetValue)}  •  ৳${_fmt.format(_erpIncentivePerSale)} per approved sale'
+                         ? 'Target: ৳${_fmt.format(_targetValue)}  •  Collection: ৳${_fmt.format(_erpCollectionAmount)} (${_erpCollectionPercent.toStringAsFixed(1)}%)  •  Commission: ${_erpCommissionPercent.toStringAsFixed(1)}%'
                        : 'Not set target yet')
                    : 'Not set target yet',
                  style: GoogleFonts.hindSiliguri(

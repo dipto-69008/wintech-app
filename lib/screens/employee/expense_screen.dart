@@ -157,6 +157,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
             if (await ApiService.isConnected) {
               try {
                 final payload = e.toMap();
+                payload['clientId'] = e.id;
                 await OfflineQueueService.uploadExpenseDocuments(payload);
                 if (isNew) {
                   // The ERP assigns the real id, so the local EXP-* placeholder
@@ -1715,6 +1716,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
         ),
       ]),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          'From / To travel details will also be saved in Motorcycle Log Book.',
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11, color: AppTheme.primaryAccent),
+        ),
+      ),
       ..._taRows.asMap().entries.map((entry) {
         final i = entry.key;
         final r = entry.value;

@@ -781,10 +781,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   List<String> _photos = [];
   bool _pickingPhoto = false;
   String _lastLookupNumber = '';
+  String _photoValidationMessage = '';
   static const int _maxPhotos = 5;
 
   // Dealer visit: zone-based party selection
   String _dealerZone = '';
+  String _dealerPartyId = '';
   List<Map<String, dynamic>> _erpParties = [];
 
   /// Full Wintech product list from the official catalog (dropdown source)
@@ -818,6 +820,17 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     return list;
   }
 
+  String _partyIdForName(String name) {
+    for (final party in _erpParties) {
+      final partyZone = (party['zone'] ?? party['area'] ?? '').toString();
+      if ((party['name'] ?? '').toString() == name &&
+          (_dealerZone.isEmpty || partyZone == _dealerZone)) {
+        return (party['_id'] ?? party['id'] ?? '').toString();
+      }
+    }
+    return '';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -840,6 +853,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
         survey?.collectionAmount == null ? '' : '${survey!.collectionAmount}';
     _remarks.text = survey?.remarks ?? '';
     _stock = survey?.wintechStock ?? '';
+    _dealerPartyId = survey?.partyId ?? '';
     _products = [...(survey?.wintechProducts ?? [])];
     _photo = survey?.photo ?? '';
     _photos = [...(survey?.photos ?? [])];
@@ -880,6 +894,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       setState(() {
         if (dealer) {
           _shopName.text = (found['shopName'] ?? '').toString();
+          _dealerPartyId = (found['partyId'] ?? '').toString();
           _dealerName.text = (found['dealerName'] ?? '').toString();
           _bazarName.text = (found['bazarName'] ?? '').toString();
           _stock = (found['wintechStock'] ?? '').toString();
@@ -980,7 +995,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     }
     // Real-time photo is mandatory: at least one camera capture.
     if (_photos.isEmpty && _photo.trim().isEmpty) {
-      _message('Please take at least one real-time photo with the camera');
+      _showPhotoRequired();
       return;
     }
     // New visit records always capture the live Asia/Dhaka timestamp.
@@ -1001,6 +1016,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
       wintechProducts: _products,
       prescription: _prescription.text.trim(),
       shopName: _shopName.text.trim(),
+      partyId: _dealerPartyId,
       dealerName: _dealerName.text.trim(),
       dealerMobile: _dealerMobile.text.trim(),
       bazarName: _bazarName.text.trim(),
@@ -1059,9 +1075,49 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   }
 
   void _message(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message, style: GoogleFonts.hindSiliguri())),
-    );
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message, style: GoogleFonts.hindSiliguri()),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  void _showPhotoRequired() {
+    setState(() {
+      _photoValidationMessage =
+          'Image Required: Please take a real-time photo with the camera before submitting.';
+    });
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          duration: const Duration(seconds: 4),
+          content: Row(
+            children: [
+              const Icon(Icons.image_not_supported_rounded,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Image Required — take a real-time camera photo first.',
+                  style: GoogleFonts.hindSiliguri(
+                      color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
   }
 
   @override
@@ -1096,6 +1152,37 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _section(isFarmer ? 'Farmer Info' : 'Shop / Dealer Info'),
+                if (_photoValidationMessage.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppTheme.error.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.image_not_supported_rounded,
+                            color: AppTheme.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _photoValidationMessage,
+                            style: GoogleFonts.hindSiliguri(
+                                color: AppTheme.error,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (isFarmer) ...[
                   Row(
                     children: [
@@ -1177,8 +1264,10 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                                 style:
                                     GoogleFonts.hindSiliguri(fontSize: 13))))
                         .toList(),
-                    onChanged: (value) =>
-                        setState(() => _dealerZone = value ?? ''),
+                    onChanged: (value) => setState(() {
+                      _dealerZone = value ?? '';
+                      _dealerPartyId = '';
+                    }),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -1202,15 +1291,23 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                                 style:
                                     GoogleFonts.hindSiliguri(fontSize: 13))))
                         .toList(),
-                    onChanged: (value) =>
-                        setState(() => _shopName.text = value ?? ''),
+                    onChanged: (value) => setState(() {
+                      _shopName.text = value ?? '';
+                      _dealerPartyId =
+                          value == null ? '' : _partyIdForName(value);
+                    }),
                     validator: (_) => _shopName.text.trim().isEmpty
                         ? 'Required'
                         : null,
                   ),
                   const SizedBox(height: 10),
-                  _field(_shopName, 'Shop Name (manual, if not in list)',
-                      required: false),
+                   _field(_shopName, 'Shop Name (manual, if not in list)',
+                       required: false,
+                       onChanged: (_) {
+                         if (_dealerPartyId.isNotEmpty) {
+                           setState(() => _dealerPartyId = '');
+                         }
+                       }),
                   const SizedBox(height: 10),
                   _field(_dealerName, 'Dealer Name'),
                   const SizedBox(height: 10),
@@ -1424,7 +1521,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
             // Keep the camera file for the normal save-time upload retry.
           }
         }
-        if (mounted) setState(() => _photos = [..._photos, storedPhoto]);
+        if (mounted) {
+          setState(() {
+            _photos = [..._photos, storedPhoto];
+            _photoValidationMessage = '';
+          });
+        }
       }
     } catch (_) {
       if (mounted) _message('Camera unavailable — please enable camera access');

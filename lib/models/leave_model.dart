@@ -62,6 +62,24 @@ class LeaveModel {
     }
   }
 
+  static String normalizeLeaveType(dynamic raw) {
+    final value = (raw ?? '').toString().trim().toLowerCase().replaceAll('-', '_');
+    if (value == typeSick || value.contains('sick') || value == 'medical') {
+      return typeSick;
+    }
+    if (value == typeFuneral || value.contains('funeral')) return typeFuneral;
+    if (value == typePaternity || value.contains('paternity')) return typePaternity;
+    if (value == typeMarriage || value.contains('marriage')) return typeMarriage;
+    if (value == typeWithoutPay ||
+        value.contains('without pay') ||
+        value.contains('without_pay') ||
+        value.contains('unpaid')) {
+      return typeWithoutPay;
+    }
+    if (value == typeEncashment || value.contains('encash')) return typeEncashment;
+    return typeCasual;
+  }
+
   String get statusLabel {
     switch (status) {
       case statusApproved: return 'Approved';
@@ -70,7 +88,11 @@ class LeaveModel {
     }
   }
 
-  int get totalDays => toDate.difference(fromDate).inDays + 1;
+  int get totalDays {
+    final start = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
+    final end = DateTime.utc(toDate.year, toDate.month, toDate.day);
+    return end.difference(start).inDays + 1;
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -91,7 +113,7 @@ class LeaveModel {
 
   factory LeaveModel.fromMap(Map<String, dynamic> m) => LeaveModel(
         id: m['id'] ?? '',
-        leaveType: m['leaveType'] ?? typeCasual,
+        leaveType: normalizeLeaveType(m['leaveType'] ?? m['type']),
         fromDate: DateTime.tryParse(m['fromDate']?.toString() ?? '') ??
             DateTime.now(),
         toDate: DateTime.tryParse(m['toDate']?.toString() ?? '') ??

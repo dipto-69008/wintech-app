@@ -11,6 +11,10 @@ class PaymentCollectionModel {
   final String srName;
   final String chequeNumber;
   final String proofImage;
+  final String invoiceNo;
+  final bool commissionRequested;
+  final double commissionPct;
+  final double commissionAmount;
 
   const PaymentCollectionModel({
     required this.id,
@@ -25,6 +29,10 @@ class PaymentCollectionModel {
     required this.srName,
     this.chequeNumber = '',
     this.proofImage = '',
+    this.invoiceNo = '',
+    this.commissionRequested = false,
+    this.commissionPct = 0,
+    this.commissionAmount = 0,
   });
 
   static const String statusPending   = 'pending';
@@ -62,6 +70,11 @@ class PaymentCollectionModel {
         'srName': srName,
         'chequeNumber': chequeNumber,
         'proofImage': proofImage,
+        if (invoiceNo.isNotEmpty) 'invoiceNo': invoiceNo,
+        if (commissionRequested && invoiceNo.isNotEmpty) ...{
+          'commissionRequested': true,
+          'commissionPct': commissionPct,
+        },
       };
 
   factory PaymentCollectionModel.fromMap(Map<String, dynamic> m) =>
@@ -78,6 +91,10 @@ class PaymentCollectionModel {
         srName: m['srName']?.toString() ?? '',
         chequeNumber: m['chequeNumber']?.toString() ?? '',
         proofImage: m['proofImage']?.toString() ?? '',
+        invoiceNo: m['invoiceNo']?.toString() ?? '',
+        commissionRequested: m['commissionRequested'] == true,
+        commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
+        commissionAmount: (m['commissionAmount'] as num?)?.toDouble() ?? 0,
       );
 
   PaymentCollectionModel copyWith({String? status, String? proofImage}) =>
@@ -94,5 +111,9 @@ class PaymentCollectionModel {
         srName: srName,
         chequeNumber: chequeNumber,
         proofImage: proofImage ?? this.proofImage,
+        invoiceNo: invoiceNo,
+        commissionRequested: commissionRequested,
+        commissionPct: commissionPct,
+        commissionAmount: commissionAmount,
       );
 }

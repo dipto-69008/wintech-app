@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import '../../config/theme.dart';
 import '../../data/wintech_catalog.dart';
 import '../../models/order_model.dart';
@@ -20,6 +21,7 @@ class PosOrderScreen extends StatefulWidget {
 }
 
 class _LineItem {
+  final quantityCtrl = TextEditingController(text: '1');
   String productId = '';
   String productName = '';
   String packSize = '';
@@ -33,6 +35,8 @@ class _LineItem {
   double get total => isBonus ? 0 : quantity * rate;
   String get displayName =>
       packSize.isEmpty ? productName : '$productName $packSize';
+
+  void dispose() => quantityCtrl.dispose();
 }
 
 class _PosOrderScreenState extends State<PosOrderScreen> {
@@ -144,7 +148,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       _isFullCashPayment && _requestCashCommission ? 3 : 0;
   double get _commissionAmount => _subTotal * _cashCommissionPct / 100;
   double get _grandTotal => _subTotal - _commissionAmount;
-  double get _due => (_grandTotal - _paid).clamp(0, double.infinity);
+  double get _effectivePaid => _paid.clamp(0, _grandTotal);
+  double get _due => (_grandTotal - _effectivePaid).clamp(0, double.infinity);
 
   bool _hasAvailableStock(_LineItem line) => line.availableStock >= 0;
 
@@ -177,7 +182,33 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       );
       return;
     }
-    setState(() => line.quantity = next);
+    _setQuantity(line, next);
+  }
+
+  void _setQuantity(_LineItem line, double quantity) {
+    final safeQuantity = quantity < 1 ? 1.0 : quantity;
+    setState(() {
+      line.quantity = safeQuantity;
+      final text = safeQuantity.toStringAsFixed(0);
+      line.quantityCtrl.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    });
+  }
+
+  void _finishQuantityEdit(_LineItem line) {
+    if (line.quantity < 1) {
+      _setQuantity(line, 1);
+      return;
+    }
+    final text = line.quantity.toStringAsFixed(0);
+    if (line.quantityCtrl.text != text) {
+      line.quantityCtrl.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
   }
 
   // ── Pickers ───────────────────────────────────────────────────────────
@@ -335,7 +366,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     final apiItems = _validLines
         .map((l) => {
               if (l.productId.isNotEmpty) 'productId': l.productId,
-              'productName': l.displayName + (l.isBonus ? ' (Bonus)' : ''),
+              'productName': l.productName + (l.isBonus ? ' (Bonus)' : ''),
+              'packSize': l.packSize,
               'quantity': l.quantity,
               'rate': l.isBonus ? 0 : l.rate,
               'unit': 'Pcs',
@@ -350,6 +382,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       'partyName': _partyName,
       'items': apiItems,
       'paymentType': _paymentType,
+      // Send the gross amount entered by the officer. The server applies the
+      // commission and stores the capped net paid amount.
       'paidAmount': _paid,
       'notes': _notesCtrl.text.trim(),
       'requestCommission': _requestCashCommission && _isFullCashPayment,
@@ -368,7 +402,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           partyName: _partyName,
           items: apiItems,
           paymentType: _paymentType,
-          paidAmount: _paid,
+           paidAmount: _paid,
           notes: _notesCtrl.text.trim(),
           probablePaymentDate: _probablePaymentDate,
           requestCommission: _requestCashCommission && _isFullCashPayment,
@@ -705,7 +739,11 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
           if (hasProduct) ...[
             const SizedBox(width: 6),
             GestureDetector(
-              onTap: () => setState(() => _lines.removeAt(index)),
+              onTap: () {
+                 final removed = _lines.removeAt(index);
+                 removed.dispose();
+                 setState(() {});
+               },
               child: Container(
                   padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
@@ -770,12 +808,34 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                   children: [
                     _qtyBtn(Icons.remove_rounded, () {
                       if (line.quantity > 1) {
-                        setState(() => line.quantity--);
+                        _setQuantity(line, line.quantity - 1);
                       }
                     }),
-                    Text(line.quantity.toStringAsFixed(0),
+                    SizedBox(
+                      width: 42,
+                      child: TextField(
+                        controller: line.quantityCtrl,
+                        textAlign: TextAlign.center,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: false),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
                         style: GoogleFonts.hindSiliguri(
-                            fontSize: 15, fontWeight: FontWeight.w800)),
+                            fontSize: 15, fontWeight: FontWeight.w800),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: (value) {
+                          final parsed = int.tryParse(value);
+                          setState(() => line.quantity = parsed?.toDouble() ?? 0);
+                        },
+                        onEditingComplete: () => _finishQuantityEdit(line),
+                        onSubmitted: (_) => _finishQuantityEdit(line),
+                      ),
+                    ),
                     _qtyBtn(Icons.add_rounded, () => _increaseQuantity(line)),
                   ],
                 ),
@@ -1025,7 +1085,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                    'Cash Commission 3% requested: ৳${_fmt2.format(_commissionAmount)} (ERP admin approval required)',
+                    'Cash Commission 3% deducted: ৳${_fmt2.format(_commissionAmount)} from the order total',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1045,8 +1105,8 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             title: Text('Request 3% cash commission',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 13, fontWeight: FontWeight.w700)),
-            subtitle: Text(
-                'Full payment received — turn this on or off before saving.',
+             subtitle: Text(
+                 'Full payment received — 3% will be deducted when enabled.',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11.5, color: AppTheme.textGrey)),
           ),
@@ -1133,6 +1193,9 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   void dispose() {
     _paidCtrl.dispose();
     _notesCtrl.dispose();
+    for (final line in _lines) {
+      line.dispose();
+    }
     super.dispose();
   }
 }

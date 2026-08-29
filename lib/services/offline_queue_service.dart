@@ -206,6 +206,7 @@ class OfflineQueueService {
             probablePaymentDate: p['probablePaymentDate'] != null
                 ? DateTime.tryParse(p['probablePaymentDate'] as String)
                 : null,
+              requestCommission: p['requestCommission'] == true,
           );
           ok = true;
         } else if (item.type == QueueItemType.stockTransfer) {
@@ -259,6 +260,7 @@ class OfflineQueueService {
             } else {
               // A queued create still carries a local EXP-* id; the ERP
               // assigns the real one, so do not send the placeholder.
+              body['clientId'] ??= item.payload['id'];
               body.remove('id');
               await ApiService.createExpense(body);
             }

@@ -66,13 +66,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
   /// Map an ERP SaleMaster (+items) document to the local OrderModel.
   OrderModel _erpToOrderModel(Map<String, dynamic> m) {
     final items = (m['items'] as List? ?? [])
-        .map((d) => OrderItem(
-              productName: d['productName']?.toString() ?? '',
+        .map((d) {
+          final productName = d['productName']?.toString() ?? '';
+          final packSize = d['packSize']?.toString() ?? '';
+          final displayName = packSize.isNotEmpty &&
+                  !productName.toLowerCase().endsWith(packSize.toLowerCase())
+              ? '$productName $packSize'
+              : productName;
+          return OrderItem(
+              productName: displayName,
               quantity: (d['quantity'] as num?)?.toDouble() ?? 0,
               unit: 'Pcs',
               unitPrice: (d['rate'] as num?)?.toDouble() ?? 0,
               isBonus: d['isBonus'] == true,
-            ))
+            );
+        })
         .toList();
     // ERP status 'a' (active) → confirmed
     final erpStatus = m['status']?.toString() ?? 'a';

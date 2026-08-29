@@ -436,6 +436,18 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 11, color: AppTheme.textGrey)),
             ],
+            if (p.invoiceNo.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text('Invoice: ${p.invoiceNo}',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 11, color: AppTheme.primaryAccent)),
+            ],
+            if (p.commissionAmount > 0) ...[
+              const SizedBox(height: 2),
+              Text('Cash commission: ৳ ${_fmt.format(p.commissionAmount)}',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 11, color: AppTheme.warning)),
+            ],
           ]),
         ),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -534,6 +546,12 @@ class PaymentCollectionDetailScreen extends StatelessWidget {
                 DateFormat('dd MMM yyyy, hh:mm a').format(payment.date)),
             if (payment.chequeNumber.isNotEmpty)
               _detail('Cheque Number', payment.chequeNumber),
+            _detail('Ledger', payment.invoiceNo.isNotEmpty
+                ? 'Invoice ${payment.invoiceNo}'
+                : 'Party Ledger'),
+            if (payment.commissionAmount > 0)
+              _detail('Cash Commission',
+                  '৳ ${NumberFormat('#,##0.00', 'en_US').format(payment.commissionAmount)} (${payment.commissionPct}%)'),
             if (payment.srName.isNotEmpty) _detail('Collected By', payment.srName),
             if (payment.notes.isNotEmpty) _detail('Notes', payment.notes),
           ]),
@@ -604,12 +622,15 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   late TextEditingController _amountCtrl;
   late TextEditingController _notesCtrl;
   late TextEditingController _chequeCtrl;
+  late TextEditingController _invoiceCtrl;
+  late TextEditingController _commissionPctCtrl;
   String _method = 'cash';
   DateTime _date = _dhakaNow();
   String _proofImage = '';
   bool _pickingImage = false;
   double _customerDue = 0;
   bool _saving = false;
+  bool _commissionRequested = false;
 
   // Searchable ERP customer selection
   List<Map<String, dynamic>> _erpParties = [];
@@ -632,6 +653,10 @@ class _CollectionDialogState extends State<_CollectionDialog> {
         TextEditingController(text: e != null ? e.amount.toString() : '');
     _notesCtrl    = TextEditingController(text: e?.notes ?? '');
     _chequeCtrl   = TextEditingController(text: e?.chequeNumber ?? '');
+    _invoiceCtrl  = TextEditingController(text: e?.invoiceNo ?? '');
+    _commissionPctCtrl = TextEditingController(
+        text: e != null && e.commissionPct > 0 ? e.commissionPct.toString() : '3');
+    _commissionRequested = e?.commissionRequested ?? false;
     _method = e?.paymentMethod ?? 'cash';
     _date   = e?.date ?? _dhakaNow();
     _customerId = e?.customerId ?? '';
@@ -642,11 +667,11 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   Future<void> _loadParties() async {
     try {
       if (await ApiService.isConnected) {
-        final data = await ApiService.parties(allBranches: true);
+        final data = await ApiService.parties();
         if (mounted) setState(() => _erpParties = data);
       }
     } catch (_) {
-      // Offline — free-text customer entry still works.
+      // Offline — an existing selected party can still be submitted from cache.
     }
   }
 
@@ -675,6 +700,8 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     _chequeCtrl.dispose();
+    _invoiceCtrl.dispose();
+    _commissionPctCtrl.dispose();
     super.dispose();
   }
 
@@ -714,6 +741,10 @@ class _CollectionDialogState extends State<_CollectionDialog> {
       notes: _notesCtrl.text.trim(),
       chequeNumber: _chequeCtrl.text.trim(),
       proofImage: _proofImage,
+      invoiceNo: _invoiceCtrl.text.trim(),
+      commissionRequested: _commissionRequested && _invoiceCtrl.text.trim().isNotEmpty,
+      commissionPct: double.tryParse(_commissionPctCtrl.text.trim()) ?? 0,
+      commissionAmount: widget.existing?.commissionAmount ?? 0,
       date: _date,
       status: widget.existing?.status ?? PaymentCollectionModel.statusPending,
       srId: widget.user?.id ?? '',
@@ -753,22 +784,22 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            _label('Customer'),
+            _label('Party'),
             TextFormField(
               controller: _customerCtrl,
-              readOnly: _erpParties.isNotEmpty,
+              readOnly: true,
               onTap: _erpParties.isNotEmpty ? _openCustomerPicker : null,
               decoration: InputDecoration(
                 hintText: _erpParties.isNotEmpty
-                    ? 'Tap to search ERP customer'
-                    : 'Customer Name',
+                    ? 'Tap to select ERP party'
+                    : 'Connect to ERP to load parties',
                 suffixIcon: _erpParties.isNotEmpty
                     ? const Icon(Icons.search_rounded,
                         color: AppTheme.primaryAccent)
                     : null,
               ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              validator: (_) =>
+                  _customerId.isEmpty ? 'Please select a party' : null,
             ),
             const SizedBox(height: 12),
             if (_customerId.isNotEmpty)
@@ -780,7 +811,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Customer due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_customerDue)}',
+                  'Party due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_customerDue)}',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -789,6 +820,75 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                 ),
               ),
             if (_customerId.isNotEmpty) const SizedBox(height: 12),
+            _label('Invoice Number (optional)'),
+            TextFormField(
+              controller: _invoiceCtrl,
+              textCapitalization: TextCapitalization.characters,
+              onChanged: (_) => setState(() {
+                if (_invoiceCtrl.text.trim().isEmpty) _commissionRequested = false;
+              }),
+              decoration: const InputDecoration(
+                hintText: 'Leave blank for party ledger payment',
+                prefixIcon: Icon(Icons.receipt_long_rounded),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'With invoice: payment reduces that invoice due. Without invoice: payment reduces the party ledger due.',
+              style: GoogleFonts.hindSiliguri(
+                fontSize: 11,
+                color: AppTheme.textGrey,
+              ),
+            ),
+            if (_invoiceCtrl.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryAccent.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: AppTheme.primaryAccent.withValues(alpha: 0.18)),
+                ),
+                child: Column(
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: _commissionRequested,
+                      onChanged: (value) =>
+                          setState(() => _commissionRequested = value ?? false),
+                      title: Text('Apply Cash Commission to this invoice',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      subtitle: Text(
+                          'Only available when this payment settles the invoice.',
+                          style: GoogleFonts.hindSiliguri(fontSize: 11)),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    if (_commissionRequested)
+                      TextFormField(
+                        controller: _commissionPctCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Cash Commission %',
+                          hintText: '3',
+                          suffixText: '%',
+                        ),
+                        validator: (value) {
+                          if (!_commissionRequested) return null;
+                          final pct = double.tryParse(value?.trim() ?? '');
+                          if (pct == null || pct <= 0 || pct > 100) {
+                            return 'Enter a percentage between 0 and 100';
+                          }
+                          return null;
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             _label('Amount (Taka)'),
             TextFormField(
               controller: _amountCtrl,
@@ -796,7 +896,9 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               decoration: const InputDecoration(hintText: '0.00'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Required';
-                if (double.tryParse(v.trim()) == null) return 'Enter a number';
+                final amount = double.tryParse(v.trim());
+                if (amount == null) return 'Enter a number';
+                if (amount <= 0) return 'Enter an amount greater than zero';
                 return null;
               },
             ),
@@ -841,7 +943,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                 ]),
               ),
             const SizedBox(height: 12),
-            _label('Collection Image (optional)'),
+            _label('Payment Collection Image (optional)'),
             Row(children: [
               OutlinedButton.icon(
                 onPressed: _pickingImage ? null : _pickProofImage,
@@ -849,7 +951,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                     ? const SizedBox(width: 14, height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.photo_camera_rounded, size: 17),
-                label: Text(_proofImage.isEmpty ? 'Take Photo' : 'Change Photo',
+                label: Text(_proofImage.isEmpty ? 'Take a Photo' : 'Retake Photo',
                     style: GoogleFonts.hindSiliguri(fontSize: 12)),
               ),
               if (_proofImage.isNotEmpty) ...[
@@ -965,7 +1067,7 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
                 color: AppTheme.divider,
                 borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 14),
-        Text('Select Customer',
+        Text('Select Party',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
@@ -982,7 +1084,7 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
         Expanded(
           child: results.isEmpty
               ? Center(
-                  child: Text('No customer found',
+                   child: Text('No party found',
                       style: GoogleFonts.hindSiliguri(
                           color: AppTheme.textGrey)))
               : ListView.builder(
