@@ -12,8 +12,13 @@ class EmployeeDashboardScreen extends StatefulWidget {
   final VoidCallback? onGoToOrders;
   final VoidCallback? onGoToTargets;
   final VoidCallback? onGoToMore;
+  final ValueChanged<String>? onGoToTool;
   const EmployeeDashboardScreen(
-      {super.key, this.onGoToOrders, this.onGoToTargets, this.onGoToMore});
+      {super.key,
+      this.onGoToOrders,
+      this.onGoToTargets,
+      this.onGoToMore,
+      this.onGoToTool});
 
   @override
   State<EmployeeDashboardScreen> createState() =>
@@ -484,12 +489,12 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   Widget _buildMoreToolsCard(bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
     const tools = [
-      (Icons.swap_horiz_rounded, 'Transfer'),
-      (Icons.receipt_rounded, 'Expense'),
-      (Icons.payments_rounded, 'Payment'),
-      (Icons.assignment_return_rounded, 'Return'),
-      (Icons.beach_access_rounded, 'Leave'),
-      (Icons.assignment_rounded, 'Field Visit Report'),
+      (Icons.swap_horiz_rounded, 'Transfer', 'stock'),
+      (Icons.receipt_rounded, 'Expense', 'expense'),
+      (Icons.payments_rounded, 'Payment', 'payment'),
+      (Icons.assignment_return_rounded, 'Return', 'return'),
+      (Icons.beach_access_rounded, 'Leave', 'leave'),
+      (Icons.assignment_rounded, 'Field Visit Report', 'survey'),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -529,7 +534,9 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                       color: AppTheme.primaryAccent.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
                       child: InkWell(
-                        onTap: widget.onGoToMore,
+                         onTap: widget.onGoToTool == null
+                             ? widget.onGoToMore
+                             : () => widget.onGoToTool!(tool.$3),
                         borderRadius: BorderRadius.circular(14),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(

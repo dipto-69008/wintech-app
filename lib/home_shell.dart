@@ -11,6 +11,12 @@ import 'screens/admin/all_employees_screen.dart';
 import 'screens/employee/employee_dashboard_screen.dart';
 import 'screens/employee/target_achievement_screen.dart';
 import 'screens/employee/more_screen.dart';
+import 'screens/employee/stock_transfer_screen.dart';
+import 'screens/employee/expense_screen.dart';
+import 'screens/employee/payment_collection_screen.dart';
+import 'screens/employee/return_products_screen.dart';
+import 'screens/employee/leave_screen.dart';
+import 'screens/employee/survey/survey_screen.dart';
 import 'screens/customer/customer_dashboard_screen.dart';
 import 'screens/customer/customer_settings_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -89,6 +95,35 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void _switchTab(int index) => setState(() => _currentIndex = index);
 
+  void _openEmployeeTool(String tag) {
+    final Widget? screen;
+    switch (tag) {
+      case 'stock':
+        screen = const StockTransferScreen();
+        break;
+      case 'expense':
+        screen = const ExpenseScreen();
+        break;
+      case 'payment':
+        screen = const PaymentCollectionScreen();
+        break;
+      case 'return':
+        screen = const ReturnProductsScreen();
+        break;
+      case 'leave':
+        screen = const LeaveScreen();
+        break;
+      case 'survey':
+        screen = const SurveyScreen();
+        break;
+      default:
+        screen = null;
+    }
+    if (screen != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen!));
+    }
+  }
+
   // ── Admin (3 tabs) ────────────────────────────────────────────────────
   List<Widget> get _adminPages => [
         const AdminDashboardScreen(),
@@ -108,6 +143,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           onGoToOrders: () => _switchTab(1),
           onGoToTargets: () => _switchTab(2),
           onGoToMore: () => _switchTab(3),
+          onGoToTool: _openEmployeeTool,
         ),
         const OrderListScreen(),
         const TargetAchievementScreen(),

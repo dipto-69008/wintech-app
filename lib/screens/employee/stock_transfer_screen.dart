@@ -8,6 +8,7 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
+import 'stock_transfer_detail_screen.dart';
 
 /// Native stock-transfer screen.
 /// — CREATE: submits directly to ERP via API; if offline, queues locally.
@@ -185,7 +186,7 @@ class _TransferListTabState extends State<_TransferListTab>
                     style: GoogleFonts.hindSiliguri(fontSize: 12, color: Colors.orange))),
               ]),
             ),
-          ...all.map((t) => _TransferCard(t: t, fmt: _fmt, isDark: isDark)),
+        ...all.map((t) => _TransferCard(t: t, fmt: _fmt, isDark: isDark)),
         ],
       ),
     );
@@ -212,6 +213,15 @@ class _TransferCard extends StatelessWidget {
     final bucket = t['bucketCount'] != null ? '${t['bucketCount']} Bkt' : null;
 
     return Container(
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StockTransferDetailScreen(transfer: t),
+          ),
+        ),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -295,6 +305,8 @@ class _TransferCard extends StatelessWidget {
           ],
         ],
       ]),
+        ),
+      ),
     );
   }
 }
@@ -507,6 +519,12 @@ class _ReceiveTabState extends State<_ReceiveTab>
                   busy: _busyId == t['_id']?.toString(),
                   onReceive: () => _decide(t, true),
                   onReject: () => _decide(t, false),
+                   onTap: () => Navigator.push(
+                     context,
+                     MaterialPageRoute(
+                       builder: (_) => StockTransferDetailScreen(transfer: t),
+                     ),
+                   ),
                 )),
           const SizedBox(height: 16),
           _sectionLabel('Receiving history', history.length),
@@ -556,6 +574,7 @@ class _IncomingCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onReceive;
   final VoidCallback onReject;
+  final VoidCallback? onTap;
 
   const _IncomingCard({
     required this.t,
@@ -564,6 +583,7 @@ class _IncomingCard extends StatelessWidget {
     required this.busy,
     required this.onReceive,
     required this.onReject,
+    this.onTap,
   });
 
   @override
@@ -577,6 +597,10 @@ class _IncomingCard extends StatelessWidget {
         : '—';
 
     return Container(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -663,6 +687,8 @@ class _IncomingCard extends StatelessWidget {
           ),
         ]),
       ]),
+        ),
+      ),
     );
   }
 }
