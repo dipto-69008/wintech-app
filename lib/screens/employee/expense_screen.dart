@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
-import '../../data/wintech_catalog.dart';
 import '../../models/expense_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
@@ -775,15 +774,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fmt = NumberFormat('#,##0.##', 'en_US');
 
-  // Dropdown-driven header values
+  // Server-owned header values. These are kept for the payload and local
+  // offline copy, but are never editable in the bill form.
   String _applicantName = '';
   String _designation = '';
   String _zone = '';
   String _month = '';
-
-  List<String> _employeeNames = [];
-  List<String> _zoneOptions = [];
-  List<String> _monthOptions = [];
 
   // Motorcycle registration number (entered once, then auto-filled)
   late TextEditingController _motoRegCtrl;
@@ -836,17 +832,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _applicantName = e?.applicantName ?? widget.user?.name ?? '';
-    _designation   = e?.designation ?? widget.user?.designation ?? '';
-    _zone          = e?.zone ?? widget.user?.zela ?? '';
+    _applicantName = widget.user?.name ?? e?.applicantName ?? '';
+    _designation   = widget.user?.designation ?? e?.designation ?? '';
+    _zone          = widget.user?.zela ?? e?.zone ?? '';
     _month         = e?.month ?? _currentMonth();
     _motoRegCtrl   = TextEditingController(text: e?.motoRegNumber ?? '');
-
-    _employeeNames = [
-      if (_applicantName.isNotEmpty) _applicantName,
-    ];
-    _zoneOptions = _buildZoneOptions();
-    _monthOptions = _buildMonthOptions();
 
     _othersCtrl = {
       for (final key in _otherKeys) key: TextEditingController(),
@@ -927,44 +917,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       _addCourierRow();
     }
 
-    _loadEmployees();
     _loadMotoReg();
     if (widget.type == ExpenseModel.typeOthersBill && e == null) {
       _loadTopSheet();
     }
-  }
-
-  List<String> _buildZoneOptions() {
-    final zones = <String>{...WintechCatalog.zones, ...UserModel.zelaList};
-    if (_zone.isNotEmpty) zones.add(_zone);
-    final list = zones.toList()..sort();
-    return list;
-  }
-
-  List<String> _buildMonthOptions() {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    final now = DateTime.now();
-    final list = <String>[];
-    for (var i = 0; i < 12; i++) {
-      final d = DateTime(now.year, now.month - i, 1);
-      list.add('${months[d.month - 1]} ${d.year}');
-    }
-    if (_month.isNotEmpty && !list.contains(_month)) list.insert(0, _month);
-    return list;
-  }
-
-  Future<void> _loadEmployees() async {
-    final employees = await LocalStorageService.getAllEmployees();
-    final names = <String>{
-      if ((widget.user?.name ?? '').isNotEmpty) widget.user!.name,
-      ...employees.map((e) => e.name),
-    };
-    if (_applicantName.isNotEmpty) names.add(_applicantName);
-    if (!mounted) return;
-    setState(() => _employeeNames = names.toList());
   }
 
   Future<void> _loadMotoReg() async {
@@ -1028,6 +984,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     'recoveryAmount', 'salesRecoveryPercent', 'tadaPercent', 'currentDues',
     'tadaAmount', 'outStationBill', 'entertainment', 'telephoneBill',
     'ddttCommission', 'courierBill', 'othersBill', 'approvedExpenseTotal',
+  ];
+
+  static const _taTransportOptions = [
+    'Motorcycle',
+    'Autorickshaw',
+    'CNG',
+    'Bus',
+    'Boat',
   ];
 
   static const Map<String, String> _otherLabels = {
@@ -1584,56 +1548,6 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (locked) _lockBanner(),
-            // Common header fields — all dropdowns
-            _sectionCard(isDark, children: [
-              _dropdownField(
-                'Applicant / Employee Name',
-                value: _applicantName.isEmpty ? null : _applicantName,
-                items: _employeeNames,
-                onChanged: (v) => setState(() => _applicantName = v ?? ''),
-              ),
-              const SizedBox(height: 12),
-              _dropdownField(
-                'Employee Designation',
-                value: ExpenseModel.designationList.contains(_designation)
-                    ? _designation
-                    : (_designation.isEmpty ? null : _designation),
-                items: [
-                  ...ExpenseModel.designationList,
-                  if (_designation.isNotEmpty &&
-                      !ExpenseModel.designationList.contains(_designation))
-                    _designation,
-                ],
-                onChanged: (v) {
-                  setState(() {
-                    _designation = v ?? '';
-                    // DA amount auto-updates from designation
-                    final auto = ExpenseModel.daByDesignation[_designation];
-                    if (auto != null) {
-                      for (final r in _daRows) {
-                        r['amount']!.text = _stripZeros(auto);
-                      }
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              _dropdownField(
-                'Zone',
-                value: _zoneOptions.contains(_zone) ? _zone : null,
-                items: _zoneOptions,
-                onChanged: (v) => setState(() => _zone = v ?? ''),
-              ),
-              const SizedBox(height: 12),
-              _dropdownField(
-                'Month',
-                value: _monthOptions.contains(_month) ? _month : null,
-                items: _monthOptions,
-                onChanged: (v) => setState(() => _month = v ?? ''),
-              ),
-            ]),
-            const SizedBox(height: 16),
-
             // Type-specific rows
             ..._buildTypeFields(isDark),
 
@@ -1751,7 +1665,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             Expanded(child: _field('To', r['to']!)),
           ]),
           const SizedBox(height: 8),
-          _field('Transport', r['modeOfTransport']!),
+          _transportField(r['modeOfTransport']!),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(flex: 2, child: _field('Description', r['description']!)),
@@ -2523,42 +2437,6 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 const BorderSide(color: AppTheme.primaryAccent, width: 2)),
       );
 
-  Widget _dropdownField(String label,
-      {String? value,
-      required List<String> items,
-      required ValueChanged<String?> onChanged}) {
-    final unique = items.toSet().toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          style: GoogleFonts.hindSiliguri(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textGrey)),
-      const SizedBox(height: 4),
-      DropdownButtonFormField<String>(
-        value: value != null && unique.contains(value) ? value : null,
-        isExpanded: true,
-        decoration: _inputDecoration(),
-        style: GoogleFonts.hindSiliguri(
-            fontSize: 13,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppTheme.darkText
-                : AppTheme.textDark),
-        hint: Text('Select $label',
-            style: GoogleFonts.hindSiliguri(
-                fontSize: 12, color: AppTheme.textGrey)),
-        items: unique
-            .map((v) => DropdownMenuItem(
-                value: v,
-                child: Text(v,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.hindSiliguri(fontSize: 13))))
-            .toList(),
-        onChanged: onChanged,
-      ),
-    ]);
-  }
-
   Widget _dateField(String label, TextEditingController ctrl,
       {bool blockFriday = false, int? daIndex}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2789,6 +2667,55 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           decoration: _inputDecoration(),
         ),
       ]);
+
+  Widget _transportField(TextEditingController ctrl) {
+    final current = ctrl.text.trim();
+    final selected = _taTransportOptions.contains(current) ? current : null;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Transport',
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textGrey)),
+      const SizedBox(height: 4),
+      InputDecorator(
+        decoration: _inputDecoration().copyWith(
+            hintText: 'Select from transport list'),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selected,
+            isExpanded: true,
+            hint: Text('Select from transport list',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12, color: AppTheme.textGrey)),
+            style: GoogleFonts.hindSiliguri(fontSize: 13),
+            items: _taTransportOptions
+                .map((option) => DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option,
+                          style: GoogleFonts.hindSiliguri(fontSize: 13)),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => ctrl.text = value);
+            },
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      TextFormField(
+        controller: ctrl,
+        onChanged: (_) => setState(() {}),
+        style: GoogleFonts.hindSiliguri(fontSize: 13),
+        decoration: _inputDecoration().copyWith(
+          labelText: 'Or write another transport',
+          labelStyle: GoogleFonts.hindSiliguri(
+              fontSize: 12, color: AppTheme.textGrey),
+        ),
+      ),
+    ]);
+  }
 
   Widget _totalRow(String label, double amount) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),

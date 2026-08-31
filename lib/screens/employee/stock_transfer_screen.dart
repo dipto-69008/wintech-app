@@ -833,15 +833,19 @@ class _NewTransferTabState extends State<_NewTransferTab> {
       if (!mounted) return;
        final prods = results[0].map(_withPackagingFallback).toList();
       final branches = results[1];
+       final employeeBranch = _user?.branch.trim() ?? '';
+       final branchNames = branches
+           .map((b) => b['name']?.toString() ?? '')
+           .where((n) => n.isNotEmpty)
+           .toList();
+       if (employeeBranch.isNotEmpty &&
+           !branchNames.any((n) => n.toLowerCase() == employeeBranch.toLowerCase())) {
+         branchNames.insert(0, employeeBranch);
+       }
       setState(() {
         _erpConnected = true;
         if (prods.isNotEmpty) _products = prods;
-        if (branches.isNotEmpty) {
-          _branches = branches
-              .map((b) => b['name']?.toString() ?? '')
-              .where((n) => n.isNotEmpty)
-              .toList();
-        }
+         if (branchNames.isNotEmpty) _branches = branchNames;
       });
     } catch (_) {
       setState(() => _erpConnected = false);
@@ -1102,11 +1106,17 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     );
   }
 
-  Widget _branchDropdown(String label, String? value, ValueChanged<String?> onChanged) {
+  Widget _branchDropdown(
+    String label,
+    String? value,
+    ValueChanged<String?> onChanged, {
+    bool enabled = true,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return DropdownButtonFormField<String>(
       value: value,
       isExpanded: true,
+      onChanged: enabled ? onChanged : null,
       style: GoogleFonts.hindSiliguri(
           fontSize: 14, color: isDark ? AppTheme.darkText : AppTheme.textDark),
       decoration: InputDecoration(
@@ -1114,11 +1124,16 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         labelStyle: GoogleFonts.hindSiliguri(fontSize: 13, color: AppTheme.textGrey),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: enabled
+            ? null
+            : const Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: Icon(Icons.lock_outline_rounded, size: 18),
+              ),
       ),
       items: _branches.map((b) => DropdownMenuItem(value: b,
           child: Text(b, style: GoogleFonts.hindSiliguri(fontSize: 14),
               overflow: TextOverflow.ellipsis))).toList(),
-      onChanged: onChanged,
     );
   }
 
@@ -1231,7 +1246,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                 (v) {
               setState(() => _fromBranch = v);
               _loadAvailability();
-            }),
+            }, enabled: false),
         const SizedBox(height: 14),
 
         if (_selectedProduct != null && _fromBranch != null) ...[

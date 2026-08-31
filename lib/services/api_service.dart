@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wintech ERP real-time API connection.
@@ -14,6 +16,9 @@ class ApiService {
   /// ERP server base URL. Change this to your deployed ERP URL.
   /// e.g. https://your-erp.replit.app  (no trailing slash)
   static const String defaultBaseUrl = 'https://wintech.dawatit.online';
+  // Keep these in sync with pubspec.yaml when publishing a new APK.
+  static const int currentAppVersionCode = 1;
+  static const String currentAppVersionName = '1.0.0';
 
   static const _keyBaseUrl = 'erp_base_url';
   static const _keyToken = 'erp_token';
@@ -86,6 +91,28 @@ class ApiService {
     final raw = prefs.getString(_keyUser);
     if (raw == null) return null;
     return Map<String, dynamic>.from(jsonDecode(raw));
+  }
+
+  /// Public metadata for the direct APK update flow.
+  static Future<Map<String, dynamic>> appUpdateInfo() =>
+      _get('/api/mobile/app-update');
+
+  /// Downloads the update into the app cache and returns its local path.
+  static Future<String> downloadAppUpdate(String downloadUrl) async {
+    final uri = Uri.tryParse(downloadUrl);
+    if (uri == null || uri.scheme != 'https') {
+      throw ApiException('Invalid secure app update URL', 400);
+    }
+    final response = await http
+        .get(uri)
+        .timeout(const Duration(minutes: 3));
+    if (response.statusCode >= 400 || response.bodyBytes.isEmpty) {
+      throw ApiException('Could not download the app update', response.statusCode);
+    }
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/wintech-agro-update.apk');
+    await file.writeAsBytes(response.bodyBytes, flush: true);
+    return file.path;
   }
 
   static Future<void> logout() async {

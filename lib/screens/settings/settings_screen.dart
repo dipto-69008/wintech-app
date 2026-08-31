@@ -18,6 +18,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const _appUpdateChannel = MethodChannel('wintech/app_update');
+
   UserModel? _user;
   bool _loading = true;
   bool _isDarkMode = false;
@@ -26,6 +28,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _pendingSync = 0;
   String _erpUrl = '';
   Timer? _syncStatusTimer;
+  bool _checkingAppUpdate = false;
+  bool _downloadingAppUpdate = false;
+  Map<String, dynamic>? _appUpdate;
 
   @override
   void initState() {
@@ -56,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _loading = false;
     });
     _checkErp();
+    _checkForAppUpdate(showResult: false);
   }
 
   Future<void> _checkErp() async {
@@ -114,6 +120,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _erpUrl = saved.replaceAll(RegExp(r'/+$'), ''));
       _checkErp();
     }
+  }
+
+  Future<void> _checkForAppUpdate({bool showResult = true}) async {
+    if (_checkingAppUpdate || _downloadingAppUpdate) return;
+    if (mounted) setState(() => _checkingAppUpdate = true);
+    try {
+      final info = await ApiService.appUpdateInfo();
+      final versionCode =
+          int.tryParse(info['versionCode']?.toString() ?? '') ?? 0;
+      final available = versionCode > ApiService.currentAppVersionCode;
+      if (!mounted) return;
+      setState(() => _appUpdate = available ? info : null);
+      if (showResult) {
+        _showMessage(available
+            ? 'New app update v${info['versionName'] ?? versionCode} is available.'
+            : 'You are using the latest app version.');
+      }
+    } catch (_) {
+      if (showResult && mounted) {
+        _showMessage('Could not check for app updates.', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _checkingAppUpdate = false);
+    }
+  }
+
+  Future<void> _installAppUpdate() async {
+    if (_appUpdate == null) {
+      await _checkForAppUpdate();
+      if (_appUpdate == null) return;
+    }
+    final url = _appUpdate?['downloadUrl']?.toString() ?? '';
+    if (url.isEmpty) {
+      _showMessage('App update link is not configured.', error: true);
+      return;
+    }
+    setState(() => _downloadingAppUpdate = true);
+    try {
+      final path = await ApiService.downloadAppUpdate(url);
+      final installed = await _appUpdateChannel.invokeMethod<bool>(
+            'installApk',
+            {'path': path},
+          ) ??
+          false;
+      if (!installed && mounted) {
+        _showMessage(
+            'Allow installation from this app in Android settings, then tap Update App again.',
+            error: true);
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        _showMessage(
+            e.message ?? 'Could not start the app installer.',
+            error: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Could not download the app update.', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _downloadingAppUpdate = false);
+    }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message,
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: error ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _logout() async {
@@ -585,6 +663,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                               ),
                               _divider(),
+                               _settingTile(
+                                 icon: Icons.system_update_rounded,
+                                 iconColor: _appUpdate != null
+                                     ? AppTheme.success
+                                     : AppTheme.primaryAccent,
+                                 label: _appUpdate != null
+                                     ? 'Update App Available'
+                                     : 'Check for App Updates',
+                                 isDark: isDark,
+                                 trailing: _downloadingAppUpdate
+                                     ? const SizedBox(
+                                         width: 20,
+                                         height: 20,
+                                         child: CircularProgressIndicator(
+                                             strokeWidth: 2))
+                                     : _appUpdate != null
+                                         ? TextButton(
+                                             onPressed: _installAppUpdate,
+                                             child: Text('Update',
+                                                 style: GoogleFonts.hindSiliguri(
+                                                     fontWeight: FontWeight.w700)))
+                                         : _checkingAppUpdate
+                                             ? const SizedBox(
+                                                 width: 20,
+                                                 height: 20,
+                                                 child:
+                                                     CircularProgressIndicator(
+                                                         strokeWidth: 2))
+                                             : null,
+                                 onTap: _appUpdate != null
+                                     ? _installAppUpdate
+                                     : _checkForAppUpdate,
+                               ),
+                               _divider(),
                               _settingTile(
                                 icon: Icons.privacy_tip_outlined,
                                 label: 'Privacy Policy',

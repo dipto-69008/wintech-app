@@ -349,6 +349,8 @@ class OfflineQueueService {
     await uploadRows('motoRows');
     await uploadRows('motoServicingRows');
     await uploadRows('outStationRows');
+    await uploadRows('entertainmentRows');
+    await uploadRows('courierRows');
   }
 
   /// Errors worth retrying: missing route, auth hiccup, throttling, 5xx.

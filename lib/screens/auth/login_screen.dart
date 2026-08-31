@@ -38,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
         name: erpUser['name']?.toString() ?? identifier,
         email: erpUser['email']?.toString() ?? identifier,
         role: UserModel.roleTeamMember, // SR / employee
+        designation: erpUser['designation']?.toString() ?? '',
         myReferralCode: erpUser['employeeCode']?.toString() ?? '',
         branch: erpUser['branchName']?.toString() ?? '',
         zela: erpUser['areaName']?.toString() ?? '',
