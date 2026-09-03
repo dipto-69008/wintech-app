@@ -10,6 +10,7 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -34,7 +35,6 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     (ExpenseModel.typeDa,         'DA Bill'),
     (ExpenseModel.typeTaDaSheet,  'Top Sheet'),
     (ExpenseModel.typeOutStation, 'Out Station'),
-    (ExpenseModel.typeMotorcycle, 'Motorcycle'),
     (ExpenseModel.typeEntertainment, 'Entertainment'),
     (ExpenseModel.typeCourier,       'Courier'),
   ];
@@ -45,11 +45,17 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 1, vsync: this);
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
   }
 
   @override
   void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
     _tabCtrl.dispose();
     super.dispose();
   }
@@ -122,22 +128,18 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     });
   }
 
-  List<ExpenseModel> get _filtered => _typeFilter == 'all'
-      ? _expenses
-      : _expenses.where((e) => e.type == _typeFilter).toList();
+  List<ExpenseModel> get _filtered {
+    final visible =
+        _expenses.where((e) => e.type != ExpenseModel.typeMotorcycle);
+    return _typeFilter == 'all'
+        ? visible.toList()
+        : visible.where((e) => e.type == _typeFilter).toList();
+  }
 
   void _openAdd() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TypePickerSheet(
-        onPick: (type) {
-          Navigator.pop(context);
-          _openForm(type: type);
-        },
-      ),
-    );
+    // Motorcycle Log is an internal mirror of TA Bill rows, not a separate
+    // employee-created expense. New bills from this module start as TA Bills.
+    _openForm(type: ExpenseModel.typeTaBill);
   }
 
   void _openForm({required String type, ExpenseModel? existing}) {
@@ -298,7 +300,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
               onPressed: _openAdd,
               backgroundColor: AppTheme.primaryAccent,
               icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: Text('New Bill',
+              label: Text('New TA Bill',
                   style: GoogleFonts.hindSiliguri(
                       color: Colors.white, fontWeight: FontWeight.w700)),
             ),
@@ -530,6 +532,12 @@ class _ExpenseScreenState extends State<ExpenseScreen>
 
   Widget _sheetEntry(Map<String, dynamic> item, bool isDark, String kind) {
     final amount = (item['amount'] as num?)?.toDouble() ?? 0;
+    final transportTags = (item['transportTags'] as List?)
+            ?.whereType<Map>()
+            .map((tag) => Map<String, dynamic>.from(tag))
+            .where((tag) => (tag['label'] ?? '').toString().trim().isNotEmpty)
+            .toList() ??
+        <Map<String, dynamic>>[];
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
@@ -541,20 +549,48 @@ class _ExpenseScreenState extends State<ExpenseScreen>
         const Icon(Icons.receipt_long_rounded, size: 19,
             color: AppTheme.primaryAccent),
         const SizedBox(width: 9),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text((item['category'] ?? item['type'] ?? kind).toString(),
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 12, fontWeight: FontWeight.w700)),
-          Text((item['description'] ?? item['date'] ?? '').toString(),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 10, color: AppTheme.textGrey)),
-        ])),
+        Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text((item['category'] ?? item['type'] ?? kind).toString(),
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
+              Text((item['description'] ?? item['date'] ?? '').toString(),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 10, color: AppTheme.textGrey)),
+              if (transportTags.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: transportTags.map(_transportTag).toList(),
+                ),
+              ],
+            ])),
         Text('৳ ${_fmt.format(amount)}',
             style: GoogleFonts.hindSiliguri(
                 fontSize: 12, fontWeight: FontWeight.w800,
                 color: AppTheme.primaryAccent)),
       ]),
+    );
+  }
+
+  Widget _transportTag(Map<String, dynamic> tag) {
+    final value = double.tryParse(tag['amount']?.toString() ?? '') ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '${tag['label']} · ৳ ${_fmt.format(value)}',
+        style: GoogleFonts.hindSiliguri(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primaryAccent),
+      ),
     );
   }
 
@@ -571,7 +607,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
               style: GoogleFonts.hindSiliguri(
                   fontSize: 15, color: AppTheme.textGrey)),
           const SizedBox(height: 6),
-          Text('Tap + to add a new bill',
+          Text('Tap + to add a new TA bill',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 12, color: AppTheme.textGrey)),
         ]),
@@ -581,7 +617,9 @@ class _ExpenseScreenState extends State<ExpenseScreen>
 
   Widget _buildTile(ExpenseModel e, bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    final statusColor = e.status == ExpenseModel.statusApproved
+    final statusColor = e.status == ExpenseModel.statusPaid
+        ? AppTheme.success
+        : e.status == ExpenseModel.statusApproved
         ? AppTheme.success
         : e.status == ExpenseModel.statusRejected
             ? AppTheme.error
@@ -695,7 +733,6 @@ class _TypePickerSheet extends StatelessWidget {
     (ExpenseModel.typeTaBill,     'TA Bill',        Icons.directions_car_rounded,   AppTheme.primaryAccent),
     (ExpenseModel.typeDa,         'DA Bill',          Icons.account_balance_wallet_rounded, AppTheme.warning),
     (ExpenseModel.typeOutStation, 'Out Station Bill', Icons.hotel_rounded,          Color(0xFFE65100)),
-    (ExpenseModel.typeMotorcycle, 'Motorcycle Log',   Icons.two_wheeler_rounded,    Color(0xFF1565C0)),
     (ExpenseModel.typeEntertainment, 'Entertainment Bill', Icons.restaurant_rounded, Color(0xFF8E24AA)),
     (ExpenseModel.typeCourier,       'Courier Bill',       Icons.local_shipping_rounded, Color(0xFF00838F)),
     (ExpenseModel.typeOthersBill, 'TA/DA Top Sheet', Icons.summarize_rounded, Color(0xFF2E7D32)),
@@ -992,6 +1029,13 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     'CNG',
     'Bus',
     'Boat',
+    'Train',
+  ];
+
+  static const _taOilOptions = [
+    'Petrol',
+    'Octane',
+    'Mobil',
   ];
 
   static const Map<String, String> _otherLabels = {
@@ -1033,6 +1077,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         'modeOfTransport': TextEditingController(text: init?['modeOfTransport'] ?? ''),
         'description':     TextEditingController(text: init?['description'] ?? ''),
         'amount':          TextEditingController(text: (init?['amount'] ?? '').toString()),
+        'prevReading':     TextEditingController(text: (init?['prevReading'] ?? '').toString()),
+        'latestReading':   TextEditingController(text: (init?['latestReading'] ?? '').toString()),
+        'oil':             TextEditingController(text: init?['oil'] ?? ''),
+        'oilQuantity':     TextEditingController(text: (init?['oilQuantity'] ?? '').toString()),
+        'oilAmount':       TextEditingController(text: (init?['oilAmount'] ?? '').toString()),
       });
     });
   }
@@ -1348,14 +1397,26 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
     switch (widget.type) {
       case ExpenseModel.typeTaBill:
-        taRows = _taRows.map((r) => {
-              'date': r['date']!.text,
-              'from': r['from']!.text,
-              'to': r['to']!.text,
-              'modeOfTransport': r['modeOfTransport']!.text,
-              'description': r['description']!.text,
-              'amount': _dbl(r['amount']!),
-            }).toList();
+        taRows = _taRows.map((r) {
+          final isMotorcycle =
+              _isMotorcycleTransport(r['modeOfTransport']!.text);
+          final prev = isMotorcycle ? _dbl(r['prevReading']!) : 0;
+          final latest = isMotorcycle ? _dbl(r['latestReading']!) : 0;
+          return {
+            'date': r['date']!.text,
+            'from': r['from']!.text,
+            'to': r['to']!.text,
+            'modeOfTransport': r['modeOfTransport']!.text,
+            'description': r['description']!.text,
+            'amount': _dbl(r['amount']!),
+            'prevReading': prev,
+            'latestReading': latest,
+            'totalKm': isMotorcycle ? _taDistance(r) : 0,
+            'oil': isMotorcycle ? r['oil']!.text : '',
+            'oilQuantity': isMotorcycle ? _dbl(r['oilQuantity']!) : 0,
+            'oilAmount': isMotorcycle ? _dbl(r['oilAmount']!) : 0,
+          };
+        }).toList();
         break;
       case ExpenseModel.typeTaDaSheet:
         tadaRows = _tadaRows.map((r) {
@@ -1617,8 +1678,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   // ── TA Bill (with From/To + Motorcycle Servicing Bill) ────────────────
   List<Widget> _buildTaBillFields(bool isDark) {
     return [
-      _motoRegField(isDark),
-      const SizedBox(height: 8),
+      if (_hasMotorcycleTaRow) ...[
+        _motoRegField(isDark),
+        const SizedBox(height: 8),
+      ],
       Row(children: [
         Text('TA Bill Rows',
             style: GoogleFonts.hindSiliguri(
@@ -1633,7 +1696,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
-          'From / To travel details will also be saved in Motorcycle Log Book.',
+           'Motorcycle rows also update the internal Motorcycle Log Book.',
           style: GoogleFonts.hindSiliguri(
               fontSize: 11, color: AppTheme.primaryAccent),
         ),
@@ -1641,6 +1704,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       ..._taRows.asMap().entries.map((entry) {
         final i = entry.key;
         final r = entry.value;
+        final isMotorcycle =
+            _isMotorcycleTransport(r['modeOfTransport']!.text);
+        final totalKm = _taDistance(r);
         return _sectionCard(isDark, children: [
           Row(children: [
             Text('Row ${i + 1}',
@@ -1665,8 +1731,36 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             Expanded(child: _field('To', r['to']!)),
           ]),
           const SizedBox(height: 8),
-          _transportField(r['modeOfTransport']!),
+           _transportField(r),
           const SizedBox(height: 8),
+           if (isMotorcycle) ...[
+             Row(children: [
+               Expanded(
+                   child: _field('Previous Reading', r['prevReading']!,
+                       keyboardType: TextInputType.number,
+                       onChanged: (_) => setState(() {}))),
+               const SizedBox(width: 8),
+               Expanded(
+                   child: _field('Latest Reading', r['latestReading']!,
+                       keyboardType: TextInputType.number,
+                       onChanged: (_) => setState(() {}))),
+             ]),
+             const SizedBox(height: 8),
+             _calculatedField('Total KM', totalKm.toStringAsFixed(0)),
+             const SizedBox(height: 8),
+             Row(children: [
+               Expanded(child: _oilField(r['oil']!)),
+               const SizedBox(width: 8),
+               Expanded(
+                   child: _field(_oilQuantityLabel(r['oil']!.text),
+                       r['oilQuantity']!,
+                       keyboardType: TextInputType.number)),
+             ]),
+             const SizedBox(height: 8),
+             _field(_oilAmountLabel(r['oil']!.text), r['oilAmount']!,
+                 keyboardType: TextInputType.number),
+             const SizedBox(height: 8),
+           ],
           Row(children: [
             Expanded(flex: 2, child: _field('Description', r['description']!)),
             const SizedBox(width: 8),
@@ -1676,7 +1770,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         ]);
       }),
       _totalRow('Total TA',
-          _taRows.fold(0.0, (s, r) => s + _dbl(r['amount']!))),
+          _taRows.fold(
+              0.0,
+              (s, r) =>
+                  s +
+                  _dbl(r['amount']!) +
+                  (_isMotorcycleTransport(r['modeOfTransport']!.text)
+                      ? _dbl(r['oilAmount']!)
+                      : 0))),
       const SizedBox(height: 8),
       ..._buildServicingSection(isDark),
     ];
@@ -2668,9 +2769,118 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         ),
       ]);
 
-  Widget _transportField(TextEditingController ctrl) {
+  double _taDistance(Map<String, TextEditingController> row) {
+    final distance =
+        _dbl(row['latestReading']!) - _dbl(row['prevReading']!);
+    return distance > 0 ? distance : 0;
+  }
+
+  Widget _calculatedField(String label, String value) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textGrey)),
+      const SizedBox(height: 4),
+      InputDecorator(
+        decoration: _inputDecoration(),
+        child: Text(value,
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 13, fontWeight: FontWeight.w600)),
+      ),
+    ]);
+  }
+
+  void _clearMotorcycleDetails(Map<String, TextEditingController> row) {
+    row['prevReading']!.clear();
+    row['latestReading']!.clear();
+    row['oil']!.clear();
+    row['oilQuantity']!.clear();
+    row['oilAmount']!.clear();
+  }
+
+  bool _isMotorcycleTransport(String value) =>
+      value.trim().toLowerCase() == 'motorcycle';
+
+  bool get _hasMotorcycleTaRow => _taRows.any((row) =>
+      _isMotorcycleTransport(row['modeOfTransport']!.text));
+
+  String _oilAmountLabel(String oil) {
+    switch (oil.trim().toLowerCase()) {
+      case 'petrol':
+        return 'Petrol Amount (৳)';
+      case 'octane':
+        return 'Octane Amount (৳)';
+      case 'mobil':
+        return 'Mobil Amount (৳)';
+      default:
+        return 'Oil Amount (৳)';
+    }
+  }
+
+  String _oilQuantityLabel(String oil) {
+    switch (oil.trim().toLowerCase()) {
+      case 'petrol':
+        return 'Petrol Quantity (L)';
+      case 'octane':
+        return 'Octane Quantity (L)';
+      case 'mobil':
+        return 'Mobil Quantity (L)';
+      default:
+        return 'Quantity (L)';
+    }
+  }
+
+  Widget _oilField(TextEditingController ctrl) {
+    final current = ctrl.text.trim();
+    final selected = _taOilOptions.contains(current) ? current : null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppTheme.textDark;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Oil',
+          style: GoogleFonts.hindSiliguri(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textGrey)),
+      const SizedBox(height: 4),
+      InputDecorator(
+        decoration: _inputDecoration().copyWith(hintText: 'Select oil'),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selected,
+            isExpanded: true,
+            dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+            iconEnabledColor: textColor,
+            hint: Text('Select oil',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12, color: AppTheme.textGrey)),
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 13, color: textColor),
+            items: _taOilOptions
+                .map((option) => DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option,
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 13, color: textColor)),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => ctrl.text = value);
+            },
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _transportField(Map<String, TextEditingController> row) {
+    final ctrl = row['modeOfTransport']!;
     final current = ctrl.text.trim();
     final selected = _taTransportOptions.contains(current) ? current : null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppTheme.textDark;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Transport',
           style: GoogleFonts.hindSiliguri(
@@ -2685,20 +2895,29 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           child: DropdownButton<String>(
             value: selected,
             isExpanded: true,
+            dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+            iconEnabledColor: textColor,
             hint: Text('Select from transport list',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12, color: AppTheme.textGrey)),
-            style: GoogleFonts.hindSiliguri(fontSize: 13),
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 13, color: textColor),
             items: _taTransportOptions
                 .map((option) => DropdownMenuItem<String>(
                       value: option,
                       child: Text(option,
-                          style: GoogleFonts.hindSiliguri(fontSize: 13)),
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 13, color: textColor)),
                     ))
                 .toList(),
             onChanged: (value) {
               if (value == null) return;
-              setState(() => ctrl.text = value);
+              setState(() {
+                ctrl.text = value;
+                if (!_isMotorcycleTransport(value)) {
+                  _clearMotorcycleDetails(row);
+                }
+              });
             },
           ),
         ),
@@ -2706,7 +2925,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       const SizedBox(height: 8),
       TextFormField(
         controller: ctrl,
-        onChanged: (_) => setState(() {}),
+        onChanged: (value) => setState(() {
+          if (!_isMotorcycleTransport(value)) {
+            _clearMotorcycleDetails(row);
+          }
+        }),
         style: GoogleFonts.hindSiliguri(fontSize: 13),
         decoration: _inputDecoration().copyWith(
           labelText: 'Or write another transport',

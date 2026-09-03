@@ -9,14 +9,15 @@ class ExpenseModel {
   final String designation;
   final String zone;
   final DateTime createdAt;
-  final String status;       // pending | approved | rejected
+  final String status;       // pending | approved | rejected | paid
   final String srId;
 
   // Month-lock: admin can unlock a previous month for re-submission
   final bool isLocked;        // true = locked by system (new month started)
   final bool adminUnlocked;   // true = admin explicitly unlocked
 
-  // TA Bill rows: [{date, from, to, modeOfTransport, description, amount}]
+  // TA Bill rows: [{date, from, to, modeOfTransport, description, amount,
+  // prevReading, latestReading, totalKm, oil, oilQuantity, oilAmount}]
   final List<Map<String, dynamic>> taRows;
 
   // Motorcycle log rows:
@@ -108,6 +109,7 @@ class ExpenseModel {
   static const String statusPending  = 'pending';
   static const String statusApproved = 'approved';
   static const String statusRejected = 'rejected';
+  static const String statusPaid = 'paid';
 
   /// Designation → DA amount per day (BDT)
   static const Map<String, double> daByDesignation = {
@@ -192,6 +194,7 @@ class ExpenseModel {
     switch (status) {
       case statusApproved: return 'Approved';
       case statusRejected: return 'Rejected';
+      case statusPaid: return 'Paid';
       default:             return 'Pending';
     }
   }
@@ -209,7 +212,9 @@ class ExpenseModel {
     switch (type) {
       case typeTaBill:
         return taRows.fold(0.0,
-            (s, r) => s + ((r['amount'] as num?)?.toDouble() ?? 0));
+            (s, r) => s +
+                ((r['amount'] as num?)?.toDouble() ?? 0) +
+                ((r['oilAmount'] as num?)?.toDouble() ?? 0));
       case typeTaDaSheet:
       case typeOthersBill:
         final sheetTotal = (othersBill['totalTaka'] as num?)?.toDouble() ?? 0;

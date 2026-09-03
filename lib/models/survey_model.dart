@@ -35,6 +35,7 @@ class SurveyModel {
   final String photo;          // legacy single photo (kept for old records)
   final List<String> photos;   // real-time camera photos (paths locally, URLs after upload)
   final String createdAt; // ISO datetime string
+  final String status; // ERP status, usually 'a' for active
 
   const SurveyModel({
     required this.id,
@@ -63,6 +64,7 @@ class SurveyModel {
     this.photo = '',
     this.photos = const [],
     required this.createdAt,
+    this.status = 'a',
   });
 
   /// All photos (legacy single + new list) without duplicates.
@@ -83,7 +85,7 @@ class SurveyModel {
         'diseases': diseases,
         'wintechProducts': wintechProducts,
         'prescription': prescription,
-        'partyId': partyId,
+        if (partyId.trim().isNotEmpty) 'partyId': partyId.trim(),
         'shopName': shopName,
         'dealerName': dealerName,
         'dealerMobile': dealerMobile,
@@ -95,6 +97,7 @@ class SurveyModel {
         'photo': photo,
         'photos': photos,
         'createdAt': createdAt,
+        'status': status,
       };
 
   factory SurveyModel.fromMap(Map<String, dynamic> m) => SurveyModel(
@@ -127,6 +130,7 @@ class SurveyModel {
                 .toList() ??
             [],
         createdAt: m['createdAt'] as String? ?? '',
+        status: m['status'] as String? ?? 'a',
       );
 
   SurveyModel copyWith({
@@ -154,6 +158,7 @@ class SurveyModel {
     String? photo,
     List<String>? photos,
     String? createdAt,
+    String? status,
   }) =>
       SurveyModel(
         id: id ?? this.id,
@@ -180,5 +185,6 @@ class SurveyModel {
         photo: photo ?? this.photo,
         photos: photos ?? this.photos,
         createdAt: createdAt ?? this.createdAt,
+        status: status ?? this.status,
       );
 }

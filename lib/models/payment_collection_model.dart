@@ -73,7 +73,7 @@ class PaymentCollectionModel {
         if (invoiceNo.isNotEmpty) 'invoiceNo': invoiceNo,
         if (commissionRequested && invoiceNo.isNotEmpty) ...{
           'commissionRequested': true,
-          'commissionPct': commissionPct,
+           'commissionPct': 3,
         },
       };
 

@@ -227,6 +227,17 @@ class ApiService {
     return List<Map<String, dynamic>>.from(body['data'] as List);
   }
 
+  /// Find one live ERP order by its invoice number for payment collection.
+  static Future<Map<String, dynamic>?> orderByInvoice(String invoiceNo) async {
+    final body = await _get('/api/mobile/orders', {
+      'invoiceNo': invoiceNo.trim(),
+      'limit': '1',
+    });
+    final data = body['data'];
+    if (data is! List || data.isEmpty) return null;
+    return Map<String, dynamic>.from(data.first as Map);
+  }
+
   /// Create an order in the ERP — appears instantly in ERP Sales → Orders.
   static Future<Map<String, dynamic>> createOrder({
     String? partyId,
@@ -236,7 +247,6 @@ class ApiService {
     double paidAmount = 0,
     String notes = '',
     DateTime? probablePaymentDate,
-    bool requestCommission = false,
   }) {
     return _post('/api/mobile/orders', {
       if (partyId != null) 'partyId': partyId,
@@ -245,11 +255,18 @@ class ApiService {
       'paymentType': paymentType,
       'paidAmount': paidAmount,
       'notes': notes,
-      'requestCommission': requestCommission,
       if (probablePaymentDate != null)
         'probablePaymentDate': probablePaymentDate.toIso8601String(),
     });
   }
+
+  /// Update an ERP order status. The server validates role, ownership and
+  /// branch before changing the shared SaleMaster record.
+  static Future<Map<String, dynamic>> updateOrderStatus(
+      String orderId, String status) =>
+      _patch('/api/mobile/orders/${Uri.encodeComponent(orderId)}', {
+        'status': status,
+      });
 
   /// Live surveys. [mineOnly] false searches every officer's records, which is
   /// what a mobile-number lookup needs.
@@ -516,6 +533,11 @@ class ApiService {
         'notes': notes,
         if (returnDate != null) 'returnDate': returnDate.toIso8601String(),
       });
+
+  /// Delete the logged-in officer's pending product return from the ERP.
+  /// Approved/refunded/replacement returns are protected server-side.
+  static Future<Map<String, dynamic>> deleteSalesReturn(String id) =>
+      _delete('/api/mobile/sales-returns/$id');
 
   /// ADMIN ONLY — approve or reject a pending cash-commission request.
   static Future<Map<String, dynamic>> decideCashCommission(

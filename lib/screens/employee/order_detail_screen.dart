@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, rootBundle;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -9,7 +9,9 @@ import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/api_service.dart';
 import '../../services/secure_screen_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final OrderModel order;
@@ -25,6 +27,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _updatingStatus = false;
   final _fmt = NumberFormat('#,##0.00', 'en_US');
   final _dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+
+  String get _invoiceNumber =>
+      _order.id.trim().isEmpty ? 'Not assigned' : _order.id.trim();
+
+  void _copyInvoiceNumber() {
+    final value = _order.id.trim();
+    if (value.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Invoice number copied',
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
 
   @override
   void initState() {
@@ -115,17 +133,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _updatingStatus = true);
     final updated = _order.copyWith(status: newStatus);
-    await LocalStorageService.saveOrder(updated);
-    if (mounted) {
-      setState(() {
-        _order = updated;
-        _updatingStatus = false;
-      });
+    try {
+      await ApiService.updateOrderStatus(_order.id, newStatus);
+      await LocalStorageService.saveOrder(updated);
+      SyncRefreshService.notify(force: true);
+      if (mounted) {
+        setState(() {
+          _order = updated;
+          _updatingStatus = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status updated: ${updated.statusLabel}',
+                style: GoogleFonts.hindSiliguri()),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _updatingStatus = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Status updated: ${updated.statusLabel}',
-              style: GoogleFonts.hindSiliguri()),
-          backgroundColor: AppTheme.success,
+          content: Text(
+            e is ApiException ? e.message : 'Could not update ERP order status',
+            style: GoogleFonts.hindSiliguri(),
+          ),
+          backgroundColor: AppTheme.error,
         ),
       );
     }
@@ -206,7 +240,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
       name:
-          'wintech_invoice_${_order.id.substring(0, 8).toUpperCase()}.pdf',
+          'wintech_invoice_${_invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf',
     );
   }
 
@@ -271,7 +305,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 fontWeight: pw.FontWeight.bold,
                                 color: PdfColors.white)),
                         pw.SizedBox(height: 2),
-                        pw.Text('#${_order.id.substring(0, 8).toUpperCase()}',
+                        pw.Text('#$_invoiceNumber',
                             style: const pw.TextStyle(
                                 fontSize: 10, color: PdfColors.white)),
                       ],
@@ -602,6 +636,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   _buildStatusBanner(isDark, statusColor),
                   const SizedBox(height: 16),
+                  _buildInvoiceCard(isDark),
+                  const SizedBox(height: 16),
                   _buildInfoCards(isDark),
                   const SizedBox(height: 16),
                   _buildItemsTable(isDark),
@@ -653,8 +689,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     color: Colors.white),
               ),
               const SizedBox(height: 2),
-              Text(
-                'Order #${_order.id.substring(0, 8).toUpperCase()}',
+               Text(
+                 'Invoice #$_invoiceNumber',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 12, color: Colors.white70),
               ),
@@ -663,6 +699,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
       actions: [
+        IconButton(
+          onPressed: _copyInvoiceNumber,
+          icon: const Icon(Icons.copy_rounded, color: Colors.white),
+          tooltip: 'Copy invoice number',
+        ),
         IconButton(
           onPressed: _downloadInvoice,
           icon: const Icon(Icons.download_rounded, color: Colors.white),
@@ -735,6 +776,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
     ]);
+  }
+
+  Widget _buildInvoiceCard(bool isDark) {
+    final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    final hasInvoice = _order.id.trim().isNotEmpty;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppTheme.primaryAccent.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+              blurRadius: 4)
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.confirmation_number_rounded,
+                color: AppTheme.primaryAccent, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Invoice Number',
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey)),
+                const SizedBox(height: 2),
+                SelectableText(
+                  _invoiceNumber,
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: hasInvoice
+                          ? AppTheme.primaryAccent
+                          : AppTheme.textGrey),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: hasInvoice ? _copyInvoiceNumber : null,
+            tooltip: 'Copy invoice number',
+            icon: Icon(Icons.copy_rounded,
+                color: hasInvoice
+                    ? AppTheme.primaryAccent
+                    : AppTheme.textGrey),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _infoCard(

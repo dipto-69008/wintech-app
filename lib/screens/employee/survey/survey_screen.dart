@@ -11,6 +11,7 @@ import '../../../models/survey_model.dart';
 import '../../../services/api_service.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../services/offline_queue_service.dart';
+import '../../../services/sync_refresh_service.dart';
 import 'survey_detail_screen.dart';
 
 class SurveyScreen extends StatefulWidget {
@@ -32,7 +33,18 @@ class _SurveyScreenState extends State<SurveyScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -55,6 +67,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           ...remote,
           ...local.where((s) => !remoteIds.contains(s.id)),
         ];
+        await LocalStorageService.replaceSurveys(all);
         erp = true;
       } catch (_) {
         // Offline or endpoint unavailable — keep local data.
@@ -788,6 +801,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   String _dealerZone = '';
   String _dealerPartyId = '';
   List<Map<String, dynamic>> _erpParties = [];
+   bool _branchLoading = true;
 
   /// Full Wintech product list from the official catalog (dropdown source)
   static final List<String> _productOptions = () {
@@ -799,20 +813,25 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     return list;
   }();
 
-  static List<String> get _zoneOptions => WintechCatalog.zones;
-
   /// Parties of the selected zone (ERP list merged with local catalog)
   List<String> get _zoneParties {
+     if (_dealerZone.trim().isEmpty) return [];
     final names = <String>{};
+     // The ERP party endpoint is already branch-scoped for a non-admin
+     // employee. Do not compare its local zone field to the branch name:
+     // zones such as Phulpur can belong to the Mymensingh branch.
     for (final p in _erpParties) {
-      final zone = (p['zone'] ?? p['area'] ?? '').toString();
-      if (_dealerZone.isEmpty || zone == _dealerZone) {
-        names.add((p['name'] ?? '').toString());
-      }
+       names.add((p['name'] ?? '').toString());
     }
-    for (final p in WintechCatalog.parties) {
-      if (_dealerZone.isEmpty || p['zone'] == _dealerZone) {
-        names.add(p['name'] as String);
+     if (_erpParties.isEmpty) {
+       final branch = _dealerZone.toLowerCase();
+       for (final p in WintechCatalog.parties) {
+         final zone = (p['zone'] ?? '').toString().toLowerCase();
+         if (zone == branch ||
+             zone.contains(branch) ||
+             branch.contains(zone)) {
+           names.add(p['name'] as String);
+         }
       }
     }
     names.remove('');
@@ -822,9 +841,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
 
   String _partyIdForName(String name) {
     for (final party in _erpParties) {
-      final partyZone = (party['zone'] ?? party['area'] ?? '').toString();
-      if ((party['name'] ?? '').toString() == name &&
-          (_dealerZone.isEmpty || partyZone == _dealerZone)) {
+       if ((party['name'] ?? '').toString() == name) {
         return (party['_id'] ?? party['id'] ?? '').toString();
       }
     }
@@ -857,8 +874,19 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     _products = [...(survey?.wintechProducts ?? [])];
     _photo = survey?.photo ?? '';
     _photos = [...(survey?.photos ?? [])];
+     _loadEmployeeBranch();
     _loadParties();
   }
+
+   Future<void> _loadEmployeeBranch() async {
+     final user = await LocalStorageService.getCurrentUser();
+     if (!mounted) return;
+     final branch = user?.branch.trim() ?? '';
+     setState(() {
+       _dealerZone = branch;
+       _branchLoading = false;
+     });
+   }
 
   /// Fetch live parties from the ERP for zone-wise dealer dropdown.
   Future<void> _loadParties() async {
@@ -1186,9 +1214,12 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                 if (isFarmer) ...[
                   Row(
                     children: [
-                      Expanded(child: _field(_farmName, 'Farm / Farmer Name')),
+                      Expanded(
+                          child: _field(_farmName, 'Farm / Farmer Name',
+                              required: true)),
                       const SizedBox(width: 10),
                       Expanded(child: _field(_farmerMobile, 'Mobile / WhatsApp',
+                          required: true,
                           keyboard: TextInputType.phone,
                            onSubmitted: (value) => _fillExistingNumber(value, dealer: false),
                            onChanged: (value) {
@@ -1199,7 +1230,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _field(_village, 'Village / Union'),
+                  _field(_village, 'Village / Union', required: true),
                   const SizedBox(height: 10),
                   _field(_diseases, 'New Disease / Problem',
                       maxLines: 2, required: false),
@@ -1249,25 +1280,25 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   _field(_prescription, 'Prescription / Recommendation',
                       maxLines: 3, required: false),
                 ] else ...[
-                  // Zone-wise party dropdown for dealership visits
-                  DropdownButtonFormField<String>(
-                    value: _dealerZone.isEmpty ? null : _dealerZone,
-                    isExpanded: true,
+                  // Zone is owned by the logged-in employee's ERP branch.
+                  InputDecorator(
                     decoration: const InputDecoration(
-                        labelText: 'Zone',
+                        labelText: 'Your Branch / Zone',
                         prefixIcon: Icon(Icons.map_rounded)),
-                    items: _zoneOptions
-                        .map((z) => DropdownMenuItem(
-                            value: z,
-                            child: Text(z,
-                                overflow: TextOverflow.ellipsis,
-                                style:
-                                    GoogleFonts.hindSiliguri(fontSize: 13))))
-                        .toList(),
-                    onChanged: (value) => setState(() {
-                      _dealerZone = value ?? '';
-                      _dealerPartyId = '';
-                    }),
+                    child: Text(
+                      _branchLoading
+                          ? 'Loading assigned branch...'
+                          : _dealerZone.isEmpty
+                              ? 'Assigned branch unavailable'
+                              : _dealerZone,
+                      style: GoogleFonts.hindSiliguri(
+                        fontSize: 13,
+                        color: _dealerZone.isEmpty
+                            ? AppTheme.error
+                            : AppTheme.textDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -1279,9 +1310,11 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                         labelText: 'Party / Shop Name *',
                         prefixIcon: Icon(Icons.storefront_rounded)),
                     hint: Text(
-                        _dealerZone.isEmpty
-                            ? 'Select zone first'
-                            : 'Select party',
+                        _branchLoading
+                            ? 'Loading branch parties...'
+                            : _dealerZone.isEmpty
+                                ? 'Assigned branch unavailable'
+                                : 'Select party',
                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
                     items: _zoneParties
                         .map((p) => DropdownMenuItem(
@@ -1309,12 +1342,13 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                          }
                        }),
                   const SizedBox(height: 10),
-                  _field(_dealerName, 'Dealer Name'),
+                  _field(_dealerName, 'Dealer Name', required: true),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
-                          child: _field(_dealerMobile, 'Mobile / WhatsApp',
+                           child: _field(_dealerMobile, 'Mobile / WhatsApp',
+                               required: true,
                               keyboard: TextInputType.phone,
                                onSubmitted: (value) => _fillExistingNumber(value, dealer: true),
                                onChanged: (value) {
@@ -1323,7 +1357,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                                  }
                                })),
                       const SizedBox(width: 10),
-                      Expanded(child: _field(_bazarName, 'Market / Bazar')),
+                      Expanded(
+                          child: _field(_bazarName, 'Market / Bazar',
+                              required: true)),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1356,7 +1392,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   _field(_remarks, 'Remarks', maxLines: 3, required: false),
                 ],
                 const SizedBox(height: 14),
-                _section('Real-time Photos (Required)'),
+                _section('Real-time Photos * (Required)'),
                 _photoPicker(),
               ],
             ),

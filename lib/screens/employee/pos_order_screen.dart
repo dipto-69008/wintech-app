@@ -56,7 +56,6 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   // Payment
   String _paymentType = 'Cash';
   DateTime? _probablePaymentDate; // expected payment date (like ERP)
-  bool _requestCashCommission = false;
   final _paidCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   static const _paymentTypes = [
@@ -137,17 +136,30 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       _validLines.where((l) => !l.isBonus).toList();
   List<_LineItem> get _bonusLines =>
       _validLines.where((l) => l.isBonus).toList();
+  String _productKey(_LineItem line) {
+    final productId = line.productId.trim();
+    if (productId.isNotEmpty) return 'id:$productId';
+    return '${line.productName.trim().toLowerCase()}|${line.packSize.trim().toLowerCase()}';
+  }
+
+  List<Map<String, dynamic>> get _bonusProductOptions {
+    final seen = <String>{};
+    return _chargedLines
+        .where((line) => seen.add(_productKey(line)))
+        .map((line) => <String, dynamic>{
+              'id': line.productId,
+              'name': line.productName,
+              'packSize': line.packSize,
+              'price': line.rate,
+              'stock': line.availableStock,
+            })
+        .toList();
+  }
+
   double get _subTotal => _chargedLines.fold(0.0, (s, l) => s + l.total);
   double get _paid => double.tryParse(_paidCtrl.text) ?? 0;
 
-  /// The employee can request a full-cash commission manually. The ERP still
-  /// validates full payment and an admin must approve the request.
-  bool get _isFullCashPayment =>
-      _paymentType == 'Cash' && _subTotal > 0 && _paid >= _subTotal;
-  double get _cashCommissionPct =>
-      _isFullCashPayment && _requestCashCommission ? 3 : 0;
-  double get _commissionAmount => _subTotal * _cashCommissionPct / 100;
-  double get _grandTotal => _subTotal - _commissionAmount;
+  double get _grandTotal => _subTotal;
   double get _effectivePaid => _paid.clamp(0, _grandTotal);
   double get _due => (_grandTotal - _effectivePaid).clamp(0, double.infinity);
 
@@ -172,6 +184,57 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       }
     }
     return true;
+  }
+
+  bool _validateBonusRules() {
+    final chargedKeys = _chargedLines.map(_productKey).toSet();
+    final bonusKeys = _bonusLines.map(_productKey).toSet();
+    if (bonusKeys.length > 1) {
+      _showError('Bonus can be given for only one ordered product.');
+      return false;
+    }
+    if (bonusKeys.any((key) => !chargedKeys.contains(key))) {
+      _showError('Bonus must be the same product that is in the order.');
+      return false;
+    }
+    return true;
+  }
+
+  void _addBonusLine() {
+    if (_chargedLines.isEmpty) {
+      _showError('Add an ordered product before adding a bonus.');
+      return;
+    }
+    if (_bonusLines.isNotEmpty) {
+      _showError('Bonus can be given for only one ordered product.');
+      return;
+    }
+    final bonusLine = _LineItem()..isBonus = true;
+    setState(() => _lines.add(bonusLine));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _lines.contains(bonusLine)) {
+        _pickProduct(_lines.indexOf(bonusLine));
+      }
+    });
+  }
+
+  void _toggleBonus(_LineItem line) {
+    if (line.isBonus) {
+      setState(() => line.isBonus = false);
+      return;
+    }
+    if (_bonusLines.isNotEmpty) {
+      _showError('Bonus can be given for only one ordered product.');
+      return;
+    }
+    final sameProductIsOrdered = _chargedLines.any(
+        (other) => other != line && _productKey(other) == _productKey(line));
+    if (!sameProductIsOrdered) {
+      _showError(
+          'Bonus must be the same product. Tap Add Bonus and select an ordered product.');
+      return;
+    }
+    setState(() => line.isBonus = true);
   }
 
   void _increaseQuantity(_LineItem line) {
@@ -272,14 +335,22 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   }
 
   void _pickProduct(int index) {
+    final selectingBonus = _lines[index].isBonus;
+    final pickerItems = selectingBonus ? _bonusProductOptions : _products;
+    if (selectingBonus && pickerItems.isEmpty) {
+      _showError('Add an ordered product before selecting a bonus.');
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SearchSheet(
-        title: 'Select Product',
-        hint: 'Search Wintech products…',
-        items: _products,
+         title: selectingBonus ? 'Select Bonus Product' : 'Select Product',
+         hint: selectingBonus
+             ? 'Choose a product already in this order…'
+             : 'Search Wintech products…',
+         items: pickerItems,
         itemBuilder: (p, isDark) {
           final stock = (p['stock'] as num?)?.toDouble() ?? 0;
           final outOfStock = _erpConnected && stock <= 0;
@@ -359,7 +430,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       _showError('Add at least one (non-bonus) product');
       return;
     }
+    if (!_validateBonusRules()) return;
     if (!_validateStock()) return;
+    if (_probablePaymentDate == null) {
+      _showError('Please select the probable payment date');
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -382,13 +458,11 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       'partyName': _partyName,
       'items': apiItems,
       'paymentType': _paymentType,
-      // Send the gross amount entered by the officer. The server applies the
-      // commission and stores the capped net paid amount.
+       // Send the gross amount entered by the officer. Any cash commission is
+       // requested later from Payment Collection after the invoice is found.
       'paidAmount': _paid,
       'notes': _notesCtrl.text.trim(),
-      'requestCommission': _requestCashCommission && _isFullCashPayment,
-      if (_probablePaymentDate != null)
-        'probablePaymentDate': _probablePaymentDate!.toIso8601String(),
+       'probablePaymentDate': _probablePaymentDate!.toIso8601String(),
     };
 
     // 1) Push to ERP live when connected; queue offline otherwise.
@@ -405,7 +479,6 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
            paidAmount: _paid,
           notes: _notesCtrl.text.trim(),
           probablePaymentDate: _probablePaymentDate,
-          requestCommission: _requestCashCommission && _isFullCashPayment,
         );
         sentToErp = true;
       } on ApiException catch (e) {
@@ -449,7 +522,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       probablePaymentDate: _probablePaymentDate,
       paidAmount: _paid,
       paymentType: _paymentType,
-      commissionPct: _cashCommissionPct,
+           commissionPct: 0,
     );
     await LocalStorageService.saveOrder(order);
 
@@ -481,6 +554,17 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
     ));
   }
 
+  void _copyInvoiceNumber() {
+    Clipboard.setData(ClipboardData(text: _invoiceNo));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Invoice number copied',
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
   // ── UI ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -505,6 +589,11 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            onPressed: _copyInvoiceNumber,
+            icon: const Icon(Icons.copy_rounded, color: Colors.white),
+            tooltip: 'Copy invoice number',
+          ),
           if (_erpConnected)
             Padding(
               padding: const EdgeInsets.only(right: 14),
@@ -672,6 +761,15 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: isDark ? AppTheme.darkText : AppTheme.textDark)),
+      const Spacer(),
+      TextButton.icon(
+        onPressed:
+            _chargedLines.isNotEmpty && _bonusLines.isEmpty ? _addBonusLine : null,
+        icon: const Icon(Icons.card_giftcard_rounded, size: 17),
+        label: Text('Add Bonus',
+            style: GoogleFonts.hindSiliguri(
+                fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
     ]);
   }
 
@@ -895,7 +993,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             // Bonus tick — mark this line as a free bonus item
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => line.isBonus = !line.isBonus),
+                onTap: () => _toggleBonus(line),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(
                       line.isBonus
@@ -1040,14 +1138,14 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             }
           },
           child: InputDecorator(
-            decoration: _fieldDeco('Probable Payment Date'),
+             decoration: _fieldDeco('Probable Payment Date *'),
             child: Row(children: [
               const Icon(Icons.event_rounded,
                   size: 16, color: AppTheme.primaryAccent),
               const SizedBox(width: 8),
               Text(
-                  _probablePaymentDate == null
-                      ? 'Select date (optional)'
+                   _probablePaymentDate == null
+                       ? 'Select date (required)'
                       : DateFormat('dd MMM yyyy')
                           .format(_probablePaymentDate!),
                   style: GoogleFonts.hindSiliguri(
@@ -1068,54 +1166,6 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             ]),
           ),
         ),
-        if (_cashCommissionPct > 0) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: AppTheme.success.withValues(alpha: 0.3)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.percent_rounded,
-                  size: 15, color: AppTheme.success),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                    'Cash Commission 3% deducted: ৳${_fmt2.format(_commissionAmount)} from the order total',
-                    style: GoogleFonts.hindSiliguri(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.success)),
-              ),
-            ]),
-          ),
-        ],
-        if (_isFullCashPayment) ...[
-          const SizedBox(height: 8),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            value: _requestCashCommission,
-            activeColor: AppTheme.primaryAccent,
-            onChanged: (value) =>
-                setState(() => _requestCashCommission = value),
-            title: Text('Request 3% cash commission',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 13, fontWeight: FontWeight.w700)),
-             subtitle: Text(
-                 'Full payment received — 3% will be deducted when enabled.',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 11.5, color: AppTheme.textGrey)),
-          ),
-        ] else if (_requestCashCommission) ...[
-          const SizedBox(height: 8),
-          Text('Commission request is off until the full cash amount is entered.',
-              style: GoogleFonts.hindSiliguri(
-                  fontSize: 11.5, color: AppTheme.textGrey)),
-        ],
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(

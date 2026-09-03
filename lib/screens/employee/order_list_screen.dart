@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
@@ -6,6 +7,7 @@ import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/sync_refresh_service.dart';
 import 'order_detail_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
@@ -23,10 +25,34 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   final _fmt = NumberFormat('#,##0', 'en_US');
 
+  void _copyInvoice(String invoiceNo) {
+    final value = invoiceNo.trim();
+    if (value.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Invoice number copied',
+          style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -343,6 +369,33 @@ class _OrderListScreenState extends State<OrderListScreen> {
               Text(order.customerName,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
+              if (order.id.trim().isNotEmpty)
+                Row(
+                  children: [
+                    const Icon(Icons.confirmation_number_outlined,
+                        size: 13, color: AppTheme.primaryAccent),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        order.id,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.hindSiliguri(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primaryAccent),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _copyInvoice(order.id),
+                      borderRadius: BorderRadius.circular(14),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.copy_rounded,
+                            size: 15, color: AppTheme.primaryAccent),
+                      ),
+                    ),
+                  ],
+                ),
               Text(
                   '${order.date.day}/${order.date.month}/${order.date.year} · $itemLabel',
                   style: GoogleFonts.hindSiliguri(

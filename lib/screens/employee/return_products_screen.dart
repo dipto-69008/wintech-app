@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/theme.dart';
 import '../../services/api_service.dart';
+import '../../services/sync_refresh_service.dart';
 import 'return_detail_screen.dart';
 
 /// Sales return invoices created in the field. Every successful submission is
@@ -73,6 +74,7 @@ class _ReturnListTab extends StatefulWidget {
 class _ReturnListTabState extends State<_ReturnListTab>
     with AutomaticKeepAliveClientMixin {
   bool _loading = true;
+  String? _deletingId;
   List<Map<String, dynamic>> _returns = [];
 
   String _money(dynamic value) {
@@ -102,7 +104,18 @@ class _ReturnListTabState extends State<_ReturnListTab>
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   @override
@@ -117,9 +130,73 @@ class _ReturnListTabState extends State<_ReturnListTab>
       final data = await ApiService.salesReturns();
       if (mounted) setState(() => _returns = data);
     } catch (_) {
-      if (mounted) setState(() => _returns = []);
+      // Keep the last-known ERP list visible during a transient failure.
+      // Clearing it would make an API error look like "no returns".
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _message(String text, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text, style: GoogleFonts.hindSiliguri()),
+      backgroundColor: error ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<void> _deleteReturn(Map<String, dynamic> item) async {
+    final status = (item['status'] ?? 'pending').toString().toLowerCase();
+    if (status != 'pending') {
+      _message('Only pending returns can be deleted', error: true);
+      return;
+    }
+
+    final returnNo = item['returnNo']?.toString() ?? 'this return';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Delete Return?',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Delete $returnNo from the app and ERP? This is only allowed before approval.',
+            style: GoogleFonts.hindSiliguri()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.hindSiliguri()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text('Delete',
+                style: GoogleFonts.hindSiliguri(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final id = (item['_id'] ?? item['id'] ?? '').toString();
+    if (id.isEmpty) {
+      _message('This return has no ERP ID and cannot be deleted',
+          error: true);
+      return;
+    }
+
+    setState(() => _deletingId = id);
+    try {
+      await ApiService.deleteSalesReturn(id);
+      _message('$returnNo deleted from ERP');
+      await _load();
+    } catch (e) {
+      _message(
+        e is ApiException ? e.message : 'Could not delete the ERP return',
+        error: true,
+      );
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
     }
   }
 
@@ -167,6 +244,7 @@ class _ReturnListTabState extends State<_ReturnListTab>
                       : AppTheme.warning;
           final statusLabel =
               status.isEmpty ? 'Pending' : '${status[0].toUpperCase()}${status.substring(1)}';
+           final returnId = (item['_id'] ?? item['id'] ?? '').toString();
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
              child: InkWell(
@@ -256,12 +334,40 @@ class _ReturnListTabState extends State<_ReturnListTab>
                        ],
                      ),
                    ),
-                  if ((item['reason'] ?? '').toString().isNotEmpty) ...[
+                   if ((item['reason'] ?? '').toString().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text('Reason: ${item['reason']}',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11, color: AppTheme.textGrey)),
                   ],
+                   if (status == 'pending') ...[
+                     const SizedBox(height: 6),
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.end,
+                       children: [
+                         Text('Can delete before approval',
+                             style: GoogleFonts.hindSiliguri(
+                                 fontSize: 10, color: AppTheme.textGrey)),
+                         const SizedBox(width: 4),
+                         IconButton(
+                           tooltip: 'Delete return',
+                           visualDensity: VisualDensity.compact,
+                           onPressed: _deletingId == returnId
+                               ? null
+                               : () => _deleteReturn(item),
+                           icon: _deletingId == returnId
+                               ? const SizedBox(
+                                   width: 18,
+                                   height: 18,
+                                   child: CircularProgressIndicator(
+                                       strokeWidth: 2,
+                                       color: AppTheme.error))
+                               : const Icon(Icons.delete_outline_rounded,
+                                   size: 20, color: AppTheme.error),
+                         ),
+                       ],
+                     ),
+                   ],
                    ],
                  ),
               ),

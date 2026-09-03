@@ -206,7 +206,6 @@ class OfflineQueueService {
             probablePaymentDate: p['probablePaymentDate'] != null
                 ? DateTime.tryParse(p['probablePaymentDate'] as String)
                 : null,
-              requestCommission: p['requestCommission'] == true,
           );
           ok = true;
         } else if (item.type == QueueItemType.stockTransfer) {

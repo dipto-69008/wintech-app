@@ -6,6 +6,7 @@ import 'models/user_model.dart';
 import 'services/api_service.dart';
 import 'services/local_storage_service.dart';
 import 'services/offline_queue_service.dart';
+import 'services/sync_refresh_service.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/all_employees_screen.dart';
 import 'screens/employee/employee_dashboard_screen.dart';
@@ -68,8 +69,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Future<void> _runSync() async {
     try {
       // Fresh reachability check so screens see the real live status.
-      await ApiService.ping(force: true);
+      final live = await ApiService.ping(force: true);
+      if (!live) return;
       final result = await OfflineQueueService.syncAll();
+      SyncRefreshService.notify();
       if (result.synced > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
@@ -93,7 +96,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     });
   }
 
-  void _switchTab(int index) => setState(() => _currentIndex = index);
+  void _switchTab(int index) {
+    setState(() => _currentIndex = index);
+    SyncRefreshService.notify(force: true);
+  }
 
   void _openEmployeeTool(String tag) {
     final Widget? screen;
@@ -224,7 +230,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   selectedColor: AppTheme.primaryAccent,
                   unselectedColor:
                       isDark ? AppTheme.darkTextGrey : AppTheme.textGrey,
-                  onTap: () => setState(() => _currentIndex = i),
+                   onTap: () => _switchTab(i),
                 );
               }),
             ),

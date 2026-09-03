@@ -623,7 +623,6 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   late TextEditingController _notesCtrl;
   late TextEditingController _chequeCtrl;
   late TextEditingController _invoiceCtrl;
-  late TextEditingController _commissionPctCtrl;
   String _method = 'cash';
   DateTime _date = _dhakaNow();
   String _proofImage = '';
@@ -631,6 +630,9 @@ class _CollectionDialogState extends State<_CollectionDialog> {
   double _customerDue = 0;
   bool _saving = false;
   bool _commissionRequested = false;
+  bool _invoiceLoading = false;
+  String _invoiceError = '';
+  Map<String, dynamic>? _invoiceOrder;
 
   // Searchable ERP customer selection
   List<Map<String, dynamic>> _erpParties = [];
@@ -654,14 +656,13 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _notesCtrl    = TextEditingController(text: e?.notes ?? '');
     _chequeCtrl   = TextEditingController(text: e?.chequeNumber ?? '');
     _invoiceCtrl  = TextEditingController(text: e?.invoiceNo ?? '');
-    _commissionPctCtrl = TextEditingController(
-        text: e != null && e.commissionPct > 0 ? e.commissionPct.toString() : '3');
     _commissionRequested = e?.commissionRequested ?? false;
     _method = e?.paymentMethod ?? 'cash';
     _date   = e?.date ?? _dhakaNow();
     _customerId = e?.customerId ?? '';
     _proofImage = e?.proofImage ?? '';
     _loadParties();
+    if (_invoiceCtrl.text.trim().isNotEmpty) _lookupInvoice();
   }
 
   Future<void> _loadParties() async {
@@ -701,7 +702,6 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _notesCtrl.dispose();
     _chequeCtrl.dispose();
     _invoiceCtrl.dispose();
-    _commissionPctCtrl.dispose();
     super.dispose();
   }
 
@@ -710,6 +710,114 @@ class _CollectionDialogState extends State<_CollectionDialog> {
 
   static double _number(dynamic value) =>
       value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+
+  double get _invoiceGross =>
+      _number(_invoiceOrder?['totalAmount'] ?? _invoiceOrder?['subTotal']);
+  double get _invoiceDue => _number(_invoiceOrder?['dueAmount']);
+  double get _invoicePaid => _number(_invoiceOrder?['paidAmount']);
+  DateTime? get _invoiceProbableDate =>
+      DateTime.tryParse(_invoiceOrder?['probablePaymentDate']?.toString() ?? '');
+  double get _invoiceCommission =>
+      (_invoiceGross * 0.03).clamp(0, _invoiceGross).toDouble();
+  double get _dueAfterCommission =>
+      (_invoiceDue - _invoiceCommission).clamp(0, double.infinity).toDouble();
+
+  bool _onOrBefore(DateTime left, DateTime right) {
+    final a = DateTime(left.year, left.month, left.day);
+    final b = DateTime(right.year, right.month, right.day);
+    return !a.isAfter(b);
+  }
+
+  bool get _commissionEligible {
+    final probable = _invoiceProbableDate;
+    return _invoiceOrder != null &&
+        _method == 'cash' &&
+        _invoiceDue > 0 &&
+        probable != null &&
+        _onOrBefore(_date, probable);
+  }
+
+  Future<void> _lookupInvoice() async {
+    final invoiceNo = _invoiceCtrl.text.trim();
+    if (invoiceNo.isEmpty) {
+      setState(() {
+        _invoiceOrder = null;
+        _invoiceError = '';
+        _commissionRequested = false;
+      });
+      return;
+    }
+    if (!await ApiService.isConnected) {
+      if (mounted) {
+        setState(() => _invoiceError = 'Connect to ERP to look up this invoice');
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _invoiceLoading = true;
+      _invoiceError = '';
+      _invoiceOrder = null;
+      _commissionRequested = false;
+    });
+    try {
+      final order = await ApiService.orderByInvoice(invoiceNo);
+      if (!mounted) return;
+      if (order == null) {
+        setState(() {
+          _invoiceLoading = false;
+          _invoiceError = 'Invoice not found in your branch';
+        });
+        return;
+      }
+      final partyId = order['partyId']?.toString() ?? '';
+      final partyName = order['partyName']?.toString() ?? '';
+      final due = _number(order['dueAmount']);
+      setState(() {
+        _invoiceLoading = false;
+        _invoiceOrder = order;
+        _invoiceError = '';
+        if (partyId.isNotEmpty) _customerId = partyId;
+        if (partyName.isNotEmpty) _customerCtrl.text = partyName;
+        _customerDue = due;
+        if (due > 0) _amountCtrl.text = due.toStringAsFixed(2);
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _invoiceLoading = false;
+          _invoiceError = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _invoiceLoading = false;
+          _invoiceError = 'Could not look up the invoice';
+        });
+      }
+    }
+  }
+
+  void _toggleCommission(bool value) {
+    if (value && !_commissionEligible) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('3% commission is not eligible for this collection',
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    setState(() {
+      _commissionRequested = value;
+      if (value) {
+        _amountCtrl.text = _dueAfterCommission.toStringAsFixed(2);
+      } else if (_invoiceOrder != null) {
+        _amountCtrl.text = _invoiceDue.toStringAsFixed(2);
+      }
+    });
+  }
 
   Future<void> _pickProofImage() async {
     if (_pickingImage) return;
@@ -739,6 +847,25 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     if (!_formKey.currentState!.validate()) return;
     // The collection timestamp is always captured at submit time in Dhaka.
     _date = _dhakaNow();
+    if (_commissionRequested) {
+      final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+      if (!_commissionEligible) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('The 3% commission is not eligible for this collection'),
+          backgroundColor: AppTheme.error,
+        ));
+        return;
+      }
+      if ((amount - _dueAfterCommission).abs() > 0.01) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Full invoice settlement with commission must be ৳${NumberFormat('#,##0.00', 'en_US').format(_dueAfterCommission)}',
+              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+          backgroundColor: AppTheme.error,
+        ));
+        return;
+      }
+    }
     setState(() => _saving = true);
     final model = PaymentCollectionModel(
       id: widget.existing?.id ??
@@ -752,8 +879,8 @@ class _CollectionDialogState extends State<_CollectionDialog> {
       proofImage: _proofImage,
       invoiceNo: _invoiceCtrl.text.trim(),
       commissionRequested: _commissionRequested && _invoiceCtrl.text.trim().isNotEmpty,
-      commissionPct: double.tryParse(_commissionPctCtrl.text.trim()) ?? 0,
-      commissionAmount: widget.existing?.commissionAmount ?? 0,
+       commissionPct: _commissionRequested ? 3 : 0,
+       commissionAmount: _commissionRequested ? _invoiceCommission : 0,
       date: _date,
       status: widget.existing?.status ?? PaymentCollectionModel.statusPending,
       srId: widget.user?.id ?? '',
@@ -820,7 +947,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Party due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_customerDue)}',
+                  '${_invoiceOrder != null ? 'Invoice' : 'Party'} due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_customerDue)}',
                   style: GoogleFonts.hindSiliguri(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -830,25 +957,96 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               ),
             if (_customerId.isNotEmpty) const SizedBox(height: 12),
             _label('Invoice Number (optional)'),
-            TextFormField(
-              controller: _invoiceCtrl,
-              textCapitalization: TextCapitalization.characters,
-              onChanged: (_) => setState(() {
-                if (_invoiceCtrl.text.trim().isEmpty) _commissionRequested = false;
-              }),
-              decoration: const InputDecoration(
-                hintText: 'Leave blank for party ledger payment',
-                prefixIcon: Icon(Icons.receipt_long_rounded),
-              ),
+             Row(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                 Expanded(
+                   child: TextFormField(
+                     controller: _invoiceCtrl,
+                     textCapitalization: TextCapitalization.characters,
+                     onFieldSubmitted: (_) => _lookupInvoice(),
+                     onChanged: (_) => setState(() {
+                       _invoiceOrder = null;
+                       _invoiceError = '';
+                       _commissionRequested = false;
+                     }),
+                     decoration: const InputDecoration(
+                       hintText: 'Enter invoice number',
+                       prefixIcon: Icon(Icons.receipt_long_rounded),
+                     ),
+                   ),
+                 ),
+                 const SizedBox(width: 8),
+                 SizedBox(
+                   height: 52,
+                   width: 52,
+                   child: IconButton.filled(
+                     onPressed: _invoiceLoading ? null : _lookupInvoice,
+                     icon: _invoiceLoading
+                         ? const SizedBox(
+                             width: 18,
+                             height: 18,
+                             child: CircularProgressIndicator(strokeWidth: 2),
+                           )
+                         : const Icon(Icons.search_rounded),
+                     tooltip: 'Find invoice',
+                   ),
+                 ),
+               ],
             ),
+             if (_invoiceError.isNotEmpty) ...[
+               const SizedBox(height: 6),
+               Text(_invoiceError,
+                   style: GoogleFonts.hindSiliguri(
+                       fontSize: 11, color: AppTheme.error)),
+             ],
             const SizedBox(height: 6),
             Text(
-              'With invoice: payment reduces that invoice due. Without invoice: payment reduces the party ledger due.',
+               'Enter an invoice number to review its total, paid amount, due, customer and probable payment date.',
               style: GoogleFonts.hindSiliguri(
                 fontSize: 11,
                 color: AppTheme.textGrey,
               ),
             ),
+             if (_invoiceOrder != null) ...[
+               const SizedBox(height: 10),
+               Container(
+                 width: double.infinity,
+                 padding: const EdgeInsets.all(12),
+                 decoration: BoxDecoration(
+                   color: AppTheme.primaryAccent.withValues(alpha: 0.07),
+                   borderRadius: BorderRadius.circular(10),
+                   border: Border.all(
+                       color: AppTheme.primaryAccent.withValues(alpha: 0.18)),
+                 ),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Text(
+                       'Invoice ${_invoiceOrder!['invoiceNo'] ?? _invoiceCtrl.text.trim()}',
+                       style: GoogleFonts.hindSiliguri(
+                           fontSize: 13, fontWeight: FontWeight.w800),
+                     ),
+                     const SizedBox(height: 6),
+                     Text('Customer: ${_invoiceOrder!['partyName'] ?? _customerCtrl.text}',
+                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                     Text('Total: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_invoiceGross)}',
+                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                     Text('Paid: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_invoicePaid)}',
+                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                     Text('Due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_invoiceDue)}',
+                         style: GoogleFonts.hindSiliguri(
+                             fontSize: 12, fontWeight: FontWeight.w800,
+                             color: _invoiceDue > 0 ? AppTheme.error : AppTheme.success)),
+                     if (_invoiceProbableDate != null)
+                       Text(
+                         'Probable payment date: ${DateFormat('dd MMM yyyy').format(_invoiceProbableDate!)}',
+                         style: GoogleFonts.hindSiliguri(fontSize: 12),
+                       ),
+                   ],
+                 ),
+               ),
+             ],
             if (_invoiceCtrl.text.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
               Container(
@@ -861,38 +1059,28 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                 ),
                 child: Column(
                   children: [
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      value: _commissionRequested,
-                      onChanged: (value) =>
-                          setState(() => _commissionRequested = value ?? false),
-                      title: Text('Apply Cash Commission to this invoice',
-                          style: GoogleFonts.hindSiliguri(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
-                      subtitle: Text(
-                          'Only available when this payment settles the invoice.',
-                          style: GoogleFonts.hindSiliguri(fontSize: 11)),
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                    if (_commissionRequested)
-                      TextFormField(
-                        controller: _commissionPctCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Cash Commission %',
-                          hintText: '3',
-                          suffixText: '%',
-                        ),
-                        validator: (value) {
-                          if (!_commissionRequested) return null;
-                          final pct = double.tryParse(value?.trim() ?? '');
-                          if (pct == null || pct <= 0 || pct > 100) {
-                            return 'Enter a percentage between 0 and 100';
-                          }
-                          return null;
-                        },
-                      ),
+                     if (_invoiceOrder != null && _commissionEligible)
+                       CheckboxListTile(
+                         contentPadding: EdgeInsets.zero,
+                         dense: true,
+                         value: _commissionRequested,
+                         onChanged: (value) => _toggleCommission(value ?? false),
+                         title: Text('Apply fixed 3% Cash Commission',
+                             style: GoogleFonts.hindSiliguri(
+                                 fontSize: 13, fontWeight: FontWeight.w700)),
+                         subtitle: Text(
+                             'Full settlement will collect ৳${NumberFormat('#,##0.00', 'en_US').format(_dueAfterCommission)}; commission is ৳${NumberFormat('#,##0.00', 'en_US').format(_invoiceCommission)}.',
+                             style: GoogleFonts.hindSiliguri(fontSize: 11)),
+                         controlAffinity: ListTileControlAffinity.leading,
+                       )
+                     else
+                       Text(
+                         _invoiceOrder == null
+                             ? 'Find this invoice first to check commission eligibility.'
+                             : '3% commission is unavailable: Cash collection must be on or before the probable payment date.',
+                         style: GoogleFonts.hindSiliguri(
+                             fontSize: 11, color: AppTheme.textGrey),
+                       ),
                   ],
                 ),
               ),
@@ -921,7 +1109,10 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                       child: Text(m.$2,
                           style: GoogleFonts.hindSiliguri())))
                   .toList(),
-              onChanged: (v) => setState(() => _method = v!),
+               onChanged: (v) => setState(() {
+                 _method = v!;
+                 if (_method != 'cash') _commissionRequested = false;
+               }),
               decoration: const InputDecoration(),
             ),
             if (_method == 'cheque') ...[

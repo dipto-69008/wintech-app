@@ -20,6 +20,18 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _obscurePass = true;
 
+  String _appRole(dynamic raw) {
+    final role = raw?.toString().trim().toLowerCase() ?? '';
+    if (role.contains('super')) return UserModel.roleSuperAdmin;
+    if (role == 'admin' || role.contains('administrator')) {
+      return UserModel.roleAdmin;
+    }
+    if (role.contains('leader')) return UserModel.roleTeamLeader;
+    if (role.contains('investor')) return UserModel.roleInvestor;
+    if (role.contains('customer')) return UserModel.roleCustomer;
+    return UserModel.roleTeamMember;
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -37,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
         id: erpUser['id']?.toString() ?? '',
         name: erpUser['name']?.toString() ?? identifier,
         email: erpUser['email']?.toString() ?? identifier,
-        role: UserModel.roleTeamMember, // SR / employee
+        role: _appRole(erpUser['role']),
         designation: erpUser['designation']?.toString() ?? '',
         myReferralCode: erpUser['employeeCode']?.toString() ?? '',
         branch: erpUser['branchName']?.toString() ?? '',

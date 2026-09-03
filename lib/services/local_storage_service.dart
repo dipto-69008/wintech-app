@@ -584,6 +584,12 @@ class LocalStorageService {
         _keyLeaves, jsonEncode(list.map((x) => x.toMap()).toList()));
   }
 
+  static Future<void> replaceLeaves(List<LeaveModel> leaves) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keyLeaves, jsonEncode(leaves.map((x) => x.toMap()).toList()));
+  }
+
   static Future<void> deleteLeave(String id) async {
     final list = await getLeaves();
     list.removeWhere((x) => x.id == id);
@@ -651,6 +657,12 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _keySurveys, jsonEncode(list.map((x) => x.toMap()).toList()));
+  }
+
+  static Future<void> replaceSurveys(List<SurveyModel> surveys) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _keySurveys, jsonEncode(surveys.map((x) => x.toMap()).toList()));
   }
 
   static Future<void> deleteSurvey(String id) async {

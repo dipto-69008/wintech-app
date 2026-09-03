@@ -10,6 +10,8 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/sync_refresh_service.dart';
+import 'leave_details_screen.dart';
 
 class LeaveScreen extends StatefulWidget {
   const LeaveScreen({super.key});
@@ -30,11 +32,17 @@ class _LeaveScreenState extends State<LeaveScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
   }
 
   @override
   void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
     _tabCtrl.dispose();
     super.dispose();
   }
@@ -60,6 +68,7 @@ class _LeaveScreenState extends State<LeaveScreen>
           ...remote,
           ...local.where((l) => !remoteIds.contains(l.id)),
         ];
+        await LocalStorageService.replaceLeaves(all);
         erp = true;
       } catch (_) {
         // Offline or endpoint unavailable — keep local data.
@@ -343,94 +352,104 @@ class _LeaveScreenState extends State<LeaveScreen>
             ? AppTheme.error
             : AppTheme.warning;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-              blurRadius: 4)
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => LeaveDetailsScreen(leave: l)),
       ),
-      child: Row(children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12)),
-          child: Icon(Icons.beach_access_rounded,
-              color: statusColor, size: 20),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+                blurRadius: 4)
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(l.typeLabel,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text(
-                '${l.fromDate.day}/${l.fromDate.month}/${l.fromDate.year} — ${l.toDate.day}/${l.toDate.month}/${l.toDate.year}',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12, color: AppTheme.textGrey)),
-            Text('${l.totalDays} days',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryAccent)),
-            if (l.reason.isNotEmpty)
-              Text(l.reason,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+        child: Row(children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(Icons.beach_access_rounded,
+                color: statusColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(l.typeLabel,
                   style: GoogleFonts.hindSiliguri(
-                      fontSize: 11, color: AppTheme.textGrey)),
-            // HR's rejection note — the officer needs to know why.
-            if (l.status == LeaveModel.statusRejected && l.adminNote.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.error.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.error),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text('Reason: ${l.adminNote}',
-                        style: GoogleFonts.hindSiliguri(
-                            fontSize: 11, color: AppTheme.error)),
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(
+                  '${l.fromDate.day}/${l.fromDate.month}/${l.fromDate.year} — ${l.toDate.day}/${l.toDate.month}/${l.toDate.year}',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 12, color: AppTheme.textGrey)),
+              Text('${l.totalDays} days',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryAccent)),
+              if (l.reason.isNotEmpty)
+                Text(l.reason,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.hindSiliguri(
+                        fontSize: 11, color: AppTheme.textGrey)),
+              // HR's rejection note — the officer needs to know why.
+              if (l.status == LeaveModel.statusRejected && l.adminNote.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ]),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.error),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text('Reason: ${l.adminNote}',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 11, color: AppTheme.error)),
+                    ),
+                  ]),
+                ),
+              ],
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(l.statusLabel,
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor)),
+            ),
+            const SizedBox(height: 6),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: AppTheme.textGrey),
+            if (l.status == LeaveModel.statusPending) ...[
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => _delete(l),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 18, color: AppTheme.error),
               ),
             ],
           ]),
-        ),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20)),
-            child: Text(l.statusLabel,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor)),
-          ),
-          if (l.status == LeaveModel.statusPending) ...[
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () => _delete(l),
-              child: const Icon(Icons.delete_outline_rounded,
-                  size: 18, color: AppTheme.error),
-            ),
-          ],
         ]),
-      ]),
+      ),
     );
   }
 }
