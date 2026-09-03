@@ -109,7 +109,7 @@ class _ReturnListTabState extends State<_ReturnListTab>
   }
 
   void _refreshFromSync() {
-    if (mounted) _load();
+    if (mounted) _load(showLoading: false);
   }
 
   @override
@@ -124,8 +124,8 @@ class _ReturnListTabState extends State<_ReturnListTab>
     if (oldWidget.refreshId != widget.refreshId) _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _loading = true);
     try {
       final data = await ApiService.salesReturns();
       if (mounted) setState(() => _returns = data);

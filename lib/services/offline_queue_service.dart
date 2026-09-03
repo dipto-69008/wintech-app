@@ -345,6 +345,7 @@ class OfflineQueueService {
       }
     }
 
+    await uploadRows('taRows');
     await uploadRows('motoRows');
     await uploadRows('motoServicingRows');
     await uploadRows('outStationRows');

@@ -5,6 +5,7 @@ import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
@@ -24,10 +25,21 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
   }
 
-  Future<void> _load() async {
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
     final user = await LocalStorageService.getCurrentUser();
     final orders = await LocalStorageService.getOrders();
     if (!mounted) return;

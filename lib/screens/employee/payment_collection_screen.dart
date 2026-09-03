@@ -10,6 +10,7 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class PaymentCollectionScreen extends StatefulWidget {
   const PaymentCollectionScreen({super.key});
@@ -30,11 +31,22 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
     final local = await LocalStorageService.getPaymentCollections();
     var all = local;

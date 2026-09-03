@@ -6,6 +6,7 @@ import '../../config/theme.dart';
 import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -40,17 +41,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
           parent: _animCtrl,
           curve: Interval(start, end, curve: Curves.easeOut)));
     });
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
   }
 
   @override
   void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
     _animCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loading = true);
     final orders = await LocalStorageService.getOrders();
     final employees = await LocalStorageService.getAllEmployees();
     if (!mounted) return;

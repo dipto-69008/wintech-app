@@ -23,13 +23,19 @@ class OrderItem {
         'isBonus': isBonus,
       };
 
-  factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
-        productName: m['productName'] ?? '',
-        quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
-        unit: m['unit'] ?? 'Pcs',
-        unitPrice: (m['unitPrice'] as num?)?.toDouble() ?? 0,
-        isBonus: m['isBonus'] == true,
-      );
+  factory OrderItem.fromMap(Map<String, dynamic> m) {
+    final productName = m['productName']?.toString() ?? '';
+    final unitPrice = (m['unitPrice'] as num?)?.toDouble() ?? 0;
+    return OrderItem(
+      productName: productName,
+      quantity: (m['quantity'] as num?)?.toDouble() ?? 0,
+      unit: m['unit']?.toString() ?? 'Pcs',
+      unitPrice: unitPrice,
+      // Keep legacy ERP bonus rows consistent with the details screen.
+      isBonus: m['isBonus'] == true ||
+          unitPrice == 0 && productName.toLowerCase().contains('(bonus)'),
+    );
+  }
 }
 
 class OrderModel {
@@ -69,6 +75,16 @@ class OrderModel {
   static String get statusConfirmed => 'confirmed';
   static String get statusDelivered => 'delivered';
   static String get statusCancelled => 'cancelled';
+
+  /// Total charged and free quantities, rather than the number of line items.
+  /// ERP may update a bonus line's quantity without creating another line.
+  double get itemQuantity => items
+      .where((item) => !item.isBonus)
+      .fold(0.0, (sum, item) => sum + item.quantity);
+
+  double get bonusQuantity => items
+      .where((item) => item.isBonus)
+      .fold(0.0, (sum, item) => sum + item.quantity);
 
   String get statusLabel {
     switch (status) {

@@ -46,7 +46,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   void _refreshFromSync() {
-    if (mounted) _load();
+    if (mounted) _load(showLoading: false);
   }
 
   @override
@@ -55,8 +55,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
 
     // 1) Try live ERP orders first (real-time from ERP database).
@@ -99,12 +99,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   !productName.toLowerCase().endsWith(packSize.toLowerCase())
               ? '$productName $packSize'
               : productName;
+          final rate = (d['rate'] as num?)?.toDouble() ?? 0;
           return OrderItem(
               productName: displayName,
               quantity: (d['quantity'] as num?)?.toDouble() ?? 0,
               unit: 'Pcs',
-              unitPrice: (d['rate'] as num?)?.toDouble() ?? 0,
-              isBonus: d['isBonus'] == true,
+              unitPrice: rate,
+              isBonus: d['isBonus'] == true ||
+                  rate == 0 && productName.toLowerCase().contains('(bonus)'),
             );
         })
         .toList();
@@ -313,10 +315,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Widget _buildOrderTile(OrderModel order, bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
-    final productCount = order.items.where((item) => !item.isBonus).length;
-    final bonusCount = order.items.where((item) => item.isBonus).length;
-    final itemLabel = '$productCount item(s)'
-        '${bonusCount > 0 ? ' + $bonusCount bonus' : ''}';
+    String quantityLabel(double quantity) => quantity == quantity.roundToDouble()
+        ? quantity.toInt().toString()
+        : quantity.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+    final itemCount = quantityLabel(order.itemQuantity);
+    final bonusCount = quantityLabel(order.bonusQuantity);
+    final itemLabel = '$itemCount item(s)'
+        '${order.bonusQuantity > 0 ? ' + $bonusCount bonus' : ''}';
     final statusColor = order.status == 'delivered'
         ? AppTheme.success
         : order.status == 'cancelled'

@@ -38,7 +38,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   }
 
   void _refreshFromSync() {
-    if (mounted) _load();
+    if (mounted) _load(showLoading: false);
   }
 
   @override
@@ -47,8 +47,8 @@ class _SurveyScreenState extends State<SurveyScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _loading = true);
     final local = await LocalStorageService.getSurveys();
     var all = local;
     var erp = false;
@@ -839,13 +839,42 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     return list;
   }
 
-  String _partyIdForName(String name) {
+  Map<String, dynamic>? _partyForName(String name) {
     for (final party in _erpParties) {
-       if ((party['name'] ?? '').toString() == name) {
-        return (party['_id'] ?? party['id'] ?? '').toString();
-      }
+      if ((party['name'] ?? '').toString() == name) return party;
+    }
+    return null;
+  }
+
+  String _firstPartyValue(
+      Map<String, dynamic> party, List<String> keys) {
+    for (final key in keys) {
+      final value = (party[key] ?? '').toString().trim();
+      if (value.isNotEmpty) return value;
     }
     return '';
+  }
+
+  void _selectDealerParty(String? value) {
+    final party = value == null ? null : _partyForName(value);
+    setState(() {
+      _shopName.text = value ?? '';
+      _dealerPartyId = party == null
+          ? ''
+          : (party['_id'] ?? party['id'] ?? '').toString();
+      _dealerName.text = party == null
+          ? ''
+          : _firstPartyValue(
+              party, ['dealerName', 'ownerName', 'contactPerson']);
+      _dealerMobile.text = party == null
+          ? ''
+          : _firstPartyValue(
+              party, ['mobile', 'phone', 'officePhone']);
+      _bazarName.text = party == null
+          ? ''
+          : _firstPartyValue(
+              party, ['bazarName', 'market', 'area']);
+    });
   }
 
   @override
@@ -1324,11 +1353,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                                 style:
                                     GoogleFonts.hindSiliguri(fontSize: 13))))
                         .toList(),
-                    onChanged: (value) => setState(() {
-                      _shopName.text = value ?? '';
-                      _dealerPartyId =
-                          value == null ? '' : _partyIdForName(value);
-                    }),
+                     onChanged: _selectDealerParty,
                     validator: (_) => _shopName.text.trim().isEmpty
                         ? 'Required'
                         : null,

@@ -37,7 +37,7 @@ class _LeaveScreenState extends State<LeaveScreen>
   }
 
   void _refreshFromSync() {
-    if (mounted) _load();
+    if (mounted) _load(showLoading: false);
   }
 
   @override
@@ -47,8 +47,8 @@ class _LeaveScreenState extends State<LeaveScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
     final local = await LocalStorageService.getLeaves();
     var all = local;

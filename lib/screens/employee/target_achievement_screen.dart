@@ -6,6 +6,7 @@ import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class TargetAchievementScreen extends StatefulWidget {
   const TargetAchievementScreen({super.key});
@@ -36,11 +37,22 @@ class _TargetAchievementScreenState extends State<TargetAchievementScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
     final orders = await LocalStorageService.getOrders();
 

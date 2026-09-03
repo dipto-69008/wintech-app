@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../config/theme.dart';
 import '../../../models/user_model.dart';
 import '../../../services/local_storage_service.dart';
+import '../../../services/sync_refresh_service.dart';
 
 class CommissionScreen extends StatefulWidget {
   const CommissionScreen({super.key});
@@ -20,7 +21,18 @@ class _CommissionScreenState extends State<CommissionScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   Future<void> _load() async {

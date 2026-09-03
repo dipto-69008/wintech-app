@@ -8,6 +8,7 @@ import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/offline_queue_service.dart';
+import '../../services/sync_refresh_service.dart';
 import 'stock_transfer_detail_screen.dart';
 
 String _packagingKey(String name, String pack) =>
@@ -153,7 +154,18 @@ class _TransferListTabState extends State<_TransferListTab>
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   @override
@@ -162,8 +174,8 @@ class _TransferListTabState extends State<_TransferListTab>
     if (oldWidget.refreshId != widget.refreshId) _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loading = true);
     final queuedItems = await OfflineQueueService.getQueue();
     final pendingTransfers = queuedItems.where((q) => q.type == QueueItemType.stockTransfer).toList();
 
@@ -439,7 +451,18 @@ class _ReceiveTabState extends State<_ReceiveTab>
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
+    super.dispose();
   }
 
   @override
@@ -448,8 +471,10 @@ class _ReceiveTabState extends State<_ReceiveTab>
     if (oldWidget.refreshId != widget.refreshId) _load();
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() { _loading = true; _error = null; });
+    }
     try {
       final data = await ApiService.incomingStockTransfers();
       if (!mounted) return;

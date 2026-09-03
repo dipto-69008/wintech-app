@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +6,7 @@ import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/sync_refresh_service.dart';
 
 class EmployeeDashboardScreen extends StatefulWidget {
   final VoidCallback? onGoToOrders;
@@ -44,26 +44,25 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   double _erpCollectionPercent = 0;
 
   final _fmt = NumberFormat('#,##0', 'en_US');
-  Timer? _liveTimer;
-
   @override
   void initState() {
     super.initState();
+    SyncRefreshService.revision.addListener(_refreshFromSync);
     _load();
-    // Real-time: refresh live ERP figures every 30 seconds so changes
-    // made in the ERP appear in the app automatically.
-    _liveTimer = Timer.periodic(
-        const Duration(seconds: 30), (_) => _load(silent: true));
+  }
+
+  void _refreshFromSync() {
+    if (mounted) _load(silent: true);
   }
 
   @override
   void dispose() {
-    _liveTimer?.cancel();
+    SyncRefreshService.revision.removeListener(_refreshFromSync);
     super.dispose();
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
+    if (!silent && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
 
     // Pull live dashboard stats from ERP when connected
@@ -640,6 +639,13 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
 
   Widget _buildOrderTile(OrderModel order, bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    String quantityLabel(double quantity) => quantity == quantity.roundToDouble()
+        ? quantity.toInt().toString()
+        : quantity.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+    final itemCount = quantityLabel(order.itemQuantity);
+    final bonusCount = quantityLabel(order.bonusQuantity);
+    final itemLabel = '$itemCount item(s)'
+        '${order.bonusQuantity > 0 ? ' + $bonusCount bonus' : ''}';
     final statusColor = order.status == 'delivered'
         ? AppTheme.success
         : order.status == 'cancelled'
@@ -676,7 +682,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               Text(order.customerName,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 14, fontWeight: FontWeight.w600)),
-              Text('${order.items.length} item(s)',
+              Text(itemLabel,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
             ],

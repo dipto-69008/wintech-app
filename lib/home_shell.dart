@@ -36,6 +36,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   UserModel? _user;
   bool _loadingUser = true;
+  bool _syncInFlight = false;
   Timer? _syncTimer;
 
   @override
@@ -53,12 +54,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Real-time link: on start, on app-resume, and every 5 seconds —
-  /// ping the ERP and push any offline items immediately.
+  /// Quiet background link: on start, on app-resume, and periodically —
+  /// ping the ERP and push any offline items without interrupting the UI.
   void _startAutoSync() {
     _runSync();
     _syncTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) => _runSync());
+        Timer.periodic(const Duration(seconds: 20), (_) => _runSync());
   }
 
   @override
@@ -67,24 +68,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   Future<void> _runSync() async {
+    if (_syncInFlight) return;
+    _syncInFlight = true;
     try {
       // Fresh reachability check so screens see the real live status.
       final live = await ApiService.ping(force: true);
       if (!live) return;
-      final result = await OfflineQueueService.syncAll();
+      await OfflineQueueService.syncAll();
       SyncRefreshService.notify();
-      if (result.synced > 0 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              '🔄 ${result.synced} offline item(s) synced to ERP',
-              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
-      }
     } catch (_) {}
+    finally {
+      _syncInFlight = false;
+    }
   }
 
   Future<void> _loadUser() async {

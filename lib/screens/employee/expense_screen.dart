@@ -50,7 +50,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   }
 
   void _refreshFromSync() {
-    if (mounted) _load();
+    if (mounted) _load(showLoading: false);
   }
 
   @override
@@ -60,8 +60,8 @@ class _ExpenseScreenState extends State<ExpenseScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
     final local = await LocalStorageService.getExpenses();
     var all = local;
@@ -137,9 +137,41 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   }
 
   void _openAdd() {
-    // Motorcycle Log is an internal mirror of TA Bill rows, not a separate
-    // employee-created expense. New bills from this module start as TA Bills.
-    _openForm(type: ExpenseModel.typeTaBill);
+    if (_typeFilter != 'all') {
+      _openForm(type: _typeFilter);
+      return;
+    }
+
+    // Keep the old All-tab flow: the user chooses between the two regular
+    // bills instead of silently opening a TA Bill form.
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _TypePickerSheet(
+        onPick: (type) {
+          Navigator.of(sheetContext).pop();
+          _openForm(type: type);
+        },
+      ),
+    );
+  }
+
+  String get _newBillLabel {
+    switch (_typeFilter) {
+      case ExpenseModel.typeDa:
+        return 'New DA Bill';
+      case ExpenseModel.typeOutStation:
+        return 'New Out Station Bill';
+      case ExpenseModel.typeEntertainment:
+        return 'New Entertainment Bill';
+      case ExpenseModel.typeCourier:
+        return 'New Courier Bill';
+      case ExpenseModel.typeTaBill:
+        return 'New TA Bill';
+      default:
+        return 'New Bill';
+    }
   }
 
   void _openForm({required String type, ExpenseModel? existing}) {
@@ -206,6 +238,12 @@ class _ExpenseScreenState extends State<ExpenseScreen>
   }
 
   Future<void> _delete(ExpenseModel e) async {
+    if (e.status.toLowerCase() != ExpenseModel.statusPending) {
+      _snack(
+          'This bill is ${e.statusLabel.toLowerCase()} and cannot be deleted.',
+          error: true);
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -300,7 +338,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
               onPressed: _openAdd,
               backgroundColor: AppTheme.primaryAccent,
               icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: Text('New TA Bill',
+               label: Text(_newBillLabel,
                   style: GoogleFonts.hindSiliguri(
                       color: Colors.white, fontWeight: FontWeight.w700)),
             ),
@@ -617,6 +655,7 @@ class _ExpenseScreenState extends State<ExpenseScreen>
 
   Widget _buildTile(ExpenseModel e, bool isDark) {
     final cardBg = isDark ? AppTheme.darkCard : Colors.white;
+    final canEdit = e.status.toLowerCase() == ExpenseModel.statusPending;
     final statusColor = e.status == ExpenseModel.statusPaid
         ? AppTheme.success
         : e.status == ExpenseModel.statusApproved
@@ -711,11 +750,15 @@ class _ExpenseScreenState extends State<ExpenseScreen>
                       color: statusColor)),
             ),
             const SizedBox(height: 4),
-            GestureDetector(
-              onTap: () => _delete(e),
-              child: const Icon(Icons.delete_outline_rounded,
-                  size: 18, color: AppTheme.error),
-            ),
+            if (canEdit)
+              GestureDetector(
+                onTap: () => _delete(e),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 18, color: AppTheme.error),
+              )
+            else
+              const Icon(Icons.lock_outline_rounded,
+                  size: 17, color: AppTheme.textGrey),
           ]),
         ]),
       ),
@@ -735,7 +778,6 @@ class _TypePickerSheet extends StatelessWidget {
     (ExpenseModel.typeOutStation, 'Out Station Bill', Icons.hotel_rounded,          Color(0xFFE65100)),
     (ExpenseModel.typeEntertainment, 'Entertainment Bill', Icons.restaurant_rounded, Color(0xFF8E24AA)),
     (ExpenseModel.typeCourier,       'Courier Bill',       Icons.local_shipping_rounded, Color(0xFF00838F)),
-    (ExpenseModel.typeOthersBill, 'TA/DA Top Sheet', Icons.summarize_rounded, Color(0xFF2E7D32)),
   ];
 
   @override
@@ -824,6 +866,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   // TA Bill rows
   final List<Map<String, TextEditingController>> _taRows = [];
+  final List<List<TextEditingController>> _taSupportingDocs = [];
 
   // Motorcycle Servicing Bill rows (attached to TA bill & motorcycle log)
   final List<Map<String, TextEditingController>> _servRows = [];
@@ -862,6 +905,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   bool _pickingPhoto = false;
 
   bool get _isAdmin => widget.user?.isAdmin ?? false;
+  bool get _readOnly =>
+      widget.existing != null &&
+      widget.existing!.status.toLowerCase() != ExpenseModel.statusPending;
 
   static String _today() => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -1069,6 +1115,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   void _addTaRow({Map<String, dynamic>? init}) {
     setState(() {
+      _taSupportingDocs.add(_docControllers(init));
       _taRows.add({
         // Date auto-filled with today for new rows
         'date':            TextEditingController(text: init?['date'] ?? _today()),
@@ -1220,7 +1267,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       }
     }
     for (final rowDocs in [
-      ..._outSupportingDocs, ..._motoSupportingDocs,
+      ..._taSupportingDocs, ..._outSupportingDocs, ..._motoSupportingDocs,
       ..._entSupportingDocs, ..._courierSupportingDocs,
     ]) {
       for (final controller in rowDocs) {
@@ -1297,6 +1344,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   }
 
   Future<void> _submit() async {
+    if (_readOnly) {
+      _formSnack(
+          'This bill is ${widget.existing!.statusLabel.toLowerCase()} and cannot be edited.',
+          error: true);
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     // ── Month lock: bills of a previous month need admin unlock ──────────
@@ -1320,6 +1373,23 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         if (hasFuel && _docPaths(_motoSupportingDocs[i]).isEmpty) {
           _formSnack(
               'Row ${i + 1}: a supporting document photo is required for petrol / octane / mobil bills.',
+              error: true);
+          return;
+        }
+      }
+    }
+    if (widget.type == ExpenseModel.typeTaBill) {
+      for (var i = 0; i < _taRows.length; i++) {
+        final r = _taRows[i];
+        final isMotorcycle =
+            _isMotorcycleTransport(r['modeOfTransport']!.text);
+        final hasOil = r['oil']!.text.trim().isNotEmpty &&
+            (_dbl(r['oilQuantity']!) > 0 || _dbl(r['oilAmount']!) > 0);
+        if (isMotorcycle &&
+            hasOil &&
+            _docPaths(_taSupportingDocs[i]).isEmpty) {
+          _formSnack(
+              'Row ${i + 1}: a supporting document photo is required for the petrol / octane / mobil bill.',
               error: true);
           return;
         }
@@ -1397,9 +1467,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
     switch (widget.type) {
       case ExpenseModel.typeTaBill:
-        taRows = _taRows.map((r) {
+        taRows = _taRows.asMap().entries.map((entry) {
+          final r = entry.value;
           final isMotorcycle =
               _isMotorcycleTransport(r['modeOfTransport']!.text);
+          final docs = _docPaths(_taSupportingDocs[entry.key]);
           final prev = isMotorcycle ? _dbl(r['prevReading']!) : 0;
           final latest = isMotorcycle ? _dbl(r['latestReading']!) : 0;
           return {
@@ -1415,6 +1487,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             'oil': isMotorcycle ? r['oil']!.text : '',
             'oilQuantity': isMotorcycle ? _dbl(r['oilQuantity']!) : 0,
             'oilAmount': isMotorcycle ? _dbl(r['oilAmount']!) : 0,
+            'supportingDoc': isMotorcycle && docs.isNotEmpty ? docs.first : '',
+            'supportingDocs': isMotorcycle ? docs : <String>[],
           };
         }).toList();
         break;
@@ -1593,12 +1667,17 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white)),
             )
-          else
+          else if (!_readOnly)
             TextButton(
               onPressed: _submit,
               child: Text('Save',
                   style: GoogleFonts.hindSiliguri(
                       color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+          if (_readOnly)
+            const Padding(
+              padding: EdgeInsets.only(right: 14),
+              child: Icon(Icons.lock_outline_rounded, size: 20),
             ),
         ],
       ),
@@ -1608,15 +1687,20 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (locked) _lockBanner(),
+            if (_readOnly)
+              _approvalBanner()
+            else if (locked)
+              _lockBanner(),
             // Type-specific rows
             ..._buildTypeFields(isDark),
 
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: (_saving || locked) ? null : _submit,
+              onPressed: (_saving || locked || _readOnly) ? null : _submit,
               child: Text(
-                  locked
+                  _readOnly
+                      ? '${widget.existing!.statusLabel} — View only'
+                      : locked
                       ? 'Locked — Admin unlock required'
                       : (widget.existing == null ? 'Save' : 'Update'),
                   style: GoogleFonts.hindSiliguri(
@@ -1648,6 +1732,29 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.error)),
+          ),
+        ]),
+      );
+
+  Widget _approvalBanner() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.success.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.lock_rounded, color: AppTheme.success, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+                'This bill is ${widget.existing!.statusLabel.toLowerCase()}. Details and supporting documents are view-only.',
+                style: GoogleFonts.hindSiliguri(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.success)),
           ),
         ]),
       );
@@ -1687,11 +1794,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
+        if (!_readOnly)
+          TextButton.icon(
           onPressed: _addTaRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+          ),
       ]),
       Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1715,9 +1823,18 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_taRows.length > 1)
+             if (_taRows.length > 1 && !_readOnly)
               GestureDetector(
-                onTap: () => setState(() => _taRows.removeAt(i)),
+                 onTap: () => setState(() {
+                   for (final c in _taRows[i].values) {
+                     c.dispose();
+                   }
+                   for (final c in _taSupportingDocs[i]) {
+                     c.dispose();
+                   }
+                   _taRows.removeAt(i);
+                   _taSupportingDocs.removeAt(i);
+                 }),
                 child: const Icon(Icons.remove_circle_outline_rounded,
                     size: 18, color: AppTheme.error),
               ),
@@ -1760,6 +1877,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
              _field(_oilAmountLabel(r['oil']!.text), r['oilAmount']!,
                  keyboardType: TextInputType.number),
              const SizedBox(height: 8),
+              _multiDocPicker(_taSupportingDocs[i],
+                  label: 'Supporting Documents',
+                  required: r['oil']!.text.trim().isNotEmpty &&
+                      (_dbl(r['oilQuantity']!) > 0 ||
+                          _dbl(r['oilAmount']!) > 0),
+                  hint: 'Petrol, octane and mobil vouchers can each be added separately.'),
            ],
           Row(children: [
             Expanded(flex: 2, child: _field('Description', r['description']!)),
@@ -1791,11 +1914,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addServRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addServRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       if (_servRows.isEmpty)
         Padding(
@@ -1815,8 +1939,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            GestureDetector(
-              onTap: () => setState(() {
+             if (!_readOnly)
+               GestureDetector(
+               onTap: () => setState(() {
                 for (final c in _servRows[i].values) {
                   c.dispose();
                 }
@@ -1855,11 +1980,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addTadaRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addTadaRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       ..._tadaRows.asMap().entries.map((entry) {
         final i = entry.key;
@@ -1873,7 +1999,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_tadaRows.length > 1)
+             if (_tadaRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() => _tadaRows.removeAt(i)),
                 child: const Icon(Icons.remove_circle_outline_rounded,
@@ -1927,11 +2053,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addOutRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addOutRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       ..._outRows.asMap().entries.map((entry) {
         final i = entry.key;
@@ -1945,7 +2072,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_outRows.length > 1)
+             if (_outRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() {
                   for (final controller in _outRows[i].values) {
@@ -2012,11 +2139,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addEntRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addEntRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       ..._entRows.asMap().entries.map((entry) {
         final i = entry.key;
@@ -2029,7 +2157,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_entRows.length > 1)
+             if (_entRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() {
                   for (final controller in _entRows[i].values) {
@@ -2084,11 +2212,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addCourierRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addCourierRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       ..._courierRows.asMap().entries.map((entry) {
         final i = entry.key;
@@ -2101,7 +2230,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_courierRows.length > 1)
+             if (_courierRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() {
                   for (final controller in _courierRows[i].values) {
@@ -2179,11 +2308,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             style: GoogleFonts.hindSiliguri(
                 fontSize: 14, fontWeight: FontWeight.w700)),
         const Spacer(),
-        TextButton.icon(
-          onPressed: _addMotoRow,
+         if (!_readOnly)
+           TextButton.icon(
+           onPressed: _addMotoRow,
           icon: const Icon(Icons.add_rounded, size: 16),
           label: Text('Add Row', style: GoogleFonts.hindSiliguri(fontSize: 12)),
-        ),
+           ),
       ]),
       ..._motoRows.asMap().entries.map((entry) {
         final i = entry.key;
@@ -2205,7 +2335,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textGrey)),
             const Spacer(),
-            if (_motoRows.length > 1)
+             if (_motoRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() {
                   for (final controller in _motoRows[i].values) {
@@ -2341,8 +2471,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2))
         else
-          TextButton.icon(
-            onPressed: _loadTopSheet,
+           TextButton.icon(
+             onPressed: _readOnly ? null : _loadTopSheet,
             icon: const Icon(Icons.sync_rounded, size: 16),
             label: Text('Auto-fill',
                 style: GoogleFonts.hindSiliguri(fontSize: 12)),
@@ -2434,7 +2564,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               ),
             ],
             const Spacer(),
-            if (_daRows.length > 1)
+             if (_daRows.length > 1 && !_readOnly)
               GestureDetector(
                 onTap: () => setState(() {
                   for (final c in _daRows[i].values) {
@@ -2463,9 +2593,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           if (friday && _isAdmin) ...[
             const SizedBox(height: 8),
             Row(children: [
-              Checkbox(
+               Checkbox(
                 value: _daAdminApproved[i],
-                onChanged: (v) =>
+                onChanged: _readOnly ? null : (v) =>
                     setState(() => _daAdminApproved[i] = v ?? false),
               ),
               Expanded(
@@ -2548,8 +2678,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               color: AppTheme.textGrey)),
       const SizedBox(height: 4),
       InkWell(
-        onTap: () =>
-            _pickRowDate(ctrl, blockFriday: blockFriday, daIndex: daIndex),
+        onTap: _readOnly
+            ? null
+            : () => _pickRowDate(ctrl,
+                blockFriday: blockFriday, daIndex: daIndex),
         borderRadius: BorderRadius.circular(10),
         child: InputDecorator(
           decoration: _inputDecoration(),
@@ -2567,6 +2699,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   Widget _docPicker(TextEditingController docCtrl, {bool required = false}) {
     final hasDoc = docCtrl.text.trim().isNotEmpty;
+    final isUploaded = docCtrl.text.trim().startsWith('http');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Text('Supporting Document',
@@ -2576,7 +2709,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 color: AppTheme.textGrey)),
         if (required) ...[
           const SizedBox(width: 4),
-          Text('(required)',
+           Text('*',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -2588,19 +2721,21 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         if (hasDoc)
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.file(
-              File(docCtrl.text),
-              width: 56,
-              height: 56,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 56,
-                height: 56,
-                color: AppTheme.divider,
-                child: const Icon(Icons.image_rounded,
-                    size: 22, color: AppTheme.textGrey),
-              ),
-            ),
+            child: isUploaded
+                ? Image.network(
+                    docCtrl.text,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _docThumbFallback(),
+                  )
+                : Image.file(
+                    File(docCtrl.text),
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _docThumbFallback(),
+                  ),
           )
         else
           Container(
@@ -2624,9 +2759,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OutlinedButton.icon(
-                  onPressed:
-                      _pickingPhoto ? null : () => _captureDoc(docCtrl),
+                 OutlinedButton.icon(
+                   onPressed: _readOnly || _pickingPhoto
+                       ? null
+                       : () => _captureDoc(docCtrl),
                   icon: _pickingPhoto
                       ? const SizedBox(
                           width: 14,
@@ -2638,7 +2774,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 ),
                 if (hasDoc)
                   TextButton(
-                    onPressed: () => setState(() => docCtrl.clear()),
+                    onPressed:
+                        _readOnly ? null : () => setState(() => docCtrl.clear()),
                     child: Text('Remove',
                         style: GoogleFonts.hindSiliguri(
                             fontSize: 11, color: AppTheme.error)),
@@ -2668,7 +2805,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 color: AppTheme.textGrey)),
         if (required) ...[
           const SizedBox(width: 4),
-          Text('(required)',
+           Text('*',
               style: GoogleFonts.hindSiliguri(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -2710,7 +2847,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                         errorBuilder: (_, __, ___) => _docThumbFallback(),
                       ),
               ),
-              Positioned(
+               if (!_readOnly)
+                 Positioned(
                 top: -7,
                 right: -7,
                 child: InkWell(
@@ -2729,7 +2867,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         ),
       const SizedBox(height: 6),
       OutlinedButton.icon(
-        onPressed: _pickingPhoto
+        onPressed: _readOnly || _pickingPhoto
             ? null
             : () async {
                 final controller = TextEditingController();
@@ -2763,7 +2901,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         TextFormField(
           controller: ctrl,
           keyboardType: keyboardType,
-          onChanged: onChanged,
+          readOnly: _readOnly,
+          onChanged: _readOnly ? null : onChanged,
           style: GoogleFonts.hindSiliguri(fontSize: 13),
           decoration: _inputDecoration(),
         ),
@@ -2865,7 +3004,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               fontSize: 13, color: textColor)),
                     ))
                 .toList(),
-            onChanged: (value) {
+             onChanged: _readOnly ? null : (value) {
               if (value == null) return;
               setState(() => ctrl.text = value);
             },
@@ -2910,7 +3049,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               fontSize: 13, color: textColor)),
                     ))
                 .toList(),
-            onChanged: (value) {
+             onChanged: _readOnly ? null : (value) {
               if (value == null) return;
               setState(() {
                 ctrl.text = value;
@@ -2925,7 +3064,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       const SizedBox(height: 8),
       TextFormField(
         controller: ctrl,
-        onChanged: (value) => setState(() {
+        readOnly: _readOnly,
+        onChanged: _readOnly ? null : (value) => setState(() {
           if (!_isMotorcycleTransport(value)) {
             _clearMotorcycleDetails(row);
           }

@@ -17,7 +17,8 @@ class ExpenseModel {
   final bool adminUnlocked;   // true = admin explicitly unlocked
 
   // TA Bill rows: [{date, from, to, modeOfTransport, description, amount,
-  // prevReading, latestReading, totalKm, oil, oilQuantity, oilAmount}]
+  // prevReading, latestReading, totalKm, oil, oilQuantity, oilAmount,
+  // supportingDoc (legacy first photo), supportingDocs[]}]
   final List<Map<String, dynamic>> taRows;
 
   // Motorcycle log rows:
@@ -215,6 +216,14 @@ class ExpenseModel {
             (s, r) => s +
                 ((r['amount'] as num?)?.toDouble() ?? 0) +
                 ((r['oilAmount'] as num?)?.toDouble() ?? 0));
+      case typeMotorcycle:
+        return motoRows.fold(0.0, (s, r) => s +
+            ((r['petrolAmount'] as num?)?.toDouble() ?? 0) +
+            ((r['octaneAmount'] as num?)?.toDouble() ?? 0) +
+            ((r['mobilAmount'] as num?)?.toDouble() ?? 0) +
+            ((r['othersAmount'] as num?)?.toDouble() ?? 0)) +
+            motoServicingRows.fold(
+                0.0, (s, r) => s + ((r['amount'] as num?)?.toDouble() ?? 0));
       case typeTaDaSheet:
       case typeOthersBill:
         final sheetTotal = (othersBill['totalTaka'] as num?)?.toDouble() ?? 0;
