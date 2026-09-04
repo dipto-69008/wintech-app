@@ -68,36 +68,23 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacementNamed(context, '/otp');
       return;
     } on ApiException catch (e) {
-      // Wrong credentials on ERP — fall through to demo accounts only if it's a demo email
-      if (!LocalStorageService.isDemoAccount(identifier)) {
-        if (!mounted) return;
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.message,
-              style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ));
-        return;
-      }
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.message,
+            style: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
     } catch (_) {
-      // Network/server unreachable — offline mode, demo accounts still work
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not connect to the ERP. Please try again.'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
-
-    // 2) Demo/offline fallback
-    final demoUser = LocalStorageService.getDemoUser(identifier);
-    if (demoUser != null) {
-      await LocalStorageService.saveCurrentUser(demoUser);
-    } else {
-      await LocalStorageService.saveUserProfile(
-        name: identifier.contains('@') ? identifier.split('@').first : identifier,
-        email: identifier,
-      );
-    }
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-    Navigator.pushReplacementNamed(context, '/otp');
   }
 
   @override
@@ -220,42 +207,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // Demo credentials
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryAccent.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppTheme.primaryAccent
-                                .withValues(alpha: 0.2)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const Icon(Icons.info_outline_rounded,
-                                size: 16, color: AppTheme.primaryAccent),
-                            const SizedBox(width: 6),
-                            Text('Demo Accounts — Wintech Agro',
-                                style: GoogleFonts.hindSiliguri(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.primaryAccent)),
-                          ]),
-                          const SizedBox(height: 8),
-                          _demoRow('Admin', 'admin@gmail.com'),
-                          _demoRow('SR / Employee', 'sr@wintech.com'),
-                          _demoRow('Customer', 'customer@gmail.com'),
-                          const SizedBox(height: 4),
-                          Text('Password: anything | OTP: 123456',
-                              style: GoogleFonts.hindSiliguri(
-                                  fontSize: 11,
-                                  color: AppTheme.textGrey,
-                                  fontStyle: FontStyle.italic)),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -267,24 +218,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _demoRow(String role, String email) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: GestureDetector(
-        onTap: () => setState(() => _emailCtrl.text = email),
-        child: Row(
-          children: [
-            Text('• $role: ',
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12, color: AppTheme.textGrey)),
-            Text(email,
-                style: GoogleFonts.hindSiliguri(
-                    fontSize: 12,
-                    color: AppTheme.primaryAccent,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
 }
