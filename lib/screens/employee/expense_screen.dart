@@ -1661,7 +1661,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       zone: _zone,
       areaName: widget.user?.areaName.isNotEmpty == true
           ? widget.user!.areaName
-          : widget.existing?.areaName ?? '',
+          : e?.areaName ?? '',
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       status: widget.existing?.status ?? ExpenseModel.statusPending,
       srId: widget.user?.id ?? '',

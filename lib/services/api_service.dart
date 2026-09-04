@@ -359,7 +359,7 @@ class ApiService {
     });
   }
 
-  /// ERP Zone stock available for a product.
+  /// ERP transfer-ledger stock available for a product at a branch.
   static Future<Map<String, dynamic>> stockAvailability({
     required String branch,
     String? productId,
@@ -367,7 +367,6 @@ class ApiService {
   }) async {
     final body = await _get('/api/mobile/stock-transfers', {
       'availability': '1',
-      'zone': branch,
       'area': branch,
       'branch': branch,
       if (productId != null && productId.isNotEmpty) 'productId': productId,
@@ -392,8 +391,6 @@ class ApiService {
       if (productId != null) 'productId': productId,
       'productName': productName,
       if (packSize != null) 'packSize': packSize,
-      'fromZone': fromBranch,
-      'toZone': toBranch,
       'fromArea': fromBranch,
       'toArea': toBranch,
       'fromBranch': fromBranch,
@@ -418,8 +415,6 @@ class ApiService {
     return _post('/api/mobile/stock-transfers', {
       'fromArea': fromBranch,
       'toArea': toBranch,
-      'fromZone': fromBranch,
-      'toZone': toBranch,
       'fromBranch': fromBranch,
       'toBranch': toBranch,
       'items': items,
