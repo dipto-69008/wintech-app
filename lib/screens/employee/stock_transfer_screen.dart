@@ -339,7 +339,7 @@ class _TransferCard extends StatelessWidget {
           const Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.textGrey),
           const SizedBox(width: 4),
           Expanded(child: Text(
-              '${t['fromBranch'] ?? '—'}  →  ${t['toBranch'] ?? '—'}',
+              '${t['fromAreaName'] ?? t['fromBranch'] ?? '—'}  →  ${t['toAreaName'] ?? t['toBranch'] ?? '—'}',
               style: GoogleFonts.hindSiliguri(fontSize: 12, color: AppTheme.textGrey))),
         ]),
         // Weight row
@@ -427,7 +427,7 @@ class _StatusChip extends StatelessWidget {
 
 // ── Receive Tab ───────────────────────────────────────────────────────────────
 
-/// Consignments addressed to the officer's own branch. They confirm receipt or
+/// Consignments addressed to the officer's own Area. They confirm receipt or
 /// reject the delivery here; history of past decisions stays visible below.
 class _ReceiveTab extends StatefulWidget {
   final int refreshId;
@@ -717,7 +717,7 @@ class _IncomingCard extends StatelessWidget {
           const Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.textGrey),
           const SizedBox(width: 4),
           Expanded(
-            child: Text('${t['fromBranch'] ?? '—'}  →  ${t['toBranch'] ?? '—'}',
+            child: Text('${t['fromAreaName'] ?? t['fromBranch'] ?? '—'}  →  ${t['toAreaName'] ?? t['toBranch'] ?? '—'}',
                 style: GoogleFonts.hindSiliguri(fontSize: 12, color: AppTheme.textGrey)),
           ),
         ]),
@@ -803,14 +803,17 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   double? _availableQuantity;
   bool _availabilityLoading = false;
 
-  // Branches from ERP (fallback: canonical operational branches)
+  // Areas from ERP (fallback: the canonical Zone → Area hierarchy)
   List<String> _branches = [
+    'Cumilla-1', 'Cumilla-2', 'Cumilla-3', 'Cumilla-4', 'Cumilla-5', 'Cumilla-6',
+    'Gouripur', 'Tarakanda', 'Fulpur', 'Fulbaria', 'Muktagacha',
+    'Netrokona', 'Sherpur', 'Trishal/Bhaluka', 'Kishoreganj',
+    'Manikganj', 'Munshiganj', 'Narsingdi', 'Gazipur',
+    'Feni-1', 'Feni-2', 'Noakhali',
+    'Jessore Sadar', 'Bakra',
+    'Khulna-1', 'Satkhira', 'Bagerhat', 'Narail', 'Magura',
     'Bogura-1', 'Bogura-2',
-    'Comilla-1', 'Comilla-2', 'Comilla-3', 'Comilla-4',
-    'Feni-1', 'Feni-2',
-    'Fulbaria', 'Fulpur', 'Gouripur',
-    'Jessore-1', 'Jessore-2 [Bakra]',
-    'Muktagasa', 'Netrokona', 'Tarakanda',
+    'Rajshahi-1', 'Pabna', 'Sirajganj', 'Natore',
   ];
 
   String? _fromBranch;
@@ -844,7 +847,9 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     if (!mounted) return;
     setState(() {
       _user = user;
-      if (user?.branch != null && user!.branch.isNotEmpty) {
+      if (user?.areaName != null && user!.areaName.isNotEmpty) {
+        _fromBranch = user.areaName;
+      } else if (user?.branch != null && user!.branch.isNotEmpty) {
         _fromBranch = user.branch;
       }
     });
@@ -858,11 +863,15 @@ class _NewTransferTabState extends State<_NewTransferTab> {
       if (!mounted) return;
        final prods = results[0].map(_withPackagingFallback).toList();
       final branches = results[1];
-       final employeeBranch = _user?.branch.trim() ?? '';
-       final branchNames = branches
-           .map((b) => b['name']?.toString() ?? '')
-           .where((n) => n.isNotEmpty)
-           .toList();
+       final employeeBranch = (_user?.areaName.isNotEmpty == true
+           ? _user!.areaName
+           : _user?.branch ?? '').trim();
+       final branchNames = <String>{
+         ..._branches,
+         ...branches
+             .map((b) => (b['areaName'] ?? b['name'])?.toString() ?? '')
+             .where((n) => n.isNotEmpty),
+       }.toList();
        if (employeeBranch.isNotEmpty &&
            !branchNames.any((n) => n.toLowerCase() == employeeBranch.toLowerCase())) {
          branchNames.insert(0, employeeBranch);
@@ -999,9 +1008,9 @@ class _NewTransferTabState extends State<_NewTransferTab> {
   }
 
   Future<void> _submit() async {
-    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source branch', error: true); return; }
-    if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination branch', error: true); return; }
-    if (_fromBranch == _toBranch) { _snack('Source and destination branch cannot be the same', error: true); return; }
+    if (_fromBranch == null || _fromBranch!.isEmpty) { _snack('Please select source Area', error: true); return; }
+    if (_toBranch == null || _toBranch!.isEmpty) { _snack('Please select destination Area', error: true); return; }
+    if (_fromBranch == _toBranch) { _snack('Source and destination Area cannot be the same', error: true); return; }
 
     // Collect items: everything in the list + whatever is still in the
     // entry fields (so single-product flow works exactly as before).
@@ -1034,7 +1043,7 @@ class _NewTransferTabState extends State<_NewTransferTab> {
           final requested = (item['quantity'] as num?)?.toDouble() ?? 0;
           if (requested > available) {
             _snack(
-                '${item['productName']}: only ${available.toStringAsFixed(0)} pcs can be transferred from $_fromBranch',
+                '${item['productName']}: only ${available.toStringAsFixed(0)} pcs can be transferred from Area $_fromBranch',
                 error: true);
             return;
           }
@@ -1048,6 +1057,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
     setState(() => _saving = true);
 
     final payload = {
+      'fromArea': _fromBranch!,
+      'toArea': _toBranch!,
       'fromBranch': _fromBranch!,
       'toBranch': _toBranch!,
       'items': items,
@@ -1266,8 +1277,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
         ),
         const SizedBox(height: 14),
 
-        // From branch
-        _branchDropdown('Source Branch (From) *', _fromBranch,
+        // From Area
+        _branchDropdown('Source Area (From) *', _fromBranch,
                 (v) {
               setState(() => _fromBranch = v);
               _loadAvailability();
@@ -1296,8 +1307,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
                   ])
                 : Text(
                     _availableQuantity == null
-                        ? 'ERP stock is unavailable for this product/branch.'
-                        : 'Available in $_fromBranch: ${_availableQuantity!.toStringAsFixed(0)} pcs  •  You can transfer up to this amount.',
+                        ? 'ERP Zone stock is unavailable for this product/Area.'
+                        : 'Available in Zone stock for $_fromBranch: ${_availableQuantity!.toStringAsFixed(0)} pcs  •  You can transfer up to this amount.',
                     style: GoogleFonts.hindSiliguri(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1309,8 +1320,8 @@ class _NewTransferTabState extends State<_NewTransferTab> {
           const SizedBox(height: 14),
         ],
 
-        // To branch
-        _branchDropdown('Destination Branch (To) *', _toBranch,
+        // To Area
+        _branchDropdown('Destination Area (To) *', _toBranch,
                 (v) => setState(() => _toBranch = v)),
         const SizedBox(height: 14),
 

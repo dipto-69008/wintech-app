@@ -365,6 +365,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                   ),
                                 ],
+                                 if (_user?.designation.isNotEmpty == true) ...[
+                                   const SizedBox(height: 7),
+                                   Text(
+                                     _user!.designation,
+                                     style: GoogleFonts.hindSiliguri(
+                                         fontSize: 12,
+                                         color: Colors.white.withValues(alpha: 0.9),
+                                         fontWeight: FontWeight.w600),
+                                   ),
+                                 ],
                                 const SizedBox(height: 18),
                                 // Edit button
                                 GestureDetector(
@@ -462,16 +472,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       : '—',
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.location_city_rounded, 'District',
-                                  _user?.zela.isEmpty == false
-                                      ? _user!.zela
-                                      : '—',
+                               _infoTile(Icons.location_city_rounded, 'Zone',
+                                   _user?.zoneName.isNotEmpty == true
+                                       ? _user!.zoneName
+                                       : (_user?.zela.isEmpty == false
+                                           ? _user!.zela
+                                           : '—'),
                                   isDark),
                               _divider(),
-                              _infoTile(Icons.pin_drop_rounded, 'Thana / Area',
-                                  _user?.thana.isEmpty == false
-                                      ? _user!.thana
-                                      : '—',
+                               _infoTile(Icons.pin_drop_rounded, 'Area',
+                                   _user?.areaName.isNotEmpty == true
+                                       ? _user!.areaName
+                                       : (_user?.thana.isEmpty == false
+                                           ? _user!.thana
+                                           : '—'),
                                   isDark),
                             ],
                           ),

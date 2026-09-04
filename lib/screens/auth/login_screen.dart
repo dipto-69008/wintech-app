@@ -49,11 +49,18 @@ class _LoginScreenState extends State<LoginScreen> {
         id: erpUser['id']?.toString() ?? '',
         name: erpUser['name']?.toString() ?? identifier,
         email: erpUser['email']?.toString() ?? identifier,
+         phone: erpUser['contactNo']?.toString() ??
+             erpUser['phone']?.toString() ?? '',
+         company: erpUser['company']?.toString() ?? '',
         role: _appRole(erpUser['role']),
         designation: erpUser['designation']?.toString() ?? '',
         myReferralCode: erpUser['employeeCode']?.toString() ?? '',
-        branch: erpUser['branchName']?.toString() ?? '',
-        zela: erpUser['areaName']?.toString() ?? '',
+        branch: erpUser['areaName']?.toString() ??
+            erpUser['branchName']?.toString() ?? '',
+        areaName: erpUser['areaName']?.toString() ??
+            erpUser['branchName']?.toString() ?? '',
+        zoneName: erpUser['zoneName']?.toString() ?? '',
+        zela: erpUser['zoneName']?.toString() ?? '',
       );
       await LocalStorageService.saveCurrentUser(user);
       if (!mounted) return;

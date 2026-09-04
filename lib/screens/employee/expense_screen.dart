@@ -917,7 +917,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     final e = widget.existing;
     _applicantName = widget.user?.name ?? e?.applicantName ?? '';
     _designation   = widget.user?.designation ?? e?.designation ?? '';
-    _zone          = widget.user?.zela ?? e?.zone ?? '';
+    _zone          = widget.user?.zoneName.isNotEmpty == true
+        ? widget.user!.zoneName
+        : e?.zone ?? '';
     _month         = e?.month ?? _currentMonth();
     _motoRegCtrl   = TextEditingController(text: e?.motoRegNumber ?? '');
 
@@ -1126,11 +1128,31 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         'amount':          TextEditingController(text: (init?['amount'] ?? '').toString()),
         'prevReading':     TextEditingController(text: (init?['prevReading'] ?? '').toString()),
         'latestReading':   TextEditingController(text: (init?['latestReading'] ?? '').toString()),
+         // Existing single-oil records are shown in the matching new pair.
+         'petrol':          TextEditingController(text: _taFuelInitial(init, 'petrol', 'Petrol')),
+         'petrolAmount':    TextEditingController(text: _taFuelInitial(init, 'petrolAmount', 'Petrol')),
+         'octane':          TextEditingController(text: _taFuelInitial(init, 'octane', 'Octane')),
+         'octaneAmount':    TextEditingController(text: _taFuelInitial(init, 'octaneAmount', 'Octane')),
+         'mobil':           TextEditingController(text: _taFuelInitial(init, 'mobil', 'Mobil')),
+         'mobilAmount':     TextEditingController(text: _taFuelInitial(init, 'mobilAmount', 'Mobil')),
         'oil':             TextEditingController(text: init?['oil'] ?? ''),
         'oilQuantity':     TextEditingController(text: (init?['oilQuantity'] ?? '').toString()),
         'oilAmount':       TextEditingController(text: (init?['oilAmount'] ?? '').toString()),
       });
     });
+  }
+
+  String _taFuelInitial(
+      Map<String, dynamic>? init, String directKey, String fuelName) {
+    final direct = init?[directKey];
+    if (direct != null) return direct.toString();
+    final legacyOil = (init?['oil'] ?? '').toString().trim().toLowerCase();
+    if (legacyOil == fuelName.toLowerCase()) {
+      final legacyKey =
+          directKey.endsWith('Amount') ? 'oilAmount' : 'oilQuantity';
+      return (init?[legacyKey] ?? '').toString();
+    }
+    return '';
   }
 
   void _addServRow({Map<String, dynamic>? init}) {
@@ -1383,8 +1405,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final r = _taRows[i];
         final isMotorcycle =
             _isMotorcycleTransport(r['modeOfTransport']!.text);
-        final hasOil = r['oil']!.text.trim().isNotEmpty &&
-            (_dbl(r['oilQuantity']!) > 0 || _dbl(r['oilAmount']!) > 0);
+        final hasOil = _dbl(r['petrol']!) > 0 ||
+            _dbl(r['petrolAmount']!) > 0 ||
+            _dbl(r['octane']!) > 0 ||
+            _dbl(r['octaneAmount']!) > 0 ||
+            _dbl(r['mobil']!) > 0 ||
+            _dbl(r['mobilAmount']!) > 0 ||
+            // Legacy rows may still only have one oil field.
+            (r['oil']!.text.trim().isNotEmpty &&
+                (_dbl(r['oilQuantity']!) > 0 || _dbl(r['oilAmount']!) > 0));
         if (isMotorcycle &&
             hasOil &&
             _docPaths(_taSupportingDocs[i]).isEmpty) {
@@ -1484,6 +1513,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             'prevReading': prev,
             'latestReading': latest,
             'totalKm': isMotorcycle ? _taDistance(r) : 0,
+           // Motorcycle fuel is stored independently so Petrol, Octane and
+           // Mobil can all be entered in the same TA row.
+           'petrol': isMotorcycle ? _dbl(r['petrol']!) : 0,
+           'petrolAmount': isMotorcycle ? _dbl(r['petrolAmount']!) : 0,
+           'octane': isMotorcycle ? _dbl(r['octane']!) : 0,
+           'octaneAmount': isMotorcycle ? _dbl(r['octaneAmount']!) : 0,
+           'mobil': isMotorcycle ? _dbl(r['mobil']!) : 0,
+           'mobilAmount': isMotorcycle ? _dbl(r['mobilAmount']!) : 0,
+           // Keep the old single-oil fields for older ERP screens/records.
             'oil': isMotorcycle ? r['oil']!.text : '',
             'oilQuantity': isMotorcycle ? _dbl(r['oilQuantity']!) : 0,
             'oilAmount': isMotorcycle ? _dbl(r['oilAmount']!) : 0,
@@ -1621,6 +1659,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       applicantName: _applicantName,
       designation: _designation,
       zone: _zone,
+      areaName: widget.user?.areaName.isNotEmpty == true
+          ? widget.user!.areaName
+          : e?.areaName ?? '',
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       status: widget.existing?.status ?? ExpenseModel.statusPending,
       srId: widget.user?.id ?? '',
@@ -1865,23 +1906,47 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
              const SizedBox(height: 8),
              _calculatedField('Total KM', totalKm.toStringAsFixed(0)),
              const SizedBox(height: 8),
-             Row(children: [
-               Expanded(child: _oilField(r['oil']!)),
-               const SizedBox(width: 8),
-               Expanded(
-                   child: _field(_oilQuantityLabel(r['oil']!.text),
-                       r['oilQuantity']!,
-                       keyboardType: TextInputType.number)),
-             ]),
-             const SizedBox(height: 8),
-             _field(_oilAmountLabel(r['oil']!.text), r['oilAmount']!,
-                 keyboardType: TextInputType.number),
+              Text('Fuel (all applicable types can be entered together)',
+                  style: GoogleFonts.hindSiliguri(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textGrey)),
+              const SizedBox(height: 5),
+              Row(children: [
+                Expanded(child: _field('Petrol (L)', r['petrol']!,
+                    keyboardType: TextInputType.number)),
+                const SizedBox(width: 8),
+                Expanded(child: _field('Petrol Amount (৳)', r['petrolAmount']!,
+                    keyboardType: TextInputType.number)),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _field('Octane (L)', r['octane']!,
+                    keyboardType: TextInputType.number)),
+                const SizedBox(width: 8),
+                Expanded(child: _field('Octane Amount (৳)', r['octaneAmount']!,
+                    keyboardType: TextInputType.number)),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _field('Mobil (L)', r['mobil']!,
+                    keyboardType: TextInputType.number)),
+                const SizedBox(width: 8),
+                Expanded(child: _field('Mobil Amount (৳)', r['mobilAmount']!,
+                    keyboardType: TextInputType.number)),
+              ]),
              const SizedBox(height: 8),
               _multiDocPicker(_taSupportingDocs[i],
                   label: 'Supporting Documents',
-                  required: r['oil']!.text.trim().isNotEmpty &&
-                      (_dbl(r['oilQuantity']!) > 0 ||
-                          _dbl(r['oilAmount']!) > 0),
+                   required: _dbl(r['petrol']!) > 0 ||
+                       _dbl(r['petrolAmount']!) > 0 ||
+                       _dbl(r['octane']!) > 0 ||
+                       _dbl(r['octaneAmount']!) > 0 ||
+                       _dbl(r['mobil']!) > 0 ||
+                       _dbl(r['mobilAmount']!) > 0 ||
+                       (r['oil']!.text.trim().isNotEmpty &&
+                           (_dbl(r['oilQuantity']!) > 0 ||
+                               _dbl(r['oilAmount']!) > 0)),
                   hint: 'Petrol, octane and mobil vouchers can each be added separately.'),
            ],
           Row(children: [
@@ -1899,7 +1964,16 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   s +
                   _dbl(r['amount']!) +
                   (_isMotorcycleTransport(r['modeOfTransport']!.text)
-                      ? _dbl(r['oilAmount']!)
+                      ? _dbl(r['petrolAmount']!) +
+                          _dbl(r['octaneAmount']!) +
+                          _dbl(r['mobilAmount']!) +
+                          // Fallback for an older row that has not been
+                          // converted to the independent fuel fields.
+                          ((_dbl(r['petrolAmount']!) == 0 &&
+                                  _dbl(r['octaneAmount']!) == 0 &&
+                                  _dbl(r['mobilAmount']!) == 0)
+                              ? _dbl(r['oilAmount']!)
+                              : 0)
                       : 0))),
       const SizedBox(height: 8),
       ..._buildServicingSection(isDark),
@@ -2934,6 +3008,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void _clearMotorcycleDetails(Map<String, TextEditingController> row) {
     row['prevReading']!.clear();
     row['latestReading']!.clear();
+    row['petrol']!.clear();
+    row['petrolAmount']!.clear();
+    row['octane']!.clear();
+    row['octaneAmount']!.clear();
+    row['mobil']!.clear();
+    row['mobilAmount']!.clear();
     row['oil']!.clear();
     row['oilQuantity']!.clear();
     row['oilAmount']!.clear();

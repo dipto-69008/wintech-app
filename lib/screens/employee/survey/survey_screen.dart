@@ -797,7 +797,8 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   String _photoValidationMessage = '';
   static const int _maxPhotos = 5;
 
-  // Dealer visit: zone-based party selection
+  // Dealer visit: Area-scoped party selection within the employee's Zone
+  String _dealerArea = '';
   String _dealerZone = '';
   String _dealerPartyId = '';
   List<Map<String, dynamic>> _erpParties = [];
@@ -813,23 +814,24 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     return list;
   }();
 
-  /// Parties of the selected zone (ERP list merged with local catalog)
+  /// Parties of the selected Area (ERP list merged with local catalog)
   List<String> get _zoneParties {
-     if (_dealerZone.trim().isEmpty) return [];
+     if (_dealerArea.trim().isEmpty) return [];
     final names = <String>{};
-     // The ERP party endpoint is already branch-scoped for a non-admin
-     // employee. Do not compare its local zone field to the branch name:
-     // zones such as Phulpur can belong to the Mymensingh branch.
+      // The ERP party endpoint is already Area-scoped for a non-admin
+      // employee. Keep the comparison Area-first; the Zone is shown separately.
     for (final p in _erpParties) {
        names.add((p['name'] ?? '').toString());
     }
      if (_erpParties.isEmpty) {
-       final branch = _dealerZone.toLowerCase();
+        final area = _dealerArea.toLowerCase();
        for (final p in WintechCatalog.parties) {
-         final zone = (p['zone'] ?? '').toString().toLowerCase();
-         if (zone == branch ||
-             zone.contains(branch) ||
-             branch.contains(zone)) {
+          final partyArea = (p['area'] ?? p['branchName'] ?? p['zone'] ?? '')
+              .toString()
+              .toLowerCase();
+          if (partyArea == area ||
+              partyArea.contains(area) ||
+              area.contains(partyArea)) {
            names.add(p['name'] as String);
          }
       }
@@ -910,14 +912,17 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
    Future<void> _loadEmployeeBranch() async {
      final user = await LocalStorageService.getCurrentUser();
      if (!mounted) return;
-     final branch = user?.branch.trim() ?? '';
+      final area = (user?.areaName.isNotEmpty == true
+          ? user!.areaName
+          : user?.branch ?? '').trim();
      setState(() {
-       _dealerZone = branch;
+        _dealerArea = area;
+        _dealerZone = user?.zoneName.trim() ?? '';
        _branchLoading = false;
      });
    }
 
-  /// Fetch live parties from the ERP for zone-wise dealer dropdown.
+  /// Fetch live parties from the ERP for Area-wise dealer dropdown.
   Future<void> _loadParties() async {
     try {
       if (await ApiService.isConnected) {
@@ -1309,20 +1314,22 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                   _field(_prescription, 'Prescription / Recommendation',
                       maxLines: 3, required: false),
                 ] else ...[
-                  // Zone is owned by the logged-in employee's ERP branch.
+                  // The employee's Area is owned by the ERP assignment; stock
+                  // and reporting still roll up to the displayed Zone.
                   InputDecorator(
                     decoration: const InputDecoration(
-                        labelText: 'Your Branch / Zone',
+                         labelText: 'Your Area / Zone',
                         prefixIcon: Icon(Icons.map_rounded)),
                     child: Text(
                       _branchLoading
-                          ? 'Loading assigned branch...'
-                          : _dealerZone.isEmpty
-                              ? 'Assigned branch unavailable'
-                              : _dealerZone,
+                           ? 'Loading assigned Area...'
+                           : _dealerArea.isEmpty
+                               ? 'Assigned Area unavailable'
+                               : 'Area: $_dealerArea'
+                                   '${_dealerZone.isNotEmpty ? '  •  Zone: $_dealerZone' : ''}',
                       style: GoogleFonts.hindSiliguri(
                         fontSize: 13,
-                        color: _dealerZone.isEmpty
+                         color: _dealerArea.isEmpty
                             ? AppTheme.error
                             : AppTheme.textDark,
                         fontWeight: FontWeight.w600,
@@ -1340,9 +1347,9 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
                         prefixIcon: Icon(Icons.storefront_rounded)),
                     hint: Text(
                         _branchLoading
-                            ? 'Loading branch parties...'
-                            : _dealerZone.isEmpty
-                                ? 'Assigned branch unavailable'
+                            ? 'Loading Area parties...'
+                            : _dealerArea.isEmpty
+                                ? 'Assigned Area unavailable'
                                 : 'Select party',
                         style: GoogleFonts.hindSiliguri(fontSize: 12)),
                     items: _zoneParties

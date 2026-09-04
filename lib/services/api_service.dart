@@ -367,6 +367,7 @@ class ApiService {
   }) async {
     final body = await _get('/api/mobile/stock-transfers', {
       'availability': '1',
+      'area': branch,
       'branch': branch,
       if (productId != null && productId.isNotEmpty) 'productId': productId,
       if (productName != null && productName.isNotEmpty)
@@ -390,6 +391,8 @@ class ApiService {
       if (productId != null) 'productId': productId,
       'productName': productName,
       if (packSize != null) 'packSize': packSize,
+      'fromArea': fromBranch,
+      'toArea': toBranch,
       'fromBranch': fromBranch,
       'toBranch': toBranch,
       'quantity': quantity,
@@ -410,6 +413,8 @@ class ApiService {
     String notes = '',
   }) {
     return _post('/api/mobile/stock-transfers', {
+      'fromArea': fromBranch,
+      'toArea': toBranch,
       'fromBranch': fromBranch,
       'toBranch': toBranch,
       'items': items,

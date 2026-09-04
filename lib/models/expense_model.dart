@@ -8,6 +8,7 @@ class ExpenseModel {
   final String applicantName;
   final String designation;
   final String zone;
+  final String areaName;
   final DateTime createdAt;
   final String status;       // pending | approved | rejected | paid
   final String srId;
@@ -17,7 +18,8 @@ class ExpenseModel {
   final bool adminUnlocked;   // true = admin explicitly unlocked
 
   // TA Bill rows: [{date, from, to, modeOfTransport, description, amount,
-  // prevReading, latestReading, totalKm, oil, oilQuantity, oilAmount,
+  // prevReading, latestReading, totalKm, petrol, petrolAmount, octane,
+  // octaneAmount, mobil, mobilAmount, oil, oilQuantity, oilAmount,
   // supportingDoc (legacy first photo), supportingDocs[]}]
   final List<Map<String, dynamic>> taRows;
 
@@ -71,6 +73,7 @@ class ExpenseModel {
     this.applicantName = '',
     this.designation = '',
     this.zone = '',
+    this.areaName = '',
     required this.createdAt,
     this.status = 'pending',
     required this.srId,
@@ -212,10 +215,20 @@ class ExpenseModel {
   double get rowTotal {
     switch (type) {
       case typeTaBill:
-        return taRows.fold(0.0,
-            (s, r) => s +
-                ((r['amount'] as num?)?.toDouble() ?? 0) +
-                ((r['oilAmount'] as num?)?.toDouble() ?? 0));
+        return taRows.fold(0.0, (s, r) {
+          final petrol = (r['petrolAmount'] as num?)?.toDouble() ?? 0;
+          final octane = (r['octaneAmount'] as num?)?.toDouble() ?? 0;
+          final mobil = (r['mobilAmount'] as num?)?.toDouble() ?? 0;
+          final fuel = petrol + octane + mobil;
+          return s +
+              ((r['amount'] as num?)?.toDouble() ?? 0) +
+              fuel +
+              // Older rows only have oilAmount; do not double-count it when
+              // a row already has one of the independent fuel amounts.
+              (fuel == 0
+                  ? ((r['oilAmount'] as num?)?.toDouble() ?? 0)
+                  : 0);
+        });
       case typeMotorcycle:
         return motoRows.fold(0.0, (s, r) => s +
             ((r['petrolAmount'] as num?)?.toDouble() ?? 0) +
@@ -273,6 +286,7 @@ class ExpenseModel {
         'applicantName': applicantName,
         'designation': designation,
         'zone': zone,
+        'areaName': areaName,
         'createdAt': createdAt.toIso8601String(),
         'status': status,
         'srId': srId,
@@ -299,6 +313,7 @@ class ExpenseModel {
         applicantName: m['applicantName'] ?? '',
         designation: m['designation'] ?? '',
         zone: m['zone'] ?? '',
+        areaName: m['areaName'] ?? m['zone'] ?? '',
         createdAt: DateTime.tryParse(m['createdAt']?.toString() ?? '') ??
             DateTime.now(),
         status: m['status'] ?? statusPending,

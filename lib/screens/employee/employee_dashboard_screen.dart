@@ -218,20 +218,33 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: Colors.white)),
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6)),
-                child: Text(
-                    'Wintech Agro — ${(_user?.branch.isNotEmpty == true) ? _user!.branch : 'Sales Representative'}',
-                    style: GoogleFonts.hindSiliguri(
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600)),
-              ),
+               Container(
+                 margin: const EdgeInsets.only(top: 4),
+                 padding: const EdgeInsets.symmetric(
+                     horizontal: 10, vertical: 4),
+                 decoration: BoxDecoration(
+                     color: Colors.white.withValues(alpha: 0.2),
+                     borderRadius: BorderRadius.circular(6)),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Text(
+                         _user?.designation.isNotEmpty == true
+                             ? _user!.designation
+                             : 'Sales Representative',
+                         style: GoogleFonts.hindSiliguri(
+                             fontSize: 11,
+                             color: Colors.white,
+                             fontWeight: FontWeight.w700)),
+                     if (_user?.branch.isNotEmpty == true)
+                       Text('Zone: ${_user!.zoneName.isNotEmpty ? _user!.zoneName : '—'}  •  Area: ${_user!.areaName.isNotEmpty ? _user!.areaName : _user!.branch}',
+                           style: GoogleFonts.hindSiliguri(
+                               fontSize: 10,
+                               color: Colors.white.withValues(alpha: 0.9),
+                               fontWeight: FontWeight.w500)),
+                   ],
+                 ),
+               ),
             ],
           ),
         ),

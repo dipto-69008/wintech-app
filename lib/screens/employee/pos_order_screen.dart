@@ -47,6 +47,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
   // Party
   String _partyId = '';
   String _partyName = '';
+  String _partyArea = '';
   String _partyZone = '';
   double _partyDue = 0;
 
@@ -105,8 +106,10 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
               .map((p) => <String, dynamic>{
                     'id': p['_id']?.toString() ?? '',
                     'name': p['name']?.toString() ?? '',
-                    'zone': p['branchName']?.toString() ??
-                        p['zone']?.toString() ?? '',
+                    'area': p['area']?.toString() ??
+                        p['areaName']?.toString() ??
+                        p['branchName']?.toString() ?? '',
+                    'zone': p['zone']?.toString() ?? '',
                     'previousDue':
                         (p['previousDue'] as num?)?.toDouble() ?? 0,
                   })
@@ -282,7 +285,7 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SearchSheet(
         title: 'Select Party',
-        hint: 'Search party name or zone…',
+         hint: 'Search party name or Area / Zone…',
         items: _parties,
         itemBuilder: (p, isDark) {
           final due = (p['previousDue'] as num?)?.toDouble() ?? 0;
@@ -301,7 +304,9 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
             title: Text(p['name'] as String,
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: Text(p['zone'] as String? ?? '',
+             subtitle: Text(
+                 'Area: ${p['area'] as String? ?? '—'}'
+                 '${(p['zone'] as String? ?? '').isNotEmpty ? '  •  Zone: ${p['zone']}' : ''}',
                 style: GoogleFonts.hindSiliguri(
                     fontSize: 11, color: AppTheme.textGrey)),
             trailing: due > 0
@@ -323,10 +328,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         },
         matcher: (p, q) =>
             (p['name'] as String).toLowerCase().contains(q) ||
+             (p['area'] as String? ?? '').toLowerCase().contains(q) ||
             (p['zone'] as String? ?? '').toLowerCase().contains(q),
         onSelect: (p) => setState(() {
           _partyId = p['id']?.toString() ?? '';
           _partyName = p['name'] as String;
+           _partyArea = p['area'] as String? ?? '';
           _partyZone = p['zone'] as String? ?? '';
           _partyDue = (p['previousDue'] as num?)?.toDouble() ?? 0;
         }),
@@ -725,8 +732,12 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 3),
                     child: Wrap(spacing: 6, children: [
-                      if (_partyZone.isNotEmpty)
-                        Text(_partyZone,
+                       if (_partyArea.isNotEmpty)
+                         Text('Area: $_partyArea',
+                             style: GoogleFonts.hindSiliguri(
+                                 fontSize: 11, color: AppTheme.textGrey)),
+                       if (_partyZone.isNotEmpty)
+                         Text('Zone: $_partyZone',
                             style: GoogleFonts.hindSiliguri(
                                 fontSize: 11, color: AppTheme.textGrey)),
                       if (_partyDue > 0)

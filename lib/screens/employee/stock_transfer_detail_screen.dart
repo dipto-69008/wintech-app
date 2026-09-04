@@ -86,8 +86,10 @@ class StockTransferDetailScreen extends StatelessWidget {
             icon: Icons.route_rounded,
             child: Column(
               children: [
-                _infoRow('From branch', _text('fromBranch')),
-                _infoRow('To branch', _text('toBranch')),
+                _infoRow('From Area', _text('fromAreaName').isNotEmpty ? _text('fromAreaName') : _text('fromBranch')),
+                _infoRow('To Area', _text('toAreaName').isNotEmpty ? _text('toAreaName') : _text('toBranch')),
+                _infoRow('From Zone', _text('fromZoneName')),
+                _infoRow('To Zone', _text('toZoneName')),
                 _infoRow('Transfer date', _date()),
               ],
             ),
