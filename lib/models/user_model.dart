@@ -17,6 +17,7 @@ class UserModel {
   final String branch;
   final String areaName;
   final String zoneName;
+  final String destination;
   // SR / Sales performance
   final double totalSales;
   final double totalCommission;
@@ -48,6 +49,7 @@ class UserModel {
     this.branch = '',
     this.areaName = '',
     this.zoneName = '',
+    this.destination = '',
     this.totalSales = 0,
     this.totalCommission = 0,
     this.pendingCommission = 0,
@@ -163,6 +165,7 @@ class UserModel {
         'branch': branch,
         'areaName': areaName,
         'zoneName': zoneName,
+        'destination': destination,
         'totalSales': totalSales,
         'totalCommission': totalCommission,
         'pendingCommission': pendingCommission,
@@ -192,6 +195,7 @@ class UserModel {
         branch: m['branch'] ?? '',
         areaName: m['areaName'] ?? m['branch'] ?? '',
         zoneName: m['zoneName'] ?? '',
+        destination: m['destination'] ?? m['areaName'] ?? m['branch'] ?? '',
         totalSales: (m['totalSales'] as num?)?.toDouble() ?? 0,
         totalCommission: (m['totalCommission'] as num?)?.toDouble() ?? 0,
         pendingCommission: (m['pendingCommission'] as num?)?.toDouble() ?? 0,
@@ -217,6 +221,7 @@ class UserModel {
     String? branch,
     String? areaName,
     String? zoneName,
+    String? destination,
     double? totalSales,
     double? totalCommission,
     double? pendingCommission,
@@ -245,6 +250,7 @@ class UserModel {
         branch: branch ?? this.branch,
         areaName: areaName ?? this.areaName,
         zoneName: zoneName ?? this.zoneName,
+        destination: destination ?? this.destination,
         totalSales: totalSales ?? this.totalSales,
         totalCommission: totalCommission ?? this.totalCommission,
         pendingCommission: pendingCommission ?? this.pendingCommission,

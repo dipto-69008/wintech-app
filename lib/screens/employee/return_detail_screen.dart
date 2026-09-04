@@ -169,9 +169,13 @@ class ReturnDetailScreen extends StatelessWidget {
             icon: Icons.notes_rounded,
             child: Column(
               children: [
-                _infoRow('Return reason', _text('reason')),
+                _infoRow('Return reason', returnData['isExpired'] == true ? 'Expired' : _text('reason')),
+                _infoRow('Stock', returnData['isExpired'] == true
+                    ? 'Not added — expired'
+                    : (returnData['status'] == 'approved' ? 'Added to Zone stock' : 'Pending approval')),
                 _infoRow('Salesperson', _text('srName', _text('createdByName'))),
-                _infoRow('Branch', _text('branchName')),
+                _infoRow('Return area', _text('areaName', _text('branchName'))),
+                _infoRow('Stock Zone', _text('zoneName', 'Resolved from return area')),
                 _infoRow('Notes', _text('notes')),
               ],
             ),

@@ -359,7 +359,12 @@ class ApiService {
     });
   }
 
-  /// ERP transfer-ledger stock available for a product at a branch.
+  /// Delete a pending stock transfer. The ERP rejects received/rejected
+  /// transfers and refunds dispatched source stock before deleting.
+  static Future<Map<String, dynamic>> deleteStockTransfer(String id) =>
+      _delete('/api/mobile/stock-transfers/$id');
+
+  /// ERP Zone stock available for a product.
   static Future<Map<String, dynamic>> stockAvailability({
     required String branch,
     String? productId,
@@ -367,7 +372,7 @@ class ApiService {
   }) async {
     final body = await _get('/api/mobile/stock-transfers', {
       'availability': '1',
-      'area': branch,
+      'zone': branch,
       'branch': branch,
       if (productId != null && productId.isNotEmpty) 'productId': productId,
       if (productName != null && productName.isNotEmpty)
@@ -391,8 +396,8 @@ class ApiService {
       if (productId != null) 'productId': productId,
       'productName': productName,
       if (packSize != null) 'packSize': packSize,
-      'fromArea': fromBranch,
-      'toArea': toBranch,
+      'fromZone': fromBranch,
+      'toZone': toBranch,
       'fromBranch': fromBranch,
       'toBranch': toBranch,
       'quantity': quantity,
@@ -413,8 +418,8 @@ class ApiService {
     String notes = '',
   }) {
     return _post('/api/mobile/stock-transfers', {
-      'fromArea': fromBranch,
-      'toArea': toBranch,
+      'fromZone': fromBranch,
+      'toZone': toBranch,
       'fromBranch': fromBranch,
       'toBranch': toBranch,
       'items': items,
@@ -527,6 +532,7 @@ class ApiService {
     required List<Map<String, dynamic>> items,
     String invoiceNo = '',
     String reason = '',
+    bool isExpired = false,
     String notes = '',
     DateTime? returnDate,
   }) =>
@@ -534,7 +540,8 @@ class ApiService {
         'partyName': partyName,
         'items': items,
         if (invoiceNo.isNotEmpty) 'invoiceNo': invoiceNo,
-        'reason': reason,
+        'reason': isExpired ? 'Expired' : reason,
+        'isExpired': isExpired,
         'notes': notes,
         if (returnDate != null) 'returnDate': returnDate.toIso8601String(),
       });

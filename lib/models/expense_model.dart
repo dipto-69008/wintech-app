@@ -45,7 +45,7 @@ class ExpenseModel {
   // Supporting documents are optional here; a row may hold several vouchers.
   final List<Map<String, dynamic>> outStationRows;
 
-  // DA bill: [{date, amount, note, dayOfWeek, adminApproved}]
+  // DA bill: [{date, destination, amount, note, dayOfWeek, adminApproved}]
   final List<Map<String, dynamic>> daRows;
 
   // Entertainment bill rows:
@@ -220,14 +220,17 @@ class ExpenseModel {
           final octane = (r['octaneAmount'] as num?)?.toDouble() ?? 0;
           final mobil = (r['mobilAmount'] as num?)?.toDouble() ?? 0;
           final fuel = petrol + octane + mobil;
+          final amountIncludesFuel = r['amountIncludesFuel'] == true;
           return s +
-              ((r['amount'] as num?)?.toDouble() ?? 0) +
-              fuel +
-              // Older rows only have oilAmount; do not double-count it when
-              // a row already has one of the independent fuel amounts.
-              (fuel == 0
-                  ? ((r['oilAmount'] as num?)?.toDouble() ?? 0)
-                  : 0);
+              (amountIncludesFuel
+                  ? ((r['amount'] as num?)?.toDouble() ?? fuel)
+                  : ((r['amount'] as num?)?.toDouble() ?? 0) +
+                      fuel +
+                      // Older rows only have oilAmount; do not double-count
+                      // it when a row already has independent fuel amounts.
+                      (fuel == 0
+                          ? ((r['oilAmount'] as num?)?.toDouble() ?? 0)
+                          : 0));
         });
       case typeMotorcycle:
         return motoRows.fold(0.0, (s, r) => s +

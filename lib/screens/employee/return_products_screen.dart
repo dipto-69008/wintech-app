@@ -393,6 +393,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
   final _reasonCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
+  bool _isExpired = false;
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _parties = [];
   Map<String, dynamic>? _product;
@@ -510,7 +511,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
       _message('Please select a customer', error: true);
       return;
     }
-    if (_reasonCtrl.text.trim().isEmpty) {
+    if (!_isExpired && _reasonCtrl.text.trim().isEmpty) {
       _message('Please enter the return reason', error: true);
       return;
     }
@@ -542,7 +543,8 @@ class _NewReturnTabState extends State<_NewReturnTab> {
                     'rate': item['rate'],
                   })
               .toList(),
-          reason: _reasonCtrl.text.trim(),
+           reason: _reasonCtrl.text.trim(),
+           isExpired: _isExpired,
           returnDate: DateTime.now());
       if (!mounted) return;
       _message('Return invoice ${result['returnNo']} created in ERP');
@@ -550,6 +552,7 @@ class _NewReturnTabState extends State<_NewReturnTab> {
         _partyCtrl.clear();
         _invoiceCtrl.clear();
         _reasonCtrl.clear();
+        _isExpired = false;
         _qtyCtrl.clear();
         _rateCtrl.clear();
         _product = null;
@@ -589,12 +592,49 @@ class _NewReturnTabState extends State<_NewReturnTab> {
               prefixIcon: Icon(Icons.receipt_long_rounded)),
         ),
         const SizedBox(height: 12),
+         Container(
+           decoration: BoxDecoration(
+             color: _isExpired
+                 ? AppTheme.warning.withValues(alpha: .12)
+                 : Theme.of(context).cardColor,
+             borderRadius: BorderRadius.circular(12),
+             border: Border.all(
+               color: _isExpired
+                   ? AppTheme.warning
+                   : AppTheme.divider,
+             ),
+           ),
+           child: SwitchListTile(
+             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+             secondary: Icon(
+               Icons.event_busy_rounded,
+               color: _isExpired ? AppTheme.warning : AppTheme.textGrey,
+             ),
+             value: _isExpired,
+             onChanged: (value) => setState(() {
+               _isExpired = value;
+               if (value) _reasonCtrl.text = 'Expired';
+               else if (_reasonCtrl.text.trim().toLowerCase() == 'expired') {
+                 _reasonCtrl.clear();
+               }
+             }),
+             title: Text('Is Expired',
+                 style: GoogleFonts.hindSiliguri(
+                     fontWeight: FontWeight.w800)),
+             subtitle: Text(
+                 'Mark this as an expired return. Stock will not be added.',
+                 style: GoogleFonts.hindSiliguri(fontSize: 11)),
+             activeColor: AppTheme.warning,
+           ),
+         ),
+         const SizedBox(height: 12),
         TextField(
           controller: _reasonCtrl,
           maxLines: 2,
+          enabled: !_isExpired,
           style: GoogleFonts.hindSiliguri(),
           decoration: const InputDecoration(
-              labelText: 'Return Reason *',
+              labelText: 'Return Reason',
               prefixIcon: Icon(Icons.notes_rounded)),
         ),
         const SizedBox(height: 22),
