@@ -858,6 +858,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   String _applicantName = '';
   String _designation = '';
   String _zone = '';
+  String _destination = '';
   String _month = '';
 
   // Motorcycle registration number (entered once, then auto-filled)
@@ -915,13 +916,22 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _applicantName = widget.user?.name ?? e?.applicantName ?? '';
-    _designation   = widget.user?.designation ?? e?.designation ?? '';
+    final userMap = widget.user?.toMap();
+    final profileDestination =
+        (userMap?['destination'] ?? userMap?['areaName'] ?? '')
+            .toString()
+            .trim();
+    _applicantName = widget.user?.name ?? widget.existing?.applicantName ?? '';
+    _designation   = widget.user?.designation ?? widget.existing?.designation ?? '';
     _zone          = widget.user?.zoneName.isNotEmpty == true
         ? widget.user!.zoneName
-        : e?.zone ?? '';
-    _month         = e?.month ?? _currentMonth();
-    _motoRegCtrl   = TextEditingController(text: e?.motoRegNumber ?? '');
+        : widget.existing?.zone ?? '';
+    _destination   = profileDestination.isNotEmpty
+        ? profileDestination
+        : widget.existing?.areaName ?? '';
+    _month         = widget.existing?.month ?? _currentMonth();
+    _motoRegCtrl   =
+        TextEditingController(text: widget.existing?.motoRegNumber ?? '');
 
     _othersCtrl = {
       for (final key in _otherKeys) key: TextEditingController(),
@@ -1237,6 +1247,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     setState(() {
       _daRows.add({
         'date':   TextEditingController(text: init?['date'] ?? _today()),
+        'destination': TextEditingController(
+            text: (init?['destination'] ?? _destination).toString()),
         'amount': TextEditingController(
             text: (init?['amount'] ?? (autoAmount ?? '')).toString()),
         'note':   TextEditingController(text: init?['note'] ?? ''),
@@ -1509,7 +1521,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
             'to': r['to']!.text,
             'modeOfTransport': r['modeOfTransport']!.text,
             'description': r['description']!.text,
-            'amount': _dbl(r['amount']!),
+            'amount': isMotorcycle ? _taFuelAmount(r) : _dbl(r['amount']!),
+            'amountIncludesFuel': isMotorcycle,
             'prevReading': prev,
             'latestReading': latest,
             'totalKm': isMotorcycle ? _taDistance(r) : 0,
@@ -1609,6 +1622,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           final d = DateTime.tryParse(r['date']!.text);
           return {
             'date':   r['date']!.text,
+            'destination': r['destination']!.text.trim(),
             'amount': _dbl(r['amount']!),
             'note':   r['note']!.text.trim(),
             'dayOfWeek': d == null ? '' : DateFormat('EEEE').format(d),
@@ -1661,7 +1675,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       zone: _zone,
       areaName: widget.user?.areaName.isNotEmpty == true
           ? widget.user!.areaName
-          : e?.areaName ?? '',
+          : widget.existing?.areaName ?? '',
       createdAt: widget.existing?.createdAt ?? DateTime.now(),
       status: widget.existing?.status ?? ExpenseModel.statusPending,
       srId: widget.user?.id ?? '',
@@ -1856,6 +1870,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         final isMotorcycle =
             _isMotorcycleTransport(r['modeOfTransport']!.text);
         final totalKm = _taDistance(r);
+        final fuelAmount = _taFuelAmount(r);
         return _sectionCard(isDark, children: [
           Row(children: [
             Text('Row ${i + 1}',
@@ -1917,7 +1932,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     keyboardType: TextInputType.number)),
                 const SizedBox(width: 8),
                 Expanded(child: _field('Petrol Amount (৳)', r['petrolAmount']!,
-                    keyboardType: TextInputType.number)),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
               ]),
               const SizedBox(height: 8),
               Row(children: [
@@ -1925,7 +1941,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     keyboardType: TextInputType.number)),
                 const SizedBox(width: 8),
                 Expanded(child: _field('Octane Amount (৳)', r['octaneAmount']!,
-                    keyboardType: TextInputType.number)),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
               ]),
               const SizedBox(height: 8),
               Row(children: [
@@ -1933,7 +1950,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     keyboardType: TextInputType.number)),
                 const SizedBox(width: 8),
                 Expanded(child: _field('Mobil Amount (৳)', r['mobilAmount']!,
-                    keyboardType: TextInputType.number)),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}))),
               ]),
              const SizedBox(height: 8),
               _multiDocPicker(_taSupportingDocs[i],
@@ -1952,29 +1970,27 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           Row(children: [
             Expanded(flex: 2, child: _field('Description', r['description']!)),
             const SizedBox(width: 8),
-            Expanded(child: _field('Amount (৳)', r['amount']!,
-                keyboardType: TextInputType.number)),
+             Expanded(
+               child: isMotorcycle
+                   ? _calculatedField(
+                       'Amount (৳)',
+                       fuelAmount > 0 ? _fmt.format(fuelAmount) : '0',
+                     )
+                   : _field('Amount (৳)', r['amount']!,
+                       keyboardType: TextInputType.number,
+                       onChanged: (_) => setState(() {})),
+             ),
           ]),
         ]);
       }),
       _totalRow('Total TA',
           _taRows.fold(
               0.0,
-              (s, r) =>
-                  s +
-                  _dbl(r['amount']!) +
-                  (_isMotorcycleTransport(r['modeOfTransport']!.text)
-                      ? _dbl(r['petrolAmount']!) +
-                          _dbl(r['octaneAmount']!) +
-                          _dbl(r['mobilAmount']!) +
-                          // Fallback for an older row that has not been
-                          // converted to the independent fuel fields.
-                          ((_dbl(r['petrolAmount']!) == 0 &&
-                                  _dbl(r['octaneAmount']!) == 0 &&
-                                  _dbl(r['mobilAmount']!) == 0)
-                              ? _dbl(r['oilAmount']!)
-                              : 0)
-                      : 0))),
+               (s, r) =>
+                   s +
+                   (_isMotorcycleTransport(r['modeOfTransport']!.text)
+                       ? _taFuelAmount(r)
+                       : _dbl(r['amount']!)))),
       const SizedBox(height: 8),
       ..._buildServicingSection(isDark),
     ];
@@ -2652,6 +2668,12 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               ),
           ]),
           const SizedBox(height: 8),
+          _calculatedField(
+              'Destination',
+              r['destination']!.text.trim().isEmpty
+                  ? 'Assigned area'
+                  : r['destination']!.text.trim()),
+          const SizedBox(height: 8),
           Row(children: [
             Expanded(
                 child: _dateField('Date', r['date']!,
@@ -2987,6 +3009,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         _dbl(row['latestReading']!) - _dbl(row['prevReading']!);
     return distance > 0 ? distance : 0;
   }
+
+  double _taFuelAmount(Map<String, TextEditingController> row) =>
+      _dbl(row['petrolAmount']!) +
+      _dbl(row['octaneAmount']!) +
+      _dbl(row['mobilAmount']!);
 
   Widget _calculatedField(String label, String value) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
