@@ -5,7 +5,6 @@ import 'config/theme.dart';
 import 'services/local_storage_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/signup_screen.dart';
 import 'screens/auth/otp_screen.dart';
 import 'screens/onboarding/employee_type_screen.dart';
 import 'screens/notifications/notification_screen.dart';
@@ -125,8 +124,6 @@ class _WintechAgroAppState extends State<WintechAgroApp> {
             return _slide(const SplashScreen(), settings);
           case '/login':
             return _slide(const LoginScreen(), settings);
-          case '/signup':
-            return _slide(const SignupScreen(), settings);
           case '/otp':
             return _slide(const OtpScreen(), settings);
           case '/employee-type':
