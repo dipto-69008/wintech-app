@@ -264,20 +264,15 @@ class UserModel {
         investorType: investorType ?? this.investorType,
       );
 
-  /// Bangladesh — 64 districts (Romanized)
-  static const List<String> zelaList = [
-    'Dhaka', 'Gazipur', 'Narayanganj', 'Munshiganj', 'Manikganj',
-    'Narsingdi', 'Tangail', 'Kishoreganj', 'Faridpur', 'Gopalganj',
-    'Madaripur', 'Rajbari', 'Shariatpur', 'Mymensingh', 'Netrokona',
-    'Jamalpur', 'Sherpur', 'Chattogram', 'Cox\'s Bazar', 'Cumilla',
-    'Feni', 'Brahmanbaria', 'Rangamati', 'Noakhali', 'Chandpur',
-    'Lakshmipur', 'Khagrachhari', 'Bandarban', 'Rajshahi', 'Natore',
-    'Chapainawabganj', 'Pabna', 'Sirajganj', 'Bogura', 'Joypurhat',
-    'Naogaon', 'Khulna', 'Bagerhat', 'Satkhira', 'Jashore', 'Jhenaidah',
-    'Magura', 'Narail', 'Kushtia', 'Meherpur', 'Chuadanga',
-    'Barishal', 'Patuakhali', 'Bhola', 'Pirojpur', 'Jhalokathi',
-    'Barguna', 'Sylhet', 'Moulvibazar', 'Habiganj', 'Sunamganj',
-    'Rangpur', 'Dinajpur', 'Gaibandha', 'Kurigram', 'Lalmonirhat',
-    'Nilphamari', 'Thakurgaon', 'Panchagarh',
+  /// Wintech's canonical Zone list. Areas belong under these Zones.
+  static const List<String> zoneList = [
+    'Cumilla',
+    'Mymensingh',
+    'Dhaka',
+    'Feni',
+    'Jessore',
+    'Khulna',
+    'Bogura',
+    'Rajshahi',
   ];
 }

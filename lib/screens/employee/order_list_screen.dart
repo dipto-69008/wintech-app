@@ -131,6 +131,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
       probablePaymentDate:
           DateTime.tryParse(m['probablePaymentDate']?.toString() ?? ''),
       paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+      mobileCollectedAmount:
+          (m['mobileCollectedAmount'] as num?)?.toDouble() ?? 0,
       paymentType: m['paymentType']?.toString() ?? 'Cash',
       commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
     );
@@ -405,6 +407,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   '${order.date.day}/${order.date.month}/${order.date.year} · $itemLabel',
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
+               if (order.mobileCollectedAmount > 0)
+                 Text(
+                   'Collected: ৳ ${_fmt.format(order.mobileCollectedAmount)}',
+                   style: GoogleFonts.hindSiliguri(
+                       fontSize: 11,
+                       fontWeight: FontWeight.w700,
+                       color: AppTheme.success),
+                 ),
             ],
           ),
         ),

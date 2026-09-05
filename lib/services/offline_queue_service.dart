@@ -163,6 +163,23 @@ class OfflineQueueService {
     await _saveQueue(q);
   }
 
+  static Future<Set<String>> queuedPaymentCollectionIds() async {
+    final q = await getQueue();
+    return q
+        .where((item) => item.type == QueueItemType.paymentCollection)
+        .map((item) => item.payload['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
+  static Future<void> removeQueuedPaymentCollection(String id) async {
+    final q = await getQueue();
+    q.removeWhere((item) =>
+        item.type == QueueItemType.paymentCollection &&
+        item.payload['id']?.toString() == id);
+    await _saveQueue(q);
+  }
+
   /// Add an offline survey (farmer/dealer visit) to the queue.
   static Future<void> enqueueSurvey(Map<String, dynamic> payload) async {
     final q = await getQueue();

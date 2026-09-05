@@ -64,15 +64,21 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   Future<void> _load({bool silent = false}) async {
     if (!silent && mounted) setState(() => _loading = true);
     final user = await LocalStorageService.getCurrentUser();
+    List<OrderModel>? liveOrders;
 
     // Pull live dashboard stats from ERP when connected
     if (await ApiService.isConnected) {
       try {
         final dash = await ApiService.dashboard();
+        final erpOrders =
+            await ApiService.orders(mineOnly: !(user?.isAdmin ?? false));
         final today = dash['today'] as Map<String, dynamic>? ?? {};
         final thisMonth = dash['thisMonth'] as Map<String, dynamic>? ?? {};
         final targets = (dash['targets'] as List? ?? []);
+        liveOrders =
+            erpOrders.map((order) => _erpToOrderModel(order, user)).toList();
         if (mounted) {
+          _user = user;
           _erpConnected = true;
           _erpTodaySales = (today['salesAmount'] as num?)?.toDouble() ?? 0;
           _erpTodayOrders = (today['orders'] as num?)?.toInt() ?? 0;
@@ -100,16 +106,68 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       _erpConnected = false;
     }
 
-    // Always load local orders (for offline display + recent list)
-    final orders = await LocalStorageService.getOrders();
+    // Use the same live ERP order source as Order List. Only use local data
+    // when the ERP is unavailable, so ERP-deleted orders disappear here too.
+    final orders = liveOrders ?? await LocalStorageService.getOrders();
     if (!mounted) return;
     setState(() {
       _user = user;
-      _orders = orders
-          .where((o) => o.srId == (user?.id ?? ''))
-          .toList();
+      _orders = liveOrders ??
+          orders.where((o) => o.srId == (user?.id ?? '')).toList();
       _loading = false;
     });
+  }
+
+  /// Map a live ERP SaleMaster (+items) document to the dashboard model.
+  OrderModel _erpToOrderModel(
+      Map<String, dynamic> m, UserModel? currentUser) {
+    final items = (m['items'] as List? ?? [])
+        .map((d) {
+          final item = Map<String, dynamic>.from(d as Map);
+          final productName = item['productName']?.toString() ?? '';
+          final packSize = item['packSize']?.toString() ?? '';
+          final displayName = packSize.isNotEmpty &&
+                  !productName.toLowerCase().endsWith(packSize.toLowerCase())
+              ? '$productName $packSize'
+              : productName;
+          final rate = (item['rate'] as num?)?.toDouble() ?? 0;
+          return OrderItem(
+            productName: displayName,
+            quantity: (item['quantity'] as num?)?.toDouble() ?? 0,
+            unit: 'Pcs',
+            unitPrice: rate,
+            isBonus: item['isBonus'] == true ||
+                (rate == 0 &&
+                    productName.toLowerCase().contains('(bonus)')),
+          );
+        })
+        .toList();
+    final erpStatus = m['status']?.toString() ?? 'a';
+    final status = erpStatus == 'a'
+        ? OrderModel.statusConfirmed
+        : (erpStatus == 'cancelled'
+            ? OrderModel.statusCancelled
+            : erpStatus);
+    return OrderModel(
+      id: m['invoiceNo']?.toString() ?? m['_id']?.toString() ?? '',
+      srId: currentUser?.id ?? '',
+      srName: m['addBy']?.toString() ?? '',
+      customerId: m['partyId']?.toString() ?? '',
+      customerName: m['partyName']?.toString() ?? '',
+      items: items,
+      total: (m['totalAmount'] as num?)?.toDouble() ?? 0,
+      date: DateTime.tryParse(m['saleDate']?.toString() ?? '') ??
+          DateTime.now(),
+      status: status,
+      notes: m['description']?.toString() ?? '',
+      probablePaymentDate:
+          DateTime.tryParse(m['probablePaymentDate']?.toString() ?? ''),
+      paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+      mobileCollectedAmount:
+          (m['mobileCollectedAmount'] as num?)?.toDouble() ?? 0,
+      paymentType: m['paymentType']?.toString() ?? 'Cash',
+      commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
+    );
   }
 
   List<OrderModel> get _todayOrders {
@@ -698,6 +756,14 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
               Text(itemLabel,
                   style: GoogleFonts.hindSiliguri(
                       fontSize: 12, color: AppTheme.textGrey)),
+               if (order.mobileCollectedAmount > 0)
+                 Text(
+                   'Collected: ৳ ${_fmt.format(order.mobileCollectedAmount)}',
+                   style: GoogleFonts.hindSiliguri(
+                       fontSize: 11,
+                       fontWeight: FontWeight.w700,
+                       color: AppTheme.success),
+                 ),
             ],
           ),
         ),

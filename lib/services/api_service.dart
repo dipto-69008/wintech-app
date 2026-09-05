@@ -218,6 +218,10 @@ class ApiService {
     return List<Map<String, dynamic>>.from(body['data'] as List);
   }
 
+  /// Read-only party ledger, protected by the employee's ERP territory scope.
+  static Future<Map<String, dynamic>> partyLedger(String partyId) =>
+      _get('/api/mobile/party-ledger/${Uri.encodeComponent(partyId)}');
+
   static Future<List<Map<String, dynamic>>> orders(
       {String status = '', bool mineOnly = true}) async {
     final body = await _get('/api/mobile/orders', {
@@ -600,6 +604,11 @@ class ApiService {
   static Future<Map<String, dynamic>> createPaymentCollection(
           Map<String, dynamic> data) =>
       _post('/api/mobile/payment-collections', data);
+
+  /// Delete a payment collection from the ERP, including its accounting
+  /// mirror. The mobile endpoint checks ownership for non-admin users.
+  static Future<Map<String, dynamic>> deletePaymentCollection(String id) =>
+      _delete('/api/mobile/payment-collections/$id');
 
   /// Fetch all ERP branches (for dropdowns).
   static Future<List<Map<String, dynamic>>> branches() async {

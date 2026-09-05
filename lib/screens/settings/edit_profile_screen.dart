@@ -16,10 +16,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _companyCtrl = TextEditingController();
   final _designationCtrl = TextEditingController();
-  final _thanaCtrl = TextEditingController();
-  String _selectedZela = 'Dhaka';
+  String _selectedZone = 'Dhaka';
   bool _loading = true;
   bool _saving = false;
   UserModel? _user;
@@ -37,10 +35,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _user = user;
       _nameCtrl.text = user?.name ?? '';
       _phoneCtrl.text = user?.phone ?? '';
-      _companyCtrl.text = user?.company ?? '';
       _designationCtrl.text = user?.designation ?? '';
-      _thanaCtrl.text = user?.thana ?? '';
-      _selectedZela = (user?.zela.isNotEmpty == true) ? user!.zela : 'Dhaka';
+      final savedZone = user?.zoneName.isNotEmpty == true
+          ? user!.zoneName
+          : (user?.zela.isNotEmpty == true ? user!.zela : 'Dhaka');
+      _selectedZone =
+          UserModel.zoneList.contains(savedZone) ? savedZone : 'Dhaka';
       _loading = false;
     });
   }
@@ -52,10 +52,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final updated = _user!.copyWith(
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
-      company: _companyCtrl.text.trim(),
       designation: _designationCtrl.text.trim(),
-      zela: _selectedZela,
-      thana: _thanaCtrl.text.trim(),
+      zela: _selectedZone,
+      zoneName: _selectedZone,
     );
     await LocalStorageService.saveCurrentUser(updated);
     // Also sync legacy profile
@@ -66,7 +65,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       company: updated.company,
       designation: updated.designation,
       role: updated.role,
-      zela: updated.zela,
+      zela: updated.zoneName,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -83,9 +82,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _companyCtrl.dispose();
     _designationCtrl.dispose();
-    _thanaCtrl.dispose();
     super.dispose();
   }
 
@@ -174,13 +171,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     BanglaTextField(
-                      controller: _companyCtrl,
-                      label: 'Company',
-                      hint: 'Company name',
-                      prefixIcon: Icons.business_outlined,
-                    ),
-                    const SizedBox(height: 12),
-                    BanglaTextField(
                       controller: _designationCtrl,
                       label: 'Designation',
                       hint: 'Your designation',
@@ -188,10 +178,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    _sectionLabel('District'),
+                    _sectionLabel('Zone'),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: _selectedZela,
+                      value: _selectedZone,
                       isExpanded: true,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.location_city_rounded,
@@ -213,23 +203,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderSide: const BorderSide(
                                 color: AppTheme.primaryAccent, width: 2)),
                       ),
-                      items: UserModel.zelaList
+                      items: UserModel.zoneList
                           .map((z) => DropdownMenuItem(
                               value: z,
                               child: Text(z,
                                   style: GoogleFonts.hindSiliguri(fontSize: 14))))
                           .toList(),
-                      onChanged: (v) => setState(() => _selectedZela = v!),
-                    ),
-                    const SizedBox(height: 20),
-
-                    _sectionLabel('Thana / Area (Assigned Territory)'),
-                    const SizedBox(height: 12),
-                    BanglaTextField(
-                      controller: _thanaCtrl,
-                      label: 'Thana',
-                      hint: 'e.g. Dhanmondi, Mirpur',
-                      prefixIcon: Icons.pin_drop_rounded,
+                      onChanged: (v) => setState(() => _selectedZone = v!),
                     ),
                     const SizedBox(height: 32),
 

@@ -375,43 +375,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                          fontWeight: FontWeight.w600),
                                    ),
                                  ],
-                                const SizedBox(height: 18),
-                                // Edit button
-                                GestureDetector(
-                                  onTap: () async {
-                                    await Navigator.pushNamed(
-                                        context, '/edit-profile');
-                                    _load();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 24, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color: Colors.black
-                                                .withValues(alpha: 0.12),
-                                            blurRadius: 8)
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.edit_rounded,
-                                            color: AppTheme.primaryAccent,
-                                            size: 15),
-                                        const SizedBox(width: 8),
-                                        Text('Edit Profile',
-                                            style: GoogleFonts.hindSiliguri(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppTheme.primaryAccent)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ],
@@ -457,12 +420,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _infoTile(Icons.phone_outlined, 'Mobile',
                                   _user?.phone.isEmpty == false
                                       ? _user!.phone
-                                      : '—',
-                                  isDark),
-                              _divider(),
-                              _infoTile(Icons.business_outlined, 'Company',
-                                  _user?.company.isEmpty == false
-                                      ? _user!.company
                                       : '—',
                                   isDark),
                               _divider(),

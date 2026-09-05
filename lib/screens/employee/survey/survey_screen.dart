@@ -802,6 +802,7 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   String _dealerZone = '';
   String _dealerPartyId = '';
   List<Map<String, dynamic>> _erpParties = [];
+  bool _partySourceChecked = false;
    bool _branchLoading = true;
 
   /// Full Wintech product list from the official catalog (dropdown source)
@@ -816,8 +817,16 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
 
   /// Parties of the selected Area (ERP list merged with local catalog)
   List<String> get _zoneParties {
-     if (_dealerArea.trim().isEmpty) return [];
+     if (_dealerArea.trim().isEmpty && _dealerZone.trim().isEmpty) return [];
     final names = <String>{};
+     if (_partySourceChecked) {
+       for (final p in _erpParties) {
+         names.add((p['name'] ?? '').toString());
+       }
+       names.remove('');
+       final list = names.toList()..sort();
+       return list;
+     }
       // The ERP party endpoint is already Area-scoped for a non-admin
       // employee. Keep the comparison Area-first; the Zone is shown separately.
     for (final p in _erpParties) {
@@ -825,11 +834,14 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
     }
      if (_erpParties.isEmpty) {
         final area = _dealerArea.toLowerCase();
+        final zone = _dealerZone.toLowerCase();
        for (final p in WintechCatalog.parties) {
           final partyArea = (p['area'] ?? p['branchName'] ?? p['zone'] ?? '')
               .toString()
               .toLowerCase();
-          if (partyArea == area ||
+           final matchesZone = zone.isNotEmpty && partyArea.contains(zone);
+           if (matchesZone ||
+               partyArea == area ||
               partyArea.contains(area) ||
               area.contains(partyArea)) {
            names.add(p['name'] as String);
@@ -925,9 +937,14 @@ class _SurveyFormDialogState extends State<_SurveyFormDialog> {
   /// Fetch live parties from the ERP for Area-wise dealer dropdown.
   Future<void> _loadParties() async {
     try {
-      if (await ApiService.isConnected) {
+       if (await ApiService.isConnected) {
         final data = await ApiService.parties(allBranches: true);
-        if (mounted) setState(() => _erpParties = data);
+         if (mounted) {
+           setState(() {
+             _erpParties = data;
+             _partySourceChecked = true;
+           });
+         }
       }
     } catch (_) {
       // Offline — the local catalog list still works.

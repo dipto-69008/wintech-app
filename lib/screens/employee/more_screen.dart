@@ -9,6 +9,7 @@ import 'payment_collection_screen.dart';
 import 'return_products_screen.dart';
 import 'leave_screen.dart';
 import 'survey/survey_screen.dart';
+import 'party_ledger_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -75,6 +76,13 @@ class _MoreScreenState extends State<MoreScreen> {
       color: Color(0xFF1565C0),
       tag: 'survey',
     ),
+    _ModuleDef(
+      title: 'Party Ledger',
+      subtitle: 'View parties and account history in your territory',
+      icon: Icons.account_balance_wallet_rounded,
+      color: Color(0xFF0F766E),
+      tag: 'party-ledger',
+    ),
   ];
 
   void _navigate(String tag) {
@@ -97,6 +105,9 @@ class _MoreScreenState extends State<MoreScreen> {
         break;
       case 'survey':
         screen = const SurveyScreen();
+        break;
+      case 'party-ledger':
+        screen = const PartyLedgerScreen();
         break;
       default:
         return;

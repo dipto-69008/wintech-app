@@ -51,6 +51,7 @@ class OrderModel {
   final String notes;
   final DateTime? probablePaymentDate; // expected payment date (like ERP)
   final double paidAmount;
+  final double mobileCollectedAmount;
   final String paymentType;
   final double commissionPct; // 3% cash commission when fully paid on delivery date
 
@@ -67,6 +68,7 @@ class OrderModel {
     this.notes = '',
     this.probablePaymentDate,
     this.paidAmount = 0,
+    this.mobileCollectedAmount = 0,
     this.paymentType = 'Cash',
     this.commissionPct = 0,
   });
@@ -108,6 +110,7 @@ class OrderModel {
         'notes': notes,
         'probablePaymentDate': probablePaymentDate?.toIso8601String(),
         'paidAmount': paidAmount,
+        'mobileCollectedAmount': mobileCollectedAmount,
         'paymentType': paymentType,
         'commissionPct': commissionPct,
       };
@@ -128,6 +131,8 @@ class OrderModel {
         probablePaymentDate:
             DateTime.tryParse(m['probablePaymentDate'] ?? ''),
         paidAmount: (m['paidAmount'] as num?)?.toDouble() ?? 0,
+        mobileCollectedAmount:
+            (m['mobileCollectedAmount'] as num?)?.toDouble() ?? 0,
         paymentType: m['paymentType'] ?? 'Cash',
         commissionPct: (m['commissionPct'] as num?)?.toDouble() ?? 0,
       );
@@ -145,6 +150,7 @@ class OrderModel {
         notes: notes ?? this.notes,
         probablePaymentDate: probablePaymentDate,
         paidAmount: paidAmount,
+        mobileCollectedAmount: mobileCollectedAmount,
         paymentType: paymentType,
         commissionPct: commissionPct,
       );

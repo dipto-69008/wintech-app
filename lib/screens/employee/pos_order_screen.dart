@@ -101,20 +101,21 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
       if (!mounted) return;
       setState(() {
         _erpConnected = true;
-        if (results[0].isNotEmpty) {
-          _parties = results[0]
-              .map((p) => <String, dynamic>{
-                    'id': p['_id']?.toString() ?? '',
-                    'name': p['name']?.toString() ?? '',
-                    'area': p['area']?.toString() ??
-                        p['areaName']?.toString() ??
-                        p['branchName']?.toString() ?? '',
-                    'zone': p['zone']?.toString() ?? '',
-                    'previousDue':
-                        (p['previousDue'] as num?)?.toDouble() ?? 0,
-                  })
-              .toList();
-        }
+        // When ERP is reachable, never retain the offline catalog. An empty
+        // scoped response must stay empty instead of showing stale parties
+        // from the employee's previous Zone.
+        _parties = results[0]
+            .map((p) => <String, dynamic>{
+                  'id': p['_id']?.toString() ?? '',
+                  'name': p['name']?.toString() ?? '',
+                  'area': p['area']?.toString() ??
+                      p['areaName']?.toString() ??
+                      p['branchName']?.toString() ?? '',
+                  'zone': p['zone']?.toString() ?? '',
+                  'previousDue':
+                      (p['previousDue'] as num?)?.toDouble() ?? 0,
+                })
+            .toList();
         if (results[1].isNotEmpty) {
           _products = results[1]
               .map((p) => <String, dynamic>{
@@ -129,7 +130,13 @@ class _PosOrderScreenState extends State<PosOrderScreen> {
         }
       });
     } catch (_) {
-      // ERP unreachable — keep Wintech offline catalog
+      // Do not show unscoped demo parties after a live ERP attempt fails.
+      if (mounted) {
+        setState(() {
+          _erpConnected = false;
+          _parties = [];
+        });
+      }
     }
   }
 

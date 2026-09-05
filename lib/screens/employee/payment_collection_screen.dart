@@ -61,10 +61,21 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
           map['id'] ??= map['_id']?.toString();
           return PaymentCollectionModel.fromMap(map);
         }).toList();
-        final remoteIds = remote.map((p) => p.id).toSet();
+        final remoteIds = <String>{
+          ...remote.map((p) => p.id),
+          ...data
+              .map((m) => m['sourcePaymentId']?.toString() ?? '')
+              .where((id) => id.isNotEmpty),
+        };
+        // Local records are only retained while they are still queued for
+        // ERP submission. This prevents an old local copy from reappearing
+        // after the matching collection was deleted in the ERP.
+        final queuedIds =
+            await OfflineQueueService.queuedPaymentCollectionIds();
         all = [
           ...remote,
-          ...local.where((p) => !remoteIds.contains(p.id)),
+          ...local.where((p) =>
+              queuedIds.contains(p.id) && !remoteIds.contains(p.id)),
         ];
         erp = true;
       } catch (_) {
@@ -184,10 +195,29 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
       ),
     );
     if (ok == true) {
+      if (_erpConnected && _isRemoteCollectionId(p.id)) {
+        try {
+          await ApiService.deletePaymentCollection(p.id);
+        } on ApiException catch (e) {
+          if (mounted) {
+            _snack(e.message);
+          }
+          return;
+        } catch (_) {
+          if (mounted) {
+            _snack('Could not delete this collection from ERP');
+          }
+          return;
+        }
+      }
+      await OfflineQueueService.removeQueuedPaymentCollection(p.id);
       await LocalStorageService.deletePaymentCollection(p.id);
-      _load();
+      await _load();
     }
   }
+
+  bool _isRemoteCollectionId(String id) =>
+      RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(id.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -725,8 +755,11 @@ class _CollectionDialogState extends State<_CollectionDialog> {
 
   double get _invoiceGross =>
       _number(_invoiceOrder?['totalAmount'] ?? _invoiceOrder?['subTotal']);
-  double get _invoiceDue => _number(_invoiceOrder?['dueAmount']);
+  double get _invoiceDue =>
+      _number(_invoiceOrder?['mobileRemainingDue'] ?? _invoiceOrder?['dueAmount']);
   double get _invoicePaid => _number(_invoiceOrder?['paidAmount']);
+  double get _mobileCollected =>
+      _number(_invoiceOrder?['mobileCollectedAmount']);
   DateTime? get _invoiceProbableDate =>
       DateTime.tryParse(_invoiceOrder?['probablePaymentDate']?.toString() ?? '');
   double get _invoiceCommission =>
@@ -784,7 +817,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
       }
       final partyId = order['partyId']?.toString() ?? '';
       final partyName = order['partyName']?.toString() ?? '';
-      final due = _number(order['dueAmount']);
+      final due = _number(order['mobileRemainingDue'] ?? order['dueAmount']);
       setState(() {
         _invoiceLoading = false;
         _invoiceOrder = order;
@@ -1046,6 +1079,14 @@ class _CollectionDialogState extends State<_CollectionDialog> {
                          style: GoogleFonts.hindSiliguri(fontSize: 12)),
                      Text('Paid: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_invoicePaid)}',
                          style: GoogleFonts.hindSiliguri(fontSize: 12)),
+                      if (_mobileCollected > 0)
+                        Text(
+                          'App collections: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_mobileCollected)}',
+                          style: GoogleFonts.hindSiliguri(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.success),
+                        ),
                      Text('Due: ৳ ${NumberFormat('#,##0.00', 'en_US').format(_invoiceDue)}',
                          style: GoogleFonts.hindSiliguri(
                              fontSize: 12, fontWeight: FontWeight.w800,
